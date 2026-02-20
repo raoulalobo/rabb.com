@@ -1,0 +1,253 @@
+/**
+ * @file prisma/schema.prisma
+ * @description Schéma Prisma pour rabb.com.
+ *   Modèles : User, Session, Account, Verification (gérés par better-auth)
+ *   + ConnectedPlatform, Post, NotificationPrefs (métier rabb)
+ *
+ *   Prisma 7 : les URLs de connexion sont définies dans prisma.config.ts (migrations)
+ *   et dans lib/prisma.ts via @prisma/adapter-pg (runtime).
+ *
+ *   Voir prisma.config.ts pour la configuration des migrations.
+ */
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Prisma 7 : provider seul suffit ici — l'URL est passée via prisma.config.ts (CLI)
+  // et via l'adapter PrismaPg({ connectionString }) dans PrismaClient (runtime).
+  provider = "postgresql"
+}
+
+// ─── Modèles better-auth (ne pas renommer les champs — requis par l'adaptateur) ──
+
+/**
+ * Utilisateur de l'application.
+ * Géré principalement par better-auth (signUp, signIn, etc.).
+ * Les champs métier sont ajoutés ici (ex: avatarUrl).
+ */
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  avatarUrl       String?
+  emailVerified   Boolean   @default(false)
+  image           String?   // Champ requis par better-auth OAuth (photo de profil Google)
+  // ID du workspace Late (profil conteneur qui regroupe les comptes sociaux connectés).
+  // Créé automatiquement lors du premier clic "Connecter" sur /settings.
+  lateWorkspaceId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  sessions   Session[]
+  accounts   Account[]
+  posts      Post[]
+  platforms  ConnectedPlatform[]
+  notifPrefs NotificationPrefs?
+
+  @@map("users")
+}
+
+/**
+ * Session utilisateur.
+ * Créée par better-auth lors du login, supprimée lors du logout.
+ */
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+/**
+ * Compte OAuth lié à un utilisateur.
+ * Ex: compte Google, futur compte GitHub, etc.
+ * Un utilisateur peut avoir plusieurs comptes OAuth.
+ */
+model Account {
+  id                   String    @id @default(cuid())
+  userId               String
+  // better-auth v1 : `accountId` (ID chez le provider) + `providerId` (nom du provider)
+  accountId            String    // Ex: ID Google de l'utilisateur, ou userId pour "credential"
+  providerId           String    // "google", "credential", etc.
+  accessToken          String?
+  refreshToken         String?
+  idToken              String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                String?
+  password             String?   // Hash du mot de passe (providerId "credential")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("accounts")
+}
+
+/**
+ * Tokens de vérification (email, reset password, etc.).
+ * Créés par better-auth, supprimés après utilisation.
+ */
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String   // email ou userId
+  value      String   // Token haché
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verifications")
+}
+
+// ─── Modèles métier rabb ──────────────────────────────────────────────────────
+
+/**
+ * Réseau social connecté par l'utilisateur via getlate.dev.
+ * Un utilisateur peut connecter plusieurs plateformes.
+ * Chaque plateforme a un profil distinct dans getlate.dev.
+ */
+model ConnectedPlatform {
+  id            String   @id @default(cuid())
+  userId        String
+  platform      String   // "instagram" | "tiktok" | "youtube" | "facebook"
+  lateProfileId String   // ID du profil dans l'API getlate.dev
+  accountName   String   // Nom affiché ex: "@mon_handle"
+  avatarUrl     String?  // Photo de profil de la plateforme
+  isActive      Boolean  @default(true)
+  connectedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  // Un utilisateur ne peut avoir qu'un profil getlate.dev par plateforme
+  @@unique([userId, platform, lateProfileId])
+  @@index([userId])
+  @@map("connected_platforms")
+}
+
+/**
+ * Post de contenu (texte + médias) destiné à être publié sur une ou plusieurs plateformes.
+ * Cycle de vie : DRAFT → SCHEDULED → PUBLISHED (ou FAILED)
+ */
+model Post {
+  id            String     @id @default(cuid())
+  userId        String
+  text          String     // Contenu textuel (max 2200 chars côté Zod)
+  mediaUrls     String[]   @default([])   // URLs Supabase Storage
+  platforms     String[]   // Ex: ["instagram", "tiktok"]
+  status        PostStatus @default(DRAFT)
+  scheduledFor  DateTime?  // Null si brouillon, défini si planifié
+  publishedAt   DateTime?  // Rempli par Inngest après publication réussie
+  latePostId    String?    // ID retourné par getlate.dev après publication
+  failureReason String?    // Message d'erreur si status = FAILED
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectedPlatform   ConnectedPlatform? @relation(fields: [connectedPlatformId], references: [id])
+  connectedPlatformId String?
+
+  // Contenus spécifiques par plateforme (overrides du contenu de base)
+  platformContents PostPlatformContent[]
+
+  // Index composés pour les requêtes fréquentes (liste par user+status, planning par date)
+  @@index([userId, status])
+  @@index([scheduledFor])
+  @@map("posts")
+}
+
+/**
+ * Contenu spécifique à une plateforme pour un post donné.
+ * Permet de personnaliser le texte et les médias par canal social.
+ *
+ * Logique d'override (opt-in) :
+ * - Si un enregistrement existe pour (postId, platform) → utiliser ce contenu
+ * - Sinon → utiliser le contenu de base du Post parent (text + mediaUrls)
+ *
+ * Cycle de vie :
+ * - Créé par save-post.action.ts lors de la sauvegarde si l'utilisateur a personnalisé
+ * - Mis à jour par publish-scheduled-post.ts lors de la publication (status, latePostId)
+ */
+model PostPlatformContent {
+  id            String             @id @default(cuid())
+  postId        String
+  /** Nom de la plateforme : "instagram" | "tiktok" | "youtube" | etc. */
+  platform      String
+  /** Texte spécifique à cette plateforme (override du Post.text) */
+  text          String
+  /** URLs de médias spécifiques (override du Post.mediaUrls) */
+  mediaUrls     String[]           @default([])
+  /** Statut de la publication sur cette plateforme */
+  status        PostPlatformStatus @default(PENDING)
+  /** ID du post getlate.dev retourné après publication sur cette plateforme */
+  latePostId    String?
+  /** Raison d'échec si status = FAILED */
+  failureReason String?
+  /** Date de publication effective sur cette plateforme */
+  publishedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Un seul enregistrement par (post, plateforme)
+  @@unique([postId, platform])
+  @@index([postId])
+  @@map("post_platform_contents")
+}
+
+/**
+ * Statuts possibles d'un post.
+ * DRAFT     : brouillon non planifié
+ * SCHEDULED : planifié, en attente de publication par Inngest
+ * PUBLISHED : publié avec succès via getlate.dev
+ * FAILED    : échec de publication (voir failureReason)
+ */
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+/**
+ * Statuts de publication d'un PostPlatformContent.
+ * Indique l'état de la publication sur une plateforme individuelle.
+ * PENDING   : en attente de publication
+ * PUBLISHED : publié avec succès sur cette plateforme
+ * FAILED    : échec de publication sur cette plateforme (voir failureReason)
+ */
+enum PostPlatformStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+/**
+ * Préférences de notifications de l'utilisateur.
+ * Relation 1-1 avec User, créée lors de l'inscription.
+ */
+model NotificationPrefs {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  emailOnFailure   Boolean @default(true)  // Email si publication échoue
+  emailWeeklyRecap Boolean @default(true)  // Récapitulatif hebdomadaire
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_prefs")
+}

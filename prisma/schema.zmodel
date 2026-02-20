@@ -1,0 +1,183 @@
+/**
+ * @file prisma/schema.zmodel
+ * @description Extension ZenStack du schéma Prisma.
+ *   Définit les règles d'accès (access control) par modèle.
+ *   Règle MVP : chaque utilisateur ne peut accéder qu'à ses propres données.
+ *
+ *   Générer le code ZenStack : pnpm zenstack generate
+ *
+ * @see https://zenstack.dev/docs/reference/zmodel-language
+ */
+
+// Import du schéma Prisma de base
+plugin prisma {
+  provider = "@core/prisma"
+  output   = "./schema.prisma"
+}
+
+plugin hooks {
+  provider = "@zenstackhq/tanstack-query"
+  output   = "lib/hooks"
+  target   = "react"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Modèles better-auth (accès géré par better-auth, pas ZenStack) ──────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  image         String?
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions   Session[]
+  accounts   Account[]
+  posts      Post[]
+  platforms  ConnectedPlatform[]
+  notifPrefs NotificationPrefs?
+
+  // Tout utilisateur connecté peut lire/modifier son propre profil
+  @@allow('read,update', auth() == this)
+  @@deny('all', auth() == null)
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@allow('all', auth() != null && auth().id == userId)
+  @@deny('all', auth() == null)
+  @@map("sessions")
+}
+
+model Account {
+  id                   String    @id @default(cuid())
+  userId               String
+  provider             String
+  providerAccountId    String
+  accessToken          String?
+  refreshToken         String?
+  idToken              String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                String?
+  password             String?   @omit  // Champ omis dans les réponses API
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@allow('all', auth() != null && auth().id == userId)
+  @@deny('all', auth() == null)
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Vérifications gérées exclusivement par better-auth — pas d'accès direct
+  @@deny('all', true)
+  @@map("verifications")
+}
+
+// ─── Modèles métier rabb ──────────────────────────────────────────────────────
+
+model ConnectedPlatform {
+  id            String   @id @default(cuid())
+  userId        String
+  platform      String
+  lateProfileId String
+  accountName   String
+  avatarUrl     String?
+  isActive      Boolean  @default(true)
+  connectedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  @@unique([userId, platform, lateProfileId])
+  @@index([userId])
+
+  // Un utilisateur ne peut voir et modifier que ses propres plateformes connectées
+  @@allow('all', auth() != null && auth().id == userId)
+  @@deny('all', auth() == null)
+  @@map("connected_platforms")
+}
+
+model Post {
+  id                  String     @id @default(cuid())
+  userId              String
+  text                String
+  mediaUrls           String[]   @default([])
+  platforms           String[]
+  status              PostStatus @default(DRAFT)
+  scheduledFor        DateTime?
+  publishedAt         DateTime?
+  latePostId          String?
+  failureReason       String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectedPlatform   ConnectedPlatform? @relation(fields: [connectedPlatformId], references: [id])
+  connectedPlatformId String?
+
+  @@index([userId, status])
+  @@index([scheduledFor])
+
+  // Un utilisateur ne peut voir et modifier que ses propres posts
+  @@allow('all', auth() != null && auth().id == userId)
+  @@deny('all', auth() == null)
+  @@map("posts")
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+model NotificationPrefs {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  emailOnFailure   Boolean @default(true)
+  emailWeeklyRecap Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Un utilisateur ne peut voir et modifier que ses propres préférences
+  @@allow('all', auth() != null && auth().id == userId)
+  @@deny('all', auth() == null)
+  @@map("notification_prefs")
+}
