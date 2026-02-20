@@ -15,9 +15,10 @@
  *   - Types MIME autorisés : images et vidéos uniquement
  */
 
+import { resolve } from 'node:path'
+
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
-import { resolve } from 'node:path'
 
 // Charger les variables d'environnement depuis .env.local
 config({ path: resolve(process.cwd(), '.env.local') })

@@ -26,8 +26,8 @@
 import { AlertTriangle, Pencil, RotateCcw } from 'lucide-react'
 import { Fragment } from 'react'
 
-import { getPlatformViolations } from '@/modules/platforms/config/platform-rules'
 import { PlatformIcon } from '@/modules/platforms/components/PlatformIcon'
+import { getPlatformViolations } from '@/modules/platforms/config/platform-rules'
 import type { Platform } from '@/modules/platforms/types'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 
@@ -70,8 +70,6 @@ export function PlatformTabs(): React.JSX.Element {
     activePlatformTab,
     setActivePlatformTab,
     platforms,
-    activeText,
-    activeMediaUrls,
     isPlatformCustomized,
     customizePlatform,
     resetPlatform,
@@ -138,7 +136,6 @@ export function PlatformTabs(): React.JSX.Element {
             {/* Menu contextuel d'override (visible uniquement sur l'onglet actif) */}
             {isActive && (
               <PlatformTabActions
-                platform={platform}
                 isCustomized={isCustomized}
                 onCustomize={() => customizePlatform(platform)}
                 onReset={() => resetPlatform(platform)}
@@ -247,12 +244,10 @@ function PlatformTabButton({
  * @param onReset - Callback pour supprimer l'override
  */
 function PlatformTabActions({
-  platform: _platform,
   isCustomized,
   onCustomize,
   onReset,
 }: {
-  platform: Platform
   isCustomized: boolean
   onCustomize: () => void
   onReset: () => void

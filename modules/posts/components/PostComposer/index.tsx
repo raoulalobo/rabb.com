@@ -44,6 +44,8 @@
 import { useCallback, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
+import { getPlatformViolations } from '@/modules/platforms/config/platform-rules'
+import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import type { Platform } from '@/modules/platforms/types'
 import { savePost } from '@/modules/posts/actions/save-post.action'
 import { schedulePost } from '@/modules/posts/actions/schedule-post.action'
@@ -54,8 +56,8 @@ import { PostComposerContext } from './context'
 import { Editor } from './Editor'
 import { Footer } from './Footer'
 import { MediaUpload } from './MediaUpload'
-import { PlatformTabs } from './PlatformTabs'
 import { Platforms } from './Platforms'
+import { PlatformTabs } from './PlatformTabs'
 import { PostComposerSkeleton } from './PostComposerSkeleton'
 import { Schedule } from './Schedule'
 
@@ -320,12 +322,60 @@ function PostComposerRoot({ children, className }: PostComposerProps): React.JSX
         if (platform === null || platform === undefined) {
           // Onglet "Tous" : ajouter à la liste de base
           addMediaUrl(publicUrl)
+
+          // Vérifier si cet ajout crée des violations mixed_not_allowed
+          // sur les plateformes sélectionnées (le store n'est pas encore mis à jour —
+          // on simule le tableau final en ajoutant publicUrl manuellement)
+          const nextMediaUrls = [...mediaUrls, publicUrl]
+          for (const selectedPlatform of platforms) {
+            const violations = getPlatformViolations(selectedPlatform, text, nextMediaUrls)
+            const mixedViolation = violations.find((v) => v.type === 'mixed_not_allowed')
+            if (mixedViolation) {
+              const label = PLATFORM_CONFIG[selectedPlatform as keyof typeof PLATFORM_CONFIG]?.label ?? selectedPlatform
+              const isNewVideo = /\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(publicUrl)
+              const mediaType = isNewVideo ? 'vidéo' : 'photo'
+              toast.warning(
+                `La ${mediaType} a été ajoutée, mais attention : ${label} ne permet pas de mixer vidéo et photos dans un même post. Il faudra choisir l'un ou l'autre à la publication.`,
+                { duration: 8000 },
+              )
+            }
+          }
         } else if (platformOverrides[platform]) {
           // Onglet plateforme avec override : ajouter à l'override
           addPlatformOverrideMediaUrl(platform, publicUrl)
+
+          // Vérifier les violations sur cet override (même logique, simulation avant mise à jour du store)
+          const currentMediaUrls = platformOverrides[platform]!.mediaUrls
+          const nextMediaUrls = [...currentMediaUrls, publicUrl]
+          const platformText = platformOverrides[platform]!.text
+          const violations = getPlatformViolations(platform, platformText, nextMediaUrls)
+          const mixedViolation = violations.find((v) => v.type === 'mixed_not_allowed')
+          if (mixedViolation) {
+            const label = PLATFORM_CONFIG[platform as keyof typeof PLATFORM_CONFIG]?.label ?? platform
+            const isNewVideo = /\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(publicUrl)
+            const mediaType = isNewVideo ? 'vidéo' : 'photo'
+            toast.warning(
+              `La ${mediaType} a été ajoutée au post ${label}, mais attention : ${label} ne permet pas de mixer vidéo et photos dans un même post. Il faudra choisir entre publier en format vidéo OU en format carrousel photo au moment de la mise en ligne.`,
+              { duration: 8000 },
+            )
+          }
         } else {
           // Onglet plateforme sans override : ajouter à la base
           addMediaUrl(publicUrl)
+
+          // Vérifier les violations sur la base pour cette plateforme
+          const nextMediaUrls = [...mediaUrls, publicUrl]
+          const violations = getPlatformViolations(platform, text, nextMediaUrls)
+          const mixedViolation = violations.find((v) => v.type === 'mixed_not_allowed')
+          if (mixedViolation) {
+            const label = PLATFORM_CONFIG[platform as keyof typeof PLATFORM_CONFIG]?.label ?? platform
+            const isNewVideo = /\.(mp4|mov|avi|webm|mkv|m4v)$/i.test(publicUrl)
+            const mediaType = isNewVideo ? 'vidéo' : 'photo'
+            toast.warning(
+              `La ${mediaType} a été ajoutée au post ${label}, mais attention : ${label} ne permet pas de mixer vidéo et photos dans un même post. Il faudra choisir entre publier en format vidéo OU en format carrousel photo au moment de la mise en ligne.`,
+              { duration: 8000 },
+            )
+          }
         }
 
         // Retirer le fichier de la liste des uploads en cours
@@ -346,7 +396,7 @@ function PostComposerRoot({ children, className }: PostComposerProps): React.JSX
         }, 3000)
       }
     },
-    [activePlatformTab, platformOverrides, addMediaUrl, addPlatformOverrideMediaUrl],
+    [activePlatformTab, platformOverrides, addMediaUrl, addPlatformOverrideMediaUrl, text, mediaUrls, platforms],
   )
 
   /**

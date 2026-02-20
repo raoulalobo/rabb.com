@@ -6,11 +6,11 @@
  *
  *   Reproduit fidèlement la mise en page de compose/page.tsx :
  *   - En-tête avec titre + description
- *   - Card du PostComposer avec skeleton interne
+ *   - Card de l'AgentComposer avec skeleton interne
  */
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { PostComposerSkeleton } from '@/modules/posts/components/PostComposer/PostComposerSkeleton'
+import { AgentComposerSkeleton } from '@/modules/posts/components/AgentComposer/AgentComposerSkeleton'
 
 /**
  * Skeleton de la page /compose.
@@ -25,8 +25,8 @@ export default function ComposeLoading(): React.JSX.Element {
         <Skeleton className="h-4 w-80" />
       </div>
 
-      {/* Skeleton du PostComposer */}
-      <PostComposerSkeleton />
+      {/* Skeleton de l'AgentComposer */}
+      <AgentComposerSkeleton />
     </div>
   )
 }

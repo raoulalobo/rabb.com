@@ -1,39 +1,40 @@
 /**
  * @file app/(dashboard)/compose/page.tsx
- * @description Page de composition d'un post.
- *   Affiche le PostComposer avec tous ses sous-composants assemblés.
- *   Protégée par le layout dashboard (authentification requise).
+ * @description Page de composition d'un post via l'AgentComposer IA.
+ *   L'utilisateur donne une instruction en texte ou en voix, uploade des médias,
+ *   et l'agent Claude génère un plan de publication adapté à chaque plateforme.
  *
  *   Architecture :
  *   - Ce fichier est un Server Component (pas de 'use client')
- *   - PostComposerCard est un Client Component (fichier séparé)
+ *   - AgentComposerCard est un Client Component (fichier séparé)
  *   - Suspense affiche le skeleton pendant le rendu du client component
  *
  * @example
  *   // Route : GET /compose
- *   // Rendu côté serveur, PostComposerCard rendu côté client
+ *   // Rendu côté serveur, AgentComposerCard rendu côté client
  */
 
 import { Suspense } from 'react'
 
+
+import { AgentComposerSkeleton } from '@/modules/posts/components/AgentComposer/AgentComposerSkeleton'
+
+import { AgentComposerCard } from './AgentComposerCard'
+
 import type { Metadata } from 'next'
-
-import { PostComposerSkeleton } from '@/modules/posts/components/PostComposer/PostComposerSkeleton'
-
-import { PostComposerCard } from './PostComposerCard'
 
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
   title: 'Composer un post — rabb',
-  description: 'Rédigez et planifiez votre contenu sur tous vos réseaux en un seul endroit.',
+  description: 'Donnez vos instructions à l\'agent IA qui planifie votre contenu sur chaque réseau.',
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /**
- * Page /compose : interface de création et planification de posts.
- * Wrapping de PostComposerCard (Client Component) dans Suspense pour le streaming SSR.
+ * Page /compose : interface de création et planification de posts pilotée par l'IA.
+ * Wrapping de AgentComposerCard (Client Component) dans Suspense pour le streaming SSR.
  */
 export default function ComposePage(): React.JSX.Element {
   return (
@@ -42,18 +43,18 @@ export default function ComposePage(): React.JSX.Element {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Nouveau post</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Rédigez, planifiez et publiez sur tous vos réseaux en un clic.
+          Donnez vos instructions, l&apos;agent adapte et planifie votre contenu sur chaque réseau.
         </p>
       </div>
 
-      {/* ── PostComposerCard (Client Component) ───────────────────────────── */}
+      {/* ── AgentComposerCard (Client Component) ──────────────────────────── */}
       {/*
-       * PostComposerCard est dans un fichier séparé marqué 'use client' car
-       * les propriétés statiques d'un Client Component (PostComposer.Editor, etc.)
-       * ne sont pas accessibles depuis un Server Component.
+       * AgentComposerCard est dans un fichier séparé marqué 'use client' car
+       * l'AgentComposer utilise des hooks React (state, router, callbacks).
+       * Même pattern que l'ancien PostComposerCard.
        */}
-      <Suspense fallback={<PostComposerSkeleton />}>
-        <PostComposerCard />
+      <Suspense fallback={<AgentComposerSkeleton />}>
+        <AgentComposerCard />
       </Suspense>
     </div>
   )

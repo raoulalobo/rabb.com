@@ -2,7 +2,7 @@
  * @file prisma/schema.prisma
  * @description Schéma Prisma pour rabb.com.
  *   Modèles : User, Session, Account, Verification (gérés par better-auth)
- *   + ConnectedPlatform, Post, NotificationPrefs (métier rabb)
+ *   + ConnectedPlatform, Post, NotificationPrefs, AgentSession (métier rabb)
  *
  *   Prisma 7 : les URLs de connexion sont définies dans prisma.config.ts (migrations)
  *   et dans lib/prisma.ts via @prisma/adapter-pg (runtime).
@@ -41,11 +41,12 @@ model User {
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  sessions   Session[]
-  accounts   Account[]
-  posts      Post[]
-  platforms  ConnectedPlatform[]
-  notifPrefs NotificationPrefs?
+  sessions      Session[]
+  accounts      Account[]
+  posts         Post[]
+  platforms     ConnectedPlatform[]
+  notifPrefs    NotificationPrefs?
+  agentSessions AgentSession[]
 
   @@map("users")
 }
@@ -164,6 +165,9 @@ model Post {
   // Contenus spécifiques par plateforme (overrides du contenu de base)
   platformContents PostPlatformContent[]
 
+  // Session agent ayant produit ce post (relation optionnelle 1-1)
+  agentSession AgentSession?
+
   // Index composés pour les requêtes fréquentes (liste par user+status, planning par date)
   @@index([userId, status])
   @@index([scheduledFor])
@@ -250,4 +254,62 @@ model NotificationPrefs {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_prefs")
+}
+
+/**
+ * Session de conversation multi-tours avec l'agent IA (AgentComposer).
+ *
+ * Cycle de vie :
+ * - DRAFT     : en cours — l'utilisateur affine le plan en plusieurs tours
+ * - VALIDATED : validé — le Post a été créé, session archivée
+ *
+ * Chaque tour de conversation est stocké dans `conversationHistory` (JSON).
+ * Ce tableau permet de reconstruire les messages Anthropic pour le prochain tour,
+ * en chaînant tool_use → tool_result entre chaque échange.
+ *
+ * Exemple de `conversationHistory` après 2 tours :
+ * [
+ *   { toolUseId: 'tu_abc', instruction: 'Poste sur Insta', planSnapshot: {...}, timestamp: '...' },
+ *   { toolUseId: 'tu_def', instruction: 'Retire YouTube', planSnapshot: {...}, timestamp: '...' },
+ * ]
+ */
+model AgentSession {
+  id     String             @id @default(cuid())
+  userId String
+  status AgentSessionStatus @default(DRAFT)
+
+  // Pool de médias courant (JSON sérialisé de PoolMedia[])
+  // Sauvegardé à chaque raffinement pour permettre la reprise après fermeture du navigateur
+  mediaPool Json @default("[]")
+
+  // Plan courant (dernière version éditable par l'utilisateur).
+  // Null avant le premier tour, mis à jour après chaque raffinement.
+  currentPlan Json?
+
+  // Historique complet des tours pour la continuité multi-tours.
+  // Chaque entrée est un ConversationTurn : { toolUseId, instruction, planSnapshot, timestamp }
+  conversationHistory Json @default("[]")
+
+  // Lien optionnel vers le Post créé lors de la validation (relation 1-1)
+  postId String? @unique
+  post   Post?   @relation(fields: [postId], references: [id])
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Index sur (userId, status) pour retrouver rapidement la session DRAFT en cours
+  @@index([userId, status])
+  @@map("agent_sessions")
+}
+
+/**
+ * Statut d'une session agent.
+ * DRAFT     : en cours d'édition — l'utilisateur peut encore affiner
+ * VALIDATED : terminée — le Post a été créé et la session est archivée
+ */
+enum AgentSessionStatus {
+  DRAFT
+  VALIDATED
 }

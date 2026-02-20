@@ -46,8 +46,11 @@ const MEDIA_BUCKET = 'post-media'
  * @returns 500 si la génération du presigned URL échoue
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const t0 = Date.now()
+
   // ─── Authentification ─────────────────────────────────────────────────────────
   const session = await auth.api.getSession({ headers: await headers() })
+  console.log('[upload-url] getSession:', Date.now() - t0, 'ms')
   if (!session) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
@@ -82,12 +85,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // better-auth (pas Supabase Auth) → auth.uid() = null → violation RLS.
   const supabase = createServiceClient()
 
+  const t1 = Date.now()
   const { data, error } = await supabase.storage
     .from(MEDIA_BUCKET)
     .createSignedUploadUrl(path)
+  console.log('[upload-url] createSignedUploadUrl:', Date.now() - t1, 'ms — erreur:', error?.message ?? 'aucune')
 
   if (error || !data) {
-    console.error('[upload-url] Erreur Supabase Storage :', error)
+    console.error('[upload-url] Erreur Supabase Storage complète :', JSON.stringify(error))
     return NextResponse.json(
       { error: 'Impossible de générer le lien d\'upload' },
       { status: 500 },
