@@ -57,6 +57,47 @@ type ComposeData = InfiniteData<ComposePage>
 /** Vue active de la page /compose */
 type ComposeView = 'list' | 'calendar'
 
+// ─── Helpers de tri ───────────────────────────────────────────────────────────
+
+/**
+ * Trie un tableau de posts selon l'ordre serveur de la page /compose :
+ *   1. scheduledFor DESC NULLS LAST (posts planifiés d'abord, brouillons après)
+ *   2. createdAt DESC (plus récent en premier, à égalité de date planifiée)
+ *
+ * Miroir exact du `orderBy` Prisma de /api/posts route.ts.
+ * Utilisé après un update optimiste pour maintenir l'ordre de la liste
+ * sans recharger les données depuis le serveur.
+ *
+ * @param posts - Posts à trier (non muté — crée une copie interne)
+ * @returns Nouveau tableau trié
+ *
+ * @example
+ *   // Post A : scheduledFor = demain
+ *   // Post B : scheduledFor = null (brouillon)
+ *   // Post C : scheduledFor = après-demain
+ *   sortComposePosts([A, B, C]) // → [C, A, B]
+ */
+function sortComposePosts(posts: Post[]): Post[] {
+  return [...posts].sort((a, b) => {
+    const aMs = a.scheduledFor ? new Date(a.scheduledFor).getTime() : null
+    const bMs = b.scheduledFor ? new Date(b.scheduledFor).getTime() : null
+
+    if (aMs !== null && bMs !== null) {
+      // Les deux ont une date → DESC (date plus grande = plus loin dans le futur = en premier)
+      if (bMs !== aMs) return bMs - aMs
+    } else if (aMs !== null) {
+      // Seul a a une date → a passe devant (NULLS LAST : les null vont en dernier)
+      return -1
+    } else if (bMs !== null) {
+      // Seul b a une date → b passe devant (NULLS LAST)
+      return 1
+    }
+
+    // Même scheduledFor (ou les deux null) → tri secondaire par createdAt DESC
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface PostComposeListProps {
@@ -254,7 +295,16 @@ export function PostComposeList({
   }
 
   /**
-   * Met à jour un post édité dans toutes les pages du cache.
+   * Met à jour un post édité dans toutes les pages du cache, puis re-trie
+   * la liste pour refléter l'ordre serveur (scheduledFor DESC NULLS LAST, createdAt DESC).
+   *
+   * Algorithme :
+   *   1. Aplatir toutes les pages chargées en un tableau unique
+   *   2. Remplacer le post modifié par sa nouvelle version
+   *   3. Re-trier via sortComposePosts (miroir du ORDER BY serveur)
+   *   4. Redistribuer dans les pages en conservant leur taille d'origine
+   *      (important pour la cohérence des curseurs TanStack Query)
+   *
    * Appelé par AgentModal en mode "edit" après la mise à jour.
    *
    * @param updatedPost - Post mis à jour retourné par l'API
@@ -262,13 +312,28 @@ export function PostComposeList({
   const handlePostUpdated = (updatedPost: Post): void => {
     queryClient.setQueryData<ComposeData>(getKey(), (old) => {
       if (!old) return old
-      return {
-        ...old,
-        pages: old.pages.map((page) => ({
-          ...page,
-          posts: page.posts.map((p) => (p.id === updatedPost.id ? updatedPost : p)),
-        })),
-      }
+
+      // 1. Aplatir tous les posts chargés (toutes les pages)
+      const allLoaded = old.pages.flatMap((page) => page.posts)
+
+      // 2. Remplacer le post modifié par sa version mise à jour
+      const replaced = allLoaded.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+
+      // 3. Re-trier selon l'ordre serveur (scheduledFor DESC NULLS LAST, createdAt DESC)
+      const sorted = sortComposePosts(replaced)
+
+      // 4. Redistribuer dans les pages en conservant leur taille d'origine.
+      //    Conserver la taille de chaque page est crucial pour ne pas corrompre
+      //    les curseurs de pagination (nextCursor) de TanStack Query.
+      let offset = 0
+      const newPages = old.pages.map((page) => {
+        const size = page.posts.length
+        const newPosts = sorted.slice(offset, offset + size)
+        offset += size
+        return { ...page, posts: newPosts }
+      })
+
+      return { ...old, pages: newPages }
     })
   }
 
