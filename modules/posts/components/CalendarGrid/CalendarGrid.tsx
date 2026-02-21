@@ -5,8 +5,25 @@
  *   Affiche une grille 7 colonnes (lun–dim) avec les posts positionnés par date.
  *   Code couleur par statut : DRAFT (gris), SCHEDULED (bleu), PUBLISHED (vert), FAILED (rouge).
  *
+ *   Nouvelles props optionnelles (rétrocompatibles) :
+ *   - `interactive`   : active le Popover d'aperçu lecture seule sur les chips
+ *   - `filterPosts`   : filtre client-side appliqué aux posts de chaque cellule
+ *   - `onMonthChange` : notifie le parent du mois affiché (pour invalidation cache externe)
+ *
+ *   Sans ces props → comportement identique à l'original (page /calendar inchangée).
+ *
  * @example
- *   <CalendarGrid year={2024} month={3} />
+ *   // Usage basique (/calendar)
+ *   <CalendarGrid />
+ *
+ *   // Usage avancé (/compose, vue calendrier)
+ *   <CalendarGrid
+ *     initialYear={2025}
+ *     initialMonth={2}
+ *     interactive
+ *     filterPosts={(posts) => posts.filter(p => p.status === 'DRAFT')}
+ *     onMonthChange={(year, month) => console.log(year, month)}
+ *   />
  */
 
 'use client'
@@ -85,18 +102,46 @@ interface CalendarGridProps {
   initialYear?: number
   /** Mois initial 1-indexé (défaut: mois courant) */
   initialMonth?: number
+  /**
+   * Si true : active le Popover d'aperçu lecture seule sur les chips.
+   * Default: false → chips non interactifs (comportement actuel /calendar/).
+   */
+  interactive?: boolean
+  /**
+   * Filtre appliqué aux posts de chaque cellule avant rendu.
+   * Absent → tout afficher (comportement actuel /calendar/).
+   * Utilisé par /compose pour restreindre à DRAFT+SCHEDULED + plateforme.
+   *
+   * @example
+   *   filterPosts={(posts) => posts.filter(p => p.status === 'SCHEDULED')}
+   */
+  filterPosts?: (posts: Post[]) => Post[]
+  /**
+   * Callback appelé à chaque changement de mois (navigation, bouton "Aujourd'hui").
+   * Permet au parent d'invalider son cache ou de mettre à jour son état interne.
+   *
+   * @param year  - Nouvelle année affichée
+   * @param month - Nouveau mois affiché (1-indexé)
+   */
+  onMonthChange?: (year: number, month: number) => void
 }
 
 /**
  * Grille calendrier mensuelle avec navigation mois précédent/suivant.
  * Charge les posts via useCalendarPosts() et les positionne par date.
  *
- * @param initialYear - Année de départ (défaut: aujourd'hui)
- * @param initialMonth - Mois de départ 1-indexé (défaut: aujourd'hui)
+ * @param initialYear   - Année de départ (défaut: aujourd'hui)
+ * @param initialMonth  - Mois de départ 1-indexé (défaut: aujourd'hui)
+ * @param interactive   - Active le popover d'aperçu sur les chips (défaut: false)
+ * @param filterPosts   - Filtre client-side appliqué par cellule (défaut: aucun)
+ * @param onMonthChange - Callback après chaque changement de mois
  */
 export function CalendarGrid({
   initialYear,
   initialMonth,
+  interactive = false,
+  filterPosts,
+  onMonthChange,
 }: CalendarGridProps): React.JSX.Element {
   const now = new Date()
   const [year, setYear] = useState(initialYear ?? now.getFullYear())
@@ -110,26 +155,38 @@ export function CalendarGrid({
 
   /**
    * Navigue vers le mois précédent.
+   * Calcule les nouvelles valeurs avant de mettre à jour l'état
+   * afin de pouvoir notifier le parent via onMonthChange de façon synchrone.
    */
   const goToPrevMonth = (): void => {
-    if (month === 1) {
-      setMonth(12)
-      setYear((y) => y - 1)
-    } else {
-      setMonth((m) => m - 1)
-    }
+    // Calcul du nouveau mois/année avant setState (setState est asynchrone)
+    const newMonth = month === 1 ? 12 : month - 1
+    const newYear = month === 1 ? year - 1 : year
+    setMonth(newMonth)
+    setYear(newYear)
+    onMonthChange?.(newYear, newMonth)
   }
 
   /**
    * Navigue vers le mois suivant.
    */
   const goToNextMonth = (): void => {
-    if (month === 12) {
-      setMonth(1)
-      setYear((y) => y + 1)
-    } else {
-      setMonth((m) => m + 1)
-    }
+    const newMonth = month === 12 ? 1 : month + 1
+    const newYear = month === 12 ? year + 1 : year
+    setMonth(newMonth)
+    setYear(newYear)
+    onMonthChange?.(newYear, newMonth)
+  }
+
+  /**
+   * Revient au mois courant (date système).
+   */
+  const goToToday = (): void => {
+    const todayYear = now.getFullYear()
+    const todayMonth = now.getMonth() + 1
+    setYear(todayYear)
+    setMonth(todayMonth)
+    onMonthChange?.(todayYear, todayMonth)
   }
 
   return (
@@ -152,10 +209,7 @@ export function CalendarGrid({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setYear(now.getFullYear())
-              setMonth(now.getMonth() + 1)
-            }}
+            onClick={goToToday}
             className="h-8 text-xs"
           >
             Aujourd&apos;hui
@@ -202,6 +256,8 @@ export function CalendarGrid({
                 isToday={isToday}
                 posts={posts}
                 isLoading={isLoading}
+                interactive={interactive}
+                filterPosts={filterPosts}
                 // Bordure sur toutes les cellules sauf la dernière ligne
                 showBottomBorder={index < days.length - 7}
                 // Bordure droite sur toutes les cellules sauf la 7ème colonne
@@ -225,11 +281,24 @@ interface CalendarCellProps {
   isLoading: boolean
   showBottomBorder: boolean
   showRightBorder: boolean
+  /**
+   * Propagé depuis CalendarGrid — active le Popover d'aperçu sur chaque chip.
+   * Default: false → chips non interactifs.
+   */
+  interactive: boolean
+  /**
+   * Filtre optionnel appliqué aux posts de cette cellule avant rendu.
+   * Propagé depuis CalendarGrid.filterPosts.
+   */
+  filterPosts?: (posts: Post[]) => Post[]
 }
 
 /**
  * Cellule individuelle du calendrier représentant un jour.
  * Affiche le numéro du jour et les chips des posts.
+ *
+ * Applique `filterPosts` si fourni (mode /compose) avant de limiter à MAX_VISIBLE.
+ * Propagé `interactive` à chaque CalendarPostChip.
  */
 function CalendarCell({
   date,
@@ -239,11 +308,16 @@ function CalendarCell({
   isLoading,
   showBottomBorder,
   showRightBorder,
+  interactive,
+  filterPosts,
 }: CalendarCellProps): React.JSX.Element {
   // Limiter l'affichage à 3 posts par cellule (+ indicateur "+N" si plus)
   const MAX_VISIBLE = 3
-  const visiblePosts = posts.slice(0, MAX_VISIBLE)
-  const hiddenCount = posts.length - MAX_VISIBLE
+
+  // Application du filtre client-side (mode /compose) avant slicing
+  const effectivePosts = filterPosts ? filterPosts(posts) : posts
+  const visiblePosts = effectivePosts.slice(0, MAX_VISIBLE)
+  const hiddenCount = effectivePosts.length - MAX_VISIBLE
 
   return (
     <div
@@ -278,11 +352,15 @@ function CalendarCell({
         ) : (
           <>
             {visiblePosts.map((post) => (
-              <CalendarPostChip key={post.id} post={post} />
+              <CalendarPostChip
+                key={post.id}
+                post={post}
+                interactive={interactive}
+              />
             ))}
-            {/* Indicateur "+N autres" si plus de MAX_VISIBLE posts */}
+            {/* Indicateur "+N autres" si plus de MAX_VISIBLE posts (après filtre) */}
             {hiddenCount > 0 && (
-              <p className="text-[10px] text-muted-foreground pl-1">
+              <p className="pl-1 text-[10px] text-muted-foreground">
                 +{hiddenCount} autre{hiddenCount > 1 ? 's' : ''}
               </p>
             )}
