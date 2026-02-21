@@ -5,7 +5,7 @@
  *   - Validation côté client avec Zod via react-hook-form
  *   - Appelle better-auth signIn.email() et signIn.social()
  *   - Gère les états de chargement et d'erreur via useAuthStore
- *   - Redirige vers / (dashboard) après connexion réussie
+ *   - Redirige vers /dashboard après connexion réussie (ou callbackUrl si présent)
  *
  * @example
  *   // app/(auth)/login/page.tsx
@@ -41,7 +41,7 @@ interface LoginFormProps {
 
 /**
  * Formulaire de connexion complet (email/password + Google OAuth).
- * Redirige vers la callbackUrl (si présente) ou vers / après succès.
+ * Redirige vers la callbackUrl (si présente) ou vers /dashboard après succès.
  *
  * @param showGoogleOAuth - Affiche le bouton Google si true (défaut: false)
  * @returns Formulaire de connexion avec gestion d'erreurs et de chargement
@@ -49,8 +49,8 @@ interface LoginFormProps {
 export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JSX.Element {
   const router = useRouter()
   const searchParams = useSearchParams()
-  // URL de redirection post-login (paramètre ?callbackUrl=...)
-  const callbackUrl = searchParams.get('callbackUrl') ?? '/'
+  // URL de redirection post-login (paramètre ?callbackUrl=...), /dashboard par défaut
+  const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard'
 
   const { isLoading, error, setLoading, setError, reset } = useAuthStore()
 

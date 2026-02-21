@@ -21,7 +21,7 @@
 
 'use client'
 
-import { Calendar, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { Calendar, Loader2, Pencil, Play, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -81,6 +81,25 @@ const STATUS_LABELS: Record<Post['status'], string> = {
   SCHEDULED: 'Planifié',
   PUBLISHED: 'Publié',
   FAILED: 'Échoué',
+}
+
+// ─── Helper détection type de média ──────────────────────────────────────────
+
+/** Extensions vidéo reconnues */
+const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|avi|mkv|m4v|ogv)(\?.*)?$/i
+
+/**
+ * Détermine si une URL pointe vers une vidéo en se basant sur l'extension.
+ *
+ * @param url - URL du média
+ * @returns true si c'est une vidéo, false si c'est une image
+ *
+ * @example
+ *   isVideoUrl('https://...supabase.co/posts/video.mp4') // true
+ *   isVideoUrl('https://...supabase.co/posts/photo.jpg') // false
+ */
+function isVideoUrl(url: string): boolean {
+  return VIDEO_EXTENSIONS.test(url)
 }
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -159,13 +178,35 @@ export function PostComposeCard({ post, onEdit, onDelete }: PostComposeCardProps
             {post.mediaUrls.slice(0, 3).map((url, i) => (
               <div
                 key={url}
-                className="size-8 overflow-hidden rounded border border-border bg-muted"
+                className="relative size-8 overflow-hidden rounded border border-border bg-muted"
               >
-                <img
-                  src={url}
-                  alt={`Média ${i + 1}`}
-                  className="size-full object-cover"
-                />
+                {isVideoUrl(url) ? (
+                  <>
+                    {/*
+                     * Vidéo : preload="metadata" charge uniquement les métadonnées
+                     * et la première image (poster naturel) sans télécharger le fichier entier.
+                     * muted est obligatoire pour l'autoplay éventuel et évite le son en vignette.
+                     */}
+                    <video
+                      src={url}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="size-full object-cover"
+                      aria-label={`Vidéo ${i + 1}`}
+                    />
+                    {/* Overlay icône Play pour signaler que c'est une vidéo */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <Play className="size-3 fill-white text-white" />
+                    </div>
+                  </>
+                ) : (
+                  <img
+                    src={url}
+                    alt={`Média ${i + 1}`}
+                    className="size-full object-cover"
+                  />
+                )}
               </div>
             ))}
             {post.mediaUrls.length > 3 && (

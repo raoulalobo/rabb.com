@@ -6,22 +6,21 @@
  *
  *   **Vue Liste** (défaut) :
  *   - Infinite scroll via useInfiniteQuery + IntersectionObserver
- *   - Filtres serveur : plateforme + intervalle de date (reset à la page 1)
- *   - Filtre client-side : statut (sur les posts déjà chargés)
+ *   - Filtres serveur : plateforme + statut + intervalle de date
+ *     → extraits en langage naturel via AIFilterModal (Sonnet)
+ *     → reset à la page 1 à chaque changement de filtre
  *   - Updates optimistes (create/update/delete) via queryClient.setQueryData
  *   - Bouton "Nouveau post" → AgentModal (création / édition)
  *
  *   **Vue Calendrier** (lecture seule) :
  *   - Charge le mois complet via useCalendarPosts (inside CalendarGrid)
- *   - Filtre client-side : statut (base DRAFT+SCHEDULED) + plateforme
- *   - Chips cliquables → Popover d'aperçu (plateforme, statut, texte, date, médias)
- *   - DateRangeFilter masqué (navigation mensuelle prend le relais)
- *   - Bouton "Nouveau post" masqué — toutes les mutations depuis la vue liste
+ *   - Filtre client-side : statut + plateforme (issus du filtre IA)
+ *   - Chips cliquables → Popover d'aperçu
+ *   - Bouton "Nouveau post" masqué
  *
  *   Architecture :
  *   Client Component ('use client') — reçoit les posts initiaux du Server Component
- *   parent, hydrate le cache TanStack Query avec ces données pour éviter un
- *   double chargement au démarrage.
+ *   parent, hydrate le cache TanStack Query pour éviter un double chargement.
  *
  * @example
  *   // Dans compose/page.tsx (Server Component)
@@ -31,23 +30,23 @@
 
 'use client'
 
-import type { InfiniteData } from '@tanstack/react-query'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, FileText, LayoutList, Loader2, Plus } from 'lucide-react'
+import { CalendarDays, FileText, LayoutList, Loader2, Plus, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { DateRange } from 'react-day-picker'
 
 import { Button } from '@/components/ui/button'
 import { AgentModal } from '@/modules/posts/components/AgentModal'
 import { CalendarGrid } from '@/modules/posts/components/CalendarGrid/CalendarGrid'
-import type { ComposeFilters, ComposePage } from '@/modules/posts/queries/posts.queries'
 import { composeQueryKey, fetchComposePage } from '@/modules/posts/queries/posts.queries'
+import type { ComposeFilters, ComposePage } from '@/modules/posts/queries/posts.queries'
 import type { Post } from '@/modules/posts/types'
 
-import { DateRangeFilter } from './DateRangeFilter'
-import { PlatformFilter } from './PlatformFilter'
+import { AIFilterModal } from './AIFilterModal'
 import { PostComposeCard } from './PostComposeCard'
-import { StatusFilter } from './StatusFilter'
+
+import type { ExtractedFilters } from './AIFilterModal'
+import type { InfiniteData } from '@tanstack/react-query'
+import type { DateRange } from 'react-day-picker'
 
 // ─── Types internes ────────────────────────────────────────────────────────────
 
@@ -110,7 +109,7 @@ interface PostComposeListProps {
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
- * Liste des posts DRAFT+SCHEDULED avec infinite scroll, filtres et toggle calendrier.
+ * Liste des posts DRAFT+SCHEDULED avec infinite scroll, filtre IA et toggle calendrier.
  *
  * @param initialPosts        - Posts SSR à hydrater dans le cache TanStack Query
  * @param initialNextCursor   - Curseur SSR pour déclencher l'infinite scroll si besoin
@@ -126,8 +125,8 @@ export function PostComposeList({
 
   /**
    * Mois/année affiché par le CalendarGrid.
-   * Initialisé au mois courant ; mis à jour lors du switch vers la vue calendrier
-   * si un DateRangeFilter est actif (pour ouvrir au mois du début de la plage).
+   * Initialisé au mois courant ; synchronisé avec le filtre date actif
+   * lors du switch vers la vue calendrier.
    */
   const [calendarInit, setCalendarInit] = useState<{ year: number; month: number }>(() => {
     const now = new Date()
@@ -135,8 +134,8 @@ export function PostComposeList({
   })
 
   // ── Filtres serveur ───────────────────────────────────────────────────────
-  // Chaque changement de ces filtres réinitialise la query à la page 1
-  // car ils font partie de la queryKey (voir composeQueryKey).
+  // Alimentés par le filtre IA (AIFilterModal → Sonnet → ExtractedFilters).
+  // Chaque changement réinitialise TanStack Query à la page 1 (queryKey change).
 
   /** Plateformes sélectionnées (vide = tout afficher) */
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
@@ -144,16 +143,17 @@ export function PostComposeList({
   /** Intervalle de date sur scheduledFor (undefined = tout afficher) */
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
 
-  // ── Filtre client-side ────────────────────────────────────────────────────
-  // Appliqué sur les posts déjà chargés — instantané, sans requête supplémentaire.
-
-  /** Statuts sélectionnés (vide = tout afficher) */
+  /** Statuts sélectionnés (vide = DRAFT+SCHEDULED par défaut côté serveur) */
   const [selectedStatuses, setSelectedStatuses] = useState<Post['status'][]>([])
+
+  // ── Requête texte active (affichée dans le bouton Rechercher) ─────────────
+  /** Libellé court de la recherche active — vide si aucun filtre IA actif */
+  const [activeQueryText, setActiveQueryText] = useState<string>('')
 
   // ── Filtre courant (mémorisé pour stabilité des références) ───────────────
   const filters: ComposeFilters = useMemo(
-    () => ({ platforms: selectedPlatforms, dateRange }),
-    [selectedPlatforms, dateRange],
+    () => ({ platforms: selectedPlatforms, dateRange, statuses: selectedStatuses }),
+    [selectedPlatforms, dateRange, selectedStatuses],
   )
 
   // ── useInfiniteQuery ──────────────────────────────────────────────────────
@@ -169,11 +169,11 @@ export function PostComposeList({
     // nextCursor = undefined signifie "pas de page suivante"
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     initialPageParam: undefined,
-    // ── Données SSR comme initialData quand aucun filtre serveur n'est actif ──
-    // Évite un round-trip réseau au premier rendu si les données SSR sont fraîches.
-    // Dès qu'un filtre est activé, TanStack Query fetche depuis la page 1 normalement.
+    // ── Données SSR comme initialData uniquement si aucun filtre actif ────────
+    // Évite un round-trip réseau au premier rendu.
+    // Dès qu'un filtre est activé, TanStack Query fetche depuis la page 1.
     initialData:
-      selectedPlatforms.length === 0 && !dateRange
+      selectedPlatforms.length === 0 && !dateRange && selectedStatuses.length === 0
         ? ({
             pages: [{ posts: initialPosts, nextCursor: initialNextCursor }],
             pageParams: [undefined],
@@ -184,35 +184,23 @@ export function PostComposeList({
   })
 
   // ── Liste plate de tous les posts chargés ─────────────────────────────────
-  // Fusion de toutes les pages en un seul tableau ordonné.
+  // Les filtres (plateforme, statut, date) sont appliqués côté serveur.
+  // Pas de filtrage client-side — seuls les posts correspondants sont retournés.
   const allPosts = useMemo(
     () => data?.pages.flatMap((page) => page.posts) ?? [],
     [data],
   )
 
-  // ── Filtre statut — client-side (vue liste) ───────────────────────────────
-  // Appliqué sur allPosts (DRAFT+SCHEDULED uniquement, cardinalité faible).
-  const filteredPosts = useMemo(
-    () =>
-      selectedStatuses.length === 0
-        ? allPosts
-        : allPosts.filter((p) => selectedStatuses.includes(p.status)),
-    [allPosts, selectedStatuses],
-  )
-
-  // ── Plateformes disponibles (pour le PlatformFilter) ─────────────────────
-  // On accumule les plateformes vues dans un Set qui ne diminue JAMAIS.
-  // Si on les calculait depuis allPosts courante, sélectionner "instagram"
-  // ferait disparaître le filtre : la query ne renvoie plus que des posts
-  // instagram → allPosts.length = 1 → condition "≥ 2" fausse → filtre caché.
-  //
-  // Avec le ref accumulateur, une fois qu'une plateforme a été vue elle reste
-  // dans la liste, quel que soit le filtre actif.
+  // ── Plateformes disponibles (pour un éventuel retour des filtres manuels) ──
+  // Accumulateur : une fois vues, les plateformes restent dans la liste même
+  // si le filtre actif les masque (évite la disparition du filtre après sélection).
   const seenPlatformsRef = useRef<Set<string>>(
     new Set(initialPosts.map((p) => p.platform)),
   )
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>(
-    () => [...seenPlatformsRef.current].sort(),
+    // Initialisation depuis initialPosts (même source que seenPlatformsRef)
+    // — évite d'accéder au ref pendant le rendu (règle react-hooks/refs)
+    () => [...new Set(initialPosts.map((p) => p.platform))].sort(),
   )
 
   // Mise à jour : ajouter les nouvelles plateformes découvertes, jamais supprimer
@@ -226,15 +214,13 @@ export function PostComposeList({
 
   // ── Filtre client-side pour la vue calendrier ─────────────────────────────
   /**
-   * Filtre appliqué à chaque cellule du CalendarGrid.
-   * Base : DRAFT+SCHEDULED (sauf si StatusFilter restreint davantage).
-   * En plus : plateforme si selectedPlatforms non vide.
-   *
-   * Stable via useCallback — évite les re-renders du CalendarGrid.
+   * Filtre appliqué aux posts de chaque cellule du CalendarGrid.
+   * Bénéficie automatiquement des filtres IA actifs (selectedStatuses / selectedPlatforms).
+   * Stable via useCallback pour éviter les re-renders du CalendarGrid.
    */
   const calendarFilter = useCallback(
     (posts: Post[]): Post[] => {
-      // Statuts actifs : ceux du filtre s'il est actif, sinon DRAFT+SCHEDULED par défaut
+      // Statuts actifs : ceux du filtre IA s'il est actif, sinon DRAFT+SCHEDULED par défaut
       const activeStatuses: Post['status'][] =
         selectedStatuses.length > 0 ? selectedStatuses : ['DRAFT', 'SCHEDULED']
 
@@ -272,7 +258,7 @@ export function PostComposeList({
 
   // ── Clé de query courante ─────────────────────────────────────────────────
   // Calcul stable pour les updates optimistes (même référence que la query active).
-  const getKey = () => composeQueryKey(filters)
+  const getKey = (): readonly unknown[] => composeQueryKey(filters)
 
   // ── Optimistic updates via queryClient.setQueryData ───────────────────────
 
@@ -303,9 +289,6 @@ export function PostComposeList({
    *   2. Remplacer le post modifié par sa nouvelle version
    *   3. Re-trier via sortComposePosts (miroir du ORDER BY serveur)
    *   4. Redistribuer dans les pages en conservant leur taille d'origine
-   *      (important pour la cohérence des curseurs TanStack Query)
-   *
-   * Appelé par AgentModal en mode "edit" après la mise à jour.
    *
    * @param updatedPost - Post mis à jour retourné par l'API
    */
@@ -356,7 +339,7 @@ export function PostComposeList({
     })
   }
 
-  // ── État de la modale ─────────────────────────────────────────────────────
+  // ── État de la modale AgentModal ──────────────────────────────────────────
   type ModalMode = 'create' | 'edit'
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<ModalMode>('create')
@@ -381,10 +364,32 @@ export function PostComposeList({
     setModalOpen(true)
   }
 
+  // ── État de la modale AIFilterModal ───────────────────────────────────────
+  const [aiModalOpen, setAiModalOpen] = useState(false)
+
+  /**
+   * Applique les filtres extraits par Sonnet.
+   * Met à jour les 3 états de filtre → queryKey change → TanStack Query reset page 1.
+   *
+   * @param filters - Filtres structurés retournés par /api/posts/filter-ai
+   */
+  const handleFiltersApplied = (filters: ExtractedFilters): void => {
+    setSelectedPlatforms(filters.platforms)
+    setSelectedStatuses(filters.statuses as Post['status'][])
+    // Convertir les dates string ISO en Date pour react-day-picker DateRange
+    setDateRange(
+      filters.dateRange
+        ? { from: new Date(filters.dateRange.from), to: new Date(filters.dateRange.to) }
+        : undefined,
+    )
+    // Stocker le texte de la requête pour affichage dans le bouton
+    setActiveQueryText(filters.queryText)
+  }
+
   // ── Switch vers la vue calendrier ─────────────────────────────────────────
   /**
    * Bascule vers la vue calendrier.
-   * Si un DateRangeFilter est actif, initialise le calendrier au mois du début
+   * Si un filtre date est actif, initialise le calendrier au mois du début
    * de la plage sélectionnée pour un alignement visuel cohérent.
    */
   const handleSwitchToCalendar = (): void => {
@@ -402,6 +407,7 @@ export function PostComposeList({
     setSelectedPlatforms([])
     setSelectedStatuses([])
     setDateRange(undefined)
+    setActiveQueryText('')
   }
 
   // ── Indicateur de filtre actif ────────────────────────────────────────────
@@ -409,6 +415,9 @@ export function PostComposeList({
     selectedPlatforms.length > 0 || selectedStatuses.length > 0 || !!dateRange?.from
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
+
+  // Supprimer avertissement ESLint pour la variable non utilisée (prête pour réactivation)
+  void availablePlatforms
 
   return (
     <>
@@ -427,27 +436,60 @@ export function PostComposeList({
         {view === 'calendar' && <div />}
 
         <div className="flex items-center gap-2">
+
+          {/* TODO: filtres manuels — désactivés au profit du filtre IA — décommenter pour réactiver */}
           {/* Filtre plateforme — visible si ≥ 2 plateformes distinctes chargées */}
-          {availablePlatforms.length >= 2 && (
+          {/* {availablePlatforms.length >= 2 && (
             <PlatformFilter
               selectedPlatforms={selectedPlatforms}
               availablePlatforms={availablePlatforms}
               onChange={setSelectedPlatforms}
             />
-          )}
+          )} */}
 
           {/* Filtre statut — toujours visible (DRAFT / SCHEDULED) */}
-          <StatusFilter
+          {/* <StatusFilter
             selectedStatuses={selectedStatuses}
             onChange={setSelectedStatuses}
-          />
+          /> */}
 
-          {/* Filtre date — masqué en vue calendrier (navigation mensuelle prend le relais) */}
-          {view === 'list' && (
+          {/* Filtre date — masqué en vue calendrier */}
+          {/* {view === 'list' && (
             <DateRangeFilter
               dateRange={dateRange}
               onChange={setDateRange}
             />
+          )} */}
+
+          {/* ── Bouton Rechercher (filtre IA en langage naturel) ────────────── */}
+          <Button
+            variant={hasActiveFilter ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => setAiModalOpen(true)}
+            className="gap-2"
+          >
+            <Search className="size-3.5" />
+            {hasActiveFilter && activeQueryText
+              ? /* Afficher le début de la requête active (max 20 chars) */
+                activeQueryText.length > 20
+                  ? `${activeQueryText.slice(0, 20)}…`
+                  : activeQueryText
+              : 'Rechercher'
+            }
+          </Button>
+
+          {/* Bouton effacer le filtre — visible uniquement si un filtre est actif */}
+          {hasActiveFilter && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              onClick={handleClearFilters}
+              aria-label="Effacer tous les filtres"
+              title="Effacer les filtres"
+            >
+              <X className="size-3.5" />
+            </Button>
           )}
 
           {/* ── Toggle vue liste / calendrier ──────────────────────────────── */}
@@ -487,11 +529,16 @@ export function PostComposeList({
 
           {/*
            * Grille calendrier avec filtre client-side et chips interactifs.
-           * Technique "breakout" : w-[90vw] + left-1/2 + -translate-x-1/2 permet
-           * de sortir du container max-w-3xl de la page /compose et d'occuper
-           * 90% de la largeur du viewport, comme la page /calendar (max-w-5xl).
+           * Technique "breakout" : left-1/2 + -translate-x-1/2 permet de sortir
+           * du container max-w-3xl de la page /compose.
+           *
+           * Largeur : calc(100vw - 15rem - 3rem)
+           *   - 15rem = sidebar fixe (w-60)
+           *   - 3rem  = padding horizontal du <main> (p-6 = 1.5rem de chaque côté)
+           * → Le calendrier occupe exactement la largeur utile du <main>,
+           *   sans débordement ni scrollbar horizontale.
            */}
-          <div className="relative left-1/2 w-[90vw] -translate-x-1/2">
+          <div className="relative left-1/2 w-[calc(100vw-15rem-3rem)] -translate-x-1/2">
             <CalendarGrid
               initialYear={calendarInit.year}
               initialMonth={calendarInit.month}
@@ -507,17 +554,15 @@ export function PostComposeList({
       {view === 'list' && (
         <>
           {/* Barre de statut — compteur + indicateur de filtre actif */}
-          {allPosts.length > 0 && (availablePlatforms.length >= 2 || selectedStatuses.length > 0 || dateRange?.from) && (
+          {allPosts.length > 0 && hasActiveFilter && (
             <p className="text-sm text-muted-foreground">
-              {filteredPosts.length} post{filteredPosts.length !== 1 ? 's' : ''}
-              {hasActiveFilter && (
-                <span className="ml-1 text-muted-foreground/70">· filtré</span>
-              )}
+              {allPosts.length} post{allPosts.length !== 1 ? 's' : ''}
+              <span className="ml-1 text-muted-foreground/70">· filtré</span>
             </p>
           )}
 
           {/* Liste des posts ou état vide */}
-          {allPosts.length === 0 ? (
+          {allPosts.length === 0 && !hasActiveFilter ? (
             /* État vide global — aucun brouillon ni planifié */
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-12 text-center">
               <div className="flex size-12 items-center justify-center rounded-full bg-muted">
@@ -534,16 +579,18 @@ export function PostComposeList({
                 Créer un post
               </Button>
             </div>
-          ) : filteredPosts.length === 0 ? (
-            /* État vide filtré — le filtre actif ne correspond à aucun post chargé */
+          ) : allPosts.length === 0 && hasActiveFilter ? (
+            /* État vide filtré — la recherche IA ne correspond à aucun post */
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
               <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                <FileText className="size-4 text-muted-foreground" />
+                <Search className="size-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Aucun post pour ce filtre</p>
+                <p className="text-sm font-medium text-foreground">Aucun résultat</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Essayez d&apos;autres critères ou effacez les filtres.
+                  {activeQueryText
+                    ? `Aucun post pour « ${activeQueryText} ».`
+                    : 'Aucun post pour ce filtre.'}
                 </p>
               </div>
               <Button
@@ -556,9 +603,9 @@ export function PostComposeList({
               </Button>
             </div>
           ) : (
-            /* Liste des posts (filtrés ou non) */
+            /* Liste des posts (filtrés côté serveur) */
             <div className="space-y-3">
-              {filteredPosts.map((post) => (
+              {allPosts.map((post) => (
                 <PostComposeCard
                   key={post.id}
                   post={post}
@@ -609,6 +656,14 @@ export function PostComposeList({
           onPostUpdated={handlePostUpdated}
         />
       )}
+
+      {/* ── AIFilterModal — recherche en langage naturel ─────────────────────── */}
+      <AIFilterModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        currentQuery={activeQueryText}
+        onFiltersApplied={handleFiltersApplied}
+      />
     </>
   )
 }

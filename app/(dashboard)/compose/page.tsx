@@ -1,19 +1,21 @@
 /**
  * @file app/(dashboard)/compose/page.tsx
- * @description Page /compose — liste des posts DRAFT de l'utilisateur.
+ * @description Page /compose — liste des posts DRAFT+SCHEDULED de l'utilisateur.
  *
- *   Charge les brouillons côté serveur (Server Component) via Prisma direct.
- *   Rend PostComposeList (Client Component) avec les posts initiaux.
- *   L'utilisateur peut créer de nouveaux posts via le bouton "Nouveau post"
- *   qui ouvre l'AgentModal en mode création.
+ *   Charge les 25 premiers posts côté serveur (Server Component) via Prisma direct.
+ *   Rend PostComposeList (Client Component) avec les posts et le curseur initiaux.
+ *   L'infinite scroll prend le relais côté client via useInfiniteQuery.
  *
  *   Architecture :
  *   - page.tsx : Server Component (authentification + chargement DB + métadonnées)
- *   - PostComposeList : Client Component (liste interactive + gestion des modales)
+ *   - PostComposeList : Client Component (infinite scroll + filtres + gestion des modales)
+ *
+ *   Tri : scheduledFor DESC NULLS LAST, puis createdAt DESC.
+ *   Les posts planifiés apparaissent en premier, les brouillons sans date ensuite.
  *
  * @example
  *   // Route : GET /compose
- *   // Rendu SSR → hydratation côté client
+ *   // Rendu SSR des 25 premiers posts → hydratation + infinite scroll côté client
  */
 
 import { headers } from 'next/headers'
@@ -35,16 +37,28 @@ export const metadata: Metadata = {
   description: 'Gérez vos brouillons et créez de nouveaux posts avec l\'agent IA.',
 }
 
-// ─── Chargement des posts DRAFT ───────────────────────────────────────────────
+// ─── Chargement SSR des 25 premiers posts ─────────────────────────────────────
 
 /**
- * Charge les posts DRAFT de l'utilisateur connecté.
- * Les posts sont triés par date de création décroissante (plus récents en premier).
+ * Résultat du chargement SSR : première page + curseur pour l'infinite scroll.
+ */
+interface InitialPostsResult {
+  posts: Post[]
+  /** Curseur vers la page suivante, ou null si tous les posts tiennent sur une page */
+  nextCursor: string | null
+}
+
+/**
+ * Charge les 25 premiers posts DRAFT+SCHEDULED de l'utilisateur.
+ * Tri : scheduledFor DESC NULLS LAST, puis createdAt DESC (cohérent avec l'API).
+ *
+ * Retourne également le curseur pour que le client puisse charger
+ * les pages suivantes via useInfiniteQuery sans re-charger les 25 premiers.
  *
  * @param userId - ID de l'utilisateur connecté
- * @returns Liste des posts DRAFT
+ * @returns Premiers posts + curseur pour la page suivante
  */
-async function fetchDraftPosts(userId: string): Promise<Post[]> {
+async function fetchInitialPosts(userId: string): Promise<InitialPostsResult> {
   const posts = await prisma.post.findMany({
     where: {
       userId,
@@ -65,20 +79,27 @@ async function fetchDraftPosts(userId: string): Promise<Post[]> {
       createdAt: true,
       updatedAt: true,
     },
-    orderBy: { createdAt: 'desc' },
-    // Limite raisonnable pour éviter des performances dégradées sur la page
-    take: 50,
+    orderBy: [
+      // Posts planifiés d'abord (nulls en dernier), puis par création décroissante
+      { scheduledFor: { sort: 'desc', nulls: 'last' } },
+      { createdAt: 'desc' },
+    ],
+    // Récupérer 25 posts — même limite que l'API en mode compose
+    take: 25,
   })
 
-  // Cast explicite : Prisma retourne PostStatus comme string, on force le type union
-  return posts as unknown as Post[]
+  return {
+    posts: posts as unknown as Post[],
+    // nextCursor = ID du dernier post si la page est complète, null si tous les posts rentrent
+    nextCursor: posts.length === 25 ? posts[posts.length - 1].id : null,
+  }
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /**
- * Page /compose : liste des brouillons + bouton de création via l'agent IA.
- * Server Component — charge les posts côté serveur avant le rendu.
+ * Page /compose : liste des brouillons + planifiés avec infinite scroll.
+ * Server Component — charge les 25 premiers posts côté serveur avant le rendu.
  */
 export default async function ComposePage(): Promise<React.JSX.Element> {
   // ── Authentification ───────────────────────────────────────────────────────
@@ -86,8 +107,9 @@ export default async function ComposePage(): Promise<React.JSX.Element> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect('/login')
 
-  // ── Chargement des posts DRAFT ────────────────────────────────────────────
-  const initialPosts = await fetchDraftPosts(session.user.id)
+  // ── Chargement des 25 premiers posts ──────────────────────────────────────
+  const { posts: initialPosts, nextCursor: initialNextCursor } =
+    await fetchInitialPosts(session.user.id)
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
@@ -96,7 +118,7 @@ export default async function ComposePage(): Promise<React.JSX.Element> {
         <h1 className="text-2xl font-semibold tracking-tight">Brouillons</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {initialPosts.length > 0
-            ? `${initialPosts.length} post${initialPosts.length > 1 ? 's' : ''} — créez de nouveaux posts avec l'agent IA.`
+            ? 'Gérez vos brouillons et planifiés — créez de nouveaux posts avec l\'agent IA.'
             : 'Créez vos premiers posts avec l\'agent IA.'}
         </p>
       </div>
@@ -104,15 +126,20 @@ export default async function ComposePage(): Promise<React.JSX.Element> {
       {/* ── Liste des posts (Client Component) ───────────────────────────── */}
       {/*
        * PostComposeList est un Client Component qui :
-       * - Affiche les posts initiaux (passés depuis ce Server Component)
+       * - Hydrate les posts initiaux (passés depuis ce Server Component)
+       * - Continue le chargement en infinite scroll via useInfiniteQuery
+       * - Gère les filtres serveur (platform, dateRange) et client (status)
        * - Gère l'ouverture de l'AgentModal (création / édition)
-       * - Met à jour la liste optimistiquement sans rechargement de page
+       * - Met à jour la liste optimistiquement via queryClient.setQueryData
        *
-       * Suspense est requis car PostComposeList est un Client Component
-       * imbriqué dans un Server Component avec Suspense streaming.
+       * initialNextCursor permet au client de savoir s'il y a des pages suivantes
+       * sans faire de requête supplémentaire au démarrage.
        */}
       <Suspense fallback={<PostComposeListSkeleton />}>
-        <PostComposeList initialPosts={initialPosts} />
+        <PostComposeList
+          initialPosts={initialPosts}
+          initialNextCursor={initialNextCursor}
+        />
       </Suspense>
     </div>
   )

@@ -1,5 +1,5 @@
 /**
- * @file app/(dashboard)/page.tsx
+ * @file app/(dashboard)/dashboard/page.tsx
  * @description Page d'accueil du dashboard (/dashboard).
  *   Affiche un résumé rapide (stats, posts récents).
  *   Phase 01 : placeholder — sera enrichi en phase 06 (analytics).
@@ -30,7 +30,7 @@ export default function DashboardPage(): React.JSX.Element {
         {['Posts publiés', 'Posts planifiés', 'Impressions', 'Engagement'].map((label) => (
           <div key={label} className="rounded-lg border bg-card p-6">
             <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <p className="text-3xl font-bold mt-2">—</p>
+            <p className="mt-2 text-3xl font-bold">—</p>
           </div>
         ))}
       </div>

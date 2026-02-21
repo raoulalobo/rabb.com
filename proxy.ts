@@ -19,7 +19,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { Session } from '@/lib/auth'
 
 // ─── Routes publiques (pas de vérification de session) ────────────────────────
-const PUBLIC_PATHS = ['/login', '/register', '/reset-password']
+// '/' = landing page publique (app/page.tsx) — accessible à tous
+const PUBLIC_PATHS = ['/', '/login', '/register', '/reset-password']
 
 /**
  * Proxy de protection des routes (Next.js 16 — remplace middleware).
@@ -56,9 +57,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Utilisateur connecté sur une route publique (login/register) → redirection vers dashboard
-  if (isPublicPath && session) {
-    return NextResponse.redirect(new URL('/', request.url))
+  // Utilisateur connecté sur /login ou /register → redirection vers le dashboard
+  // (on laisse passer les connectés sur '/' pour qu'ils voient la landing page)
+  const isAuthPage = ['/login', '/register'].some((p) => pathname.startsWith(p))
+  if (isAuthPage && session) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return NextResponse.next()

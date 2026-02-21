@@ -3,8 +3,7 @@
  * @module layout
  * @description Barre de navigation latérale du dashboard.
  *   - Affiche le logo rabb et les liens de navigation principaux
- *   - Gère l'état ouvert/réduit via useAppStore (Zustand)
- *   - Sur mobile : se ferme automatiquement après un clic (Sheet pattern à intégrer en phase 04)
+ *   - Largeur fixe w-60 (240px), toujours visible, sans comportement rétractable
  *
  * Navigation principale (MVP) :
  *   - Dashboard (/) → vue d'ensemble rapide
@@ -33,7 +32,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
-import { useAppStore } from '@/store/app.store'
 
 // ─── Configuration de la navigation ───────────────────────────────────────────
 
@@ -64,7 +62,7 @@ const NAV_ITEMS: NavItem[] = [
 
 /**
  * Sidebar de navigation principale du dashboard.
- * S'adapte à l'état ouvert/réduit du store global (useAppStore).
+ * Largeur fixe w-60 (240px), toujours visible, sans toggle.
  *
  * @returns Barre latérale avec logo, navigation et indicateur de route active
  */
@@ -72,18 +70,8 @@ export function Sidebar(): React.JSX.Element {
   // Pathname courant pour surligner le lien actif
   const pathname = usePathname()
 
-  // État sidebar (ouvert/réduit) depuis le store global
-  const isSidebarOpen = useAppStore((state) => state.isSidebarOpen)
-
   return (
-    <aside
-      className={cn(
-        // Transition fluide lors du toggle
-        'flex h-full flex-col border-r bg-sidebar transition-all duration-300',
-        // Largeur adaptative : 240px ouverte, 64px réduite
-        isSidebarOpen ? 'w-60' : 'w-16'
-      )}
-    >
+    <aside className="flex h-full w-60 flex-col border-r bg-sidebar">
       {/* ── Logo ─────────────────────────────────────────────────────── */}
       <div className="flex h-16 items-center border-b px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
@@ -91,10 +79,7 @@ export function Sidebar(): React.JSX.Element {
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
             r
           </div>
-          {/* Nom masqué quand la sidebar est réduite */}
-          {isSidebarOpen && (
-            <span className="font-semibold text-sidebar-foreground">rabb</span>
-          )}
+          <span className="font-semibold text-sidebar-foreground">rabb</span>
         </Link>
       </div>
 
@@ -117,8 +102,7 @@ export function Sidebar(): React.JSX.Element {
               )}
             >
               <Icon className="size-4 shrink-0" />
-              {/* Libellé masqué quand la sidebar est réduite */}
-              {isSidebarOpen && <span>{label}</span>}
+              <span>{label}</span>
             </Link>
           )
         })}
