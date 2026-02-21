@@ -12,8 +12,15 @@
  *   1. Attendre la date scheduledFor via step.sleepUntil()
  *   2. Récupérer le post en DB et vérifier son statut (SCHEDULED)
  *   3. Récupérer le profil getlate.dev de la plateforme du post
- *   4. Publier via getlate.dev avec le texte et les médias du post
- *   5. Mettre à jour le Post avec le statut PUBLISHED (ou FAILED)
+ *   4. Publier via getlate.dev avec publishNow: true (Inngest a déjà attendu)
+ *   5. Vérifier le statut par plateforme dans la réponse Late
+ *   6. Mettre à jour le Post avec PUBLISHED + platformPostUrl (ou FAILED)
+ *
+ *   Pourquoi `publishNow: true` au lieu de `scheduledAt` ?
+ *   - Inngest gère le timing via `step.sleepUntil()` (persistance, retries, backoff)
+ *   - Late ne connaît pas la date de publication — c'est Inngest qui décide du moment
+ *   - En passant `publishNow: true`, Late publie immédiatement à réception
+ *   - Late retourne le statut par plateforme + l'URL du post publié
  *
  *   En cas d'échec après les 3 retries Inngest :
  *   → L'event "inngest/function.failed" est émis automatiquement
@@ -102,25 +109,53 @@ export const publishScheduledPost = inngest.createFunction(
       throw new Error(`Profil ${post.platform} introuvable pour l'utilisateur`)
     }
 
-    // ── Étape 4 : Publier via getlate.dev ────────────────────────────────────
-    // Publication directe : le post a son texte et ses médias adaptés à la plateforme
+    // ── Étape 4 : Publier via getlate.dev avec publishNow ────────────────────
+    // `publishNow: true` car Inngest a déjà attendu via step.sleepUntil().
+    // Late publie immédiatement et retourne le statut par plateforme + l'URL du post.
     const latePost = await step.run('publier-post', async () => {
       return late.posts.create({
         text: post.text,
         // Un seul profileId : la publication est sur une seule plateforme
         profileIds: [connectedPlatform.lateProfileId],
         mediaUrls: post.mediaUrls.length > 0 ? post.mediaUrls : undefined,
+        // Late publie immédiatement — Inngest a déjà géré le timing via sleepUntil
+        publishNow: true,
       })
     })
 
-    // ── Étape 5 : Mettre à jour le statut du Post ─────────────────────────────
+    // ── Étape 5 : Vérifier le statut de publication par plateforme ───────────
+    // Late retourne `platforms[0]` avec status 'success' | 'failed' | 'pending'.
+    // En cas d'échec, on throw pour déclencher les retries Inngest automatiques.
+    const platformResult = latePost.platforms?.[0]
+
+    if (!platformResult || platformResult.status === 'failed') {
+      // Marquer comme FAILED immédiatement (avant le throw)
+      // pour que l'UI reflète l'erreur même si les retries échouent.
+      await prisma.post.update({
+        where: { id: postId },
+        data: {
+          status: 'FAILED',
+          failureReason: `Late : publication échouée sur ${platformResult?.platform ?? connectedPlatform.platform}`,
+        },
+      })
+      throw new Error(
+        `Late : publication échouée sur ${platformResult?.platform ?? connectedPlatform.platform}`
+      )
+    }
+
+    // ── Étape 6 : Mettre à jour le statut du Post ─────────────────────────────
+    // Récupérer l'ID Late : Late retourne `_id` (MongoDB), fallback sur `id`
+    const latePostId = latePost._id ?? latePost.id ?? null
+
     await step.run('mettre-a-jour-statut', async () => {
       return prisma.post.update({
         where: { id: postId },
         data: {
           status: 'PUBLISHED',
-          publishedAt: new Date(),
-          latePostId: latePost.id,
+          publishedAt: latePost.publishedAt ? new Date(latePost.publishedAt) : new Date(),
+          latePostId,
+          // URL directe du post publié (ex: "https://tiktok.com/@handle/video/...")
+          platformPostUrl: platformResult.platformPostUrl ?? null,
           failureReason: null,
         },
       })
@@ -129,7 +164,8 @@ export const publishScheduledPost = inngest.createFunction(
     return {
       published: true,
       platform: post.platform,
-      latePostId: latePost.id,
+      latePostId,
+      platformPostUrl: platformResult.platformPostUrl ?? null,
     }
   },
 )

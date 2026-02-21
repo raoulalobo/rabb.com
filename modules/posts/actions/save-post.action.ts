@@ -54,6 +54,7 @@ function mapPrismaPost(record: {
   publishedAt: Date | null
   status: string
   latePostId: string | null
+  platformPostUrl: string | null
   failureReason: string | null
   createdAt: Date
   updatedAt: Date
@@ -68,6 +69,7 @@ function mapPrismaPost(record: {
     publishedAt: record.publishedAt,
     status: record.status as Post['status'],
     latePostId: record.latePostId,
+    platformPostUrl: record.platformPostUrl,
     failureReason: record.failureReason,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

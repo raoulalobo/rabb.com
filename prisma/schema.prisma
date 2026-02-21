@@ -160,8 +160,9 @@ model Post {
   status        PostStatus @default(DRAFT)
   scheduledFor  DateTime?  // Null si brouillon, défini si planifié
   publishedAt   DateTime?  // Rempli par Inngest après publication réussie
-  latePostId    String?    // ID retourné par getlate.dev après publication
-  failureReason String?    // Message d'erreur si status = FAILED
+  latePostId      String?    // ID retourné par getlate.dev après publication
+  platformPostUrl String?    // URL directe du post sur la plateforme sociale (ex: tiktok.com/...)
+  failureReason   String?    // Message d'erreur si status = FAILED
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

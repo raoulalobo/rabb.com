@@ -64,15 +64,54 @@ export interface LateConnectResponse {
   state: string
 }
 
+/**
+ * Résultat de publication d'un post sur une plateforme spécifique.
+ * Retourné dans le tableau `platforms[]` de LatePost après publication.
+ * Permet de vérifier le statut par plateforme et de récupérer l'URL du post publié.
+ */
+export interface LatePostPlatformResult {
+  /** Nom de la plateforme (ex: "tiktok", "instagram") */
+  platform: string
+  /** Compte social ciblé */
+  accountId: {
+    _id: string
+    username: string
+    displayName: string
+    isActive: boolean
+  }
+  /**
+   * Statut de publication sur cette plateforme.
+   * - `pending`  : en attente de traitement par Late
+   * - `success`  : publié avec succès
+   * - `failed`   : échec de publication
+   */
+  status: 'pending' | 'success' | 'failed'
+  /**
+   * URL directe du post publié sur la plateforme sociale.
+   * Ex: "https://www.tiktok.com/@handle/video/123456789"
+   * Disponible uniquement si `status === 'success'`.
+   */
+  platformPostUrl?: string
+}
+
 /** Post publié ou planifié via getlate.dev */
 export interface LatePost {
-  id: string
+  /** ID MongoDB du post dans getlate.dev (utilisé comme latePostId en DB) */
+  _id: string
+  /** Alias de _id — certains endpoints retournent `id` */
+  id?: string
   text: string
   profileIds: string[]
   scheduledAt?: string
   publishedAt?: string
   status: 'draft' | 'scheduled' | 'published' | 'failed'
   mediaUrls?: string[]
+  /**
+   * Résultats par plateforme après publication.
+   * Présent quand `publishNow: true` et que Late a traité la demande.
+   * Utiliser `platforms[0].status` pour vérifier le succès.
+   */
+  platforms?: LatePostPlatformResult[]
 }
 
 /** Paramètres pour créer un post */
@@ -81,6 +120,12 @@ export interface LateCreatePostParams {
   profileIds: string[]
   scheduledAt?: string
   mediaUrls?: string[]
+  /**
+   * Si `true`, Late publie immédiatement sans attendre `scheduledAt`.
+   * À utiliser avec Inngest : Inngest a déjà attendu via `step.sleepUntil()`,
+   * donc Late doit publier dès réception de la requête.
+   */
+  publishNow?: boolean
 }
 
 /** Statistiques d'un post */

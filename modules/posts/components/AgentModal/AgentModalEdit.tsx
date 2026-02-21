@@ -4,13 +4,14 @@
  * @description Zone d'édition d'un post existant via une instruction libre.
  *
  *   Permet :
- *   - Saisir une instruction de modification (texte ou dictée vocale)
+ *   - Saisir une instruction de modification (texte ou dictée vocale via Web Speech API)
  *   - Ajouter de nouveaux médias via bouton ou glisser-déposer (drag & drop)
  *   - Supprimer des médias existants (croix sur chaque vignette)
  *   - Appeler POST /api/agent/edit-post → post mis à jour en DB
  *
  *   Le pool de médias est initialisé avec les URLs actuelles du post.
  *   L'agent reçoit le pool final (ajouts + suppressions) et met à jour le post.
+ *   Dictée vocale : useSpeechRecognition (natif navigateur, aucun appel serveur).
  *
  * @example
  *   <AgentModalEdit
@@ -28,7 +29,7 @@ import { useCallback, useId, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
-import { useVoiceRecorder } from '@/modules/posts/hooks/useVoiceRecorder'
+import { useSpeechRecognition } from '@/modules/posts/hooks/useSpeechRecognition'
 import type { Post, PoolMedia, UploadingFile } from '@/modules/posts/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -89,17 +90,16 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
   // Config visuelle de la plateforme
   const config = PLATFORM_CONFIG[post.platform as keyof typeof PLATFORM_CONFIG]
 
-  // ── Dictée vocale ─────────────────────────────────────────────────────────
-  const { status: micStatus, startRecording, stopRecording } = useVoiceRecorder({
+  // ── Dictée vocale (Web Speech API — natif, aucun appel serveur) ──────────
+  const { isListening, startListening, stopListening, isSupported } = useSpeechRecognition({
     /** Appende le texte transcrit à l'instruction existante */
-    onTranscription: (text) => {
+    onResult: (text) => {
       setInstruction((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))
     },
-    onError: (msg) => setError(msg),
   })
 
-  const isMicBusy = micStatus !== 'idle'
-  const isDisabled = isUpdating || isMicBusy
+  // Web Speech API : pas d'état 'transcribing', seul isListening bloque l'UI
+  const isDisabled = isUpdating || isListening
 
   // ── Upload d'un fichier ────────────────────────────────────────────────────
 
@@ -448,36 +448,29 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
             Instruction de modification
           </label>
 
-          {/* Bouton dictée vocale */}
-          <button
-            type="button"
-            onClick={micStatus === 'recording' ? stopRecording : () => void startRecording()}
-            disabled={isUpdating || micStatus === 'transcribing'}
-            aria-label={
-              micStatus === 'recording'
-                ? "Arrêter l'enregistrement"
-                : micStatus === 'transcribing'
-                  ? 'Transcription en cours…'
-                  : 'Démarrer la dictée vocale'
-            }
-            className={[
-              'flex size-7 items-center justify-center rounded-full transition-all',
-              micStatus === 'recording'
-                ? 'animate-pulse bg-red-100 text-red-500 hover:bg-red-200'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              isUpdating || micStatus === 'transcribing'
-                ? 'cursor-not-allowed opacity-50'
-                : '',
-            ].join(' ')}
-          >
-            {micStatus === 'transcribing' ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : micStatus === 'recording' ? (
-              <MicOff className="size-3.5" />
-            ) : (
-              <Mic className="size-3.5" />
-            )}
-          </button>
+          {/* Bouton dictée vocale — masqué si Web Speech API non supportée (ex: Firefox) */}
+          {isSupported && (
+            <button
+              type="button"
+              onClick={isListening ? stopListening : startListening}
+              disabled={isUpdating}
+              aria-label={isListening ? "Arrêter la dictée vocale" : 'Démarrer la dictée vocale'}
+              className={[
+                'flex size-7 items-center justify-center rounded-full transition-all',
+                isListening
+                  ? 'animate-pulse bg-red-100 text-red-500 hover:bg-red-200'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                isUpdating ? 'cursor-not-allowed opacity-50' : '',
+              ].join(' ')}
+            >
+              {/* Mic = prêt, MicOff = écoute active */}
+              {isListening ? (
+                <MicOff className="size-3.5" />
+              ) : (
+                <Mic className="size-3.5" />
+              )}
+            </button>
+          )}
         </div>
 
         <Textarea
@@ -491,12 +484,12 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
         />
 
         <p className="text-xs text-muted-foreground">
-          {micStatus === 'recording' && (
-            <span className="font-medium text-red-500">● Enregistrement en cours…</span>
+          {/* Web Speech API : résultat instantané, pas d'état 'transcribing' */}
+          {isListening ? (
+            <span className="font-medium text-red-500">● En cours d&apos;écoute… (parlez maintenant)</span>
+          ) : (
+            'Décrivez ce que vous souhaitez modifier (texte, médias, ton…).'
           )}
-          {micStatus === 'transcribing' && 'Transcription en cours…'}
-          {micStatus === 'idle' &&
-            'Décrivez ce que vous souhaitez modifier (texte, médias, ton…).'}
         </p>
       </div>
 

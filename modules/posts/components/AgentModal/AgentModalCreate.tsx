@@ -5,10 +5,13 @@
  *
  *   Gère :
  *   1. Upload de médias — bouton "Ajouter" OU glisser-déposer (drag & drop)
- *   2. Dictée vocale — bouton micro → Whisper → texte inséré dans l'instruction
+ *   2. Dictée vocale — bouton micro → Web Speech API → texte inséré dans l'instruction
  *   3. Saisie de l'instruction en texte libre
  *   4. Appel à POST /api/agent/create-posts → N posts DRAFT créés en DB
  *   5. Affichage du résumé des posts créés avant fermeture
+ *
+ *   Dictée vocale : useSpeechRecognition (natif navigateur, aucun appel serveur).
+ *   Le bouton micro est masqué si `isSupported === false` (ex: Firefox sans flag).
  *
  * @example
  *   <AgentModalCreate
@@ -25,7 +28,7 @@ import { useCallback, useId, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
-import { useVoiceRecorder } from '@/modules/posts/hooks/useVoiceRecorder'
+import { useSpeechRecognition } from '@/modules/posts/hooks/useSpeechRecognition'
 import type { Post, PoolMedia, UploadingFile } from '@/modules/posts/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -68,16 +71,15 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
   const dragCounterRef = useRef(0)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
 
-  // ── Dictée vocale ─────────────────────────────────────────────────────────
-  const { status: micStatus, startRecording, stopRecording } = useVoiceRecorder({
+  // ── Dictée vocale (Web Speech API — natif, aucun appel serveur) ──────────
+  const { isListening, startListening, stopListening, isSupported } = useSpeechRecognition({
     /**
      * Appende le texte transcrit à l'instruction existante.
      * Sépare par un espace si l'instruction n'est pas vide.
      */
-    onTranscription: (text) => {
+    onResult: (text) => {
       setInstruction((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))
     },
-    onError: (msg) => setError(msg),
   })
 
   // ── Upload d'un fichier ────────────────────────────────────────────────────
@@ -300,8 +302,8 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
 
   // ── Rendu — étape principale ──────────────────────────────────────────────
 
-  const isMicBusy = micStatus !== 'idle'
-  const isDisabled = isGenerating || isMicBusy
+  // Web Speech API : pas d'état 'transcribing' (résultat instantané)
+  const isDisabled = isGenerating || isListening
 
   return (
     <div className="space-y-4">
@@ -313,13 +315,15 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
             Instruction
           </label>
 
-          {/* Bouton dictée vocale */}
-          <MicButton
-            status={micStatus}
-            disabled={isGenerating}
-            onStart={() => void startRecording()}
-            onStop={stopRecording}
-          />
+          {/* Bouton dictée vocale — masqué si Web Speech API non supportée (ex: Firefox) */}
+          {isSupported && (
+            <MicButton
+              isListening={isListening}
+              disabled={isGenerating}
+              onStart={startListening}
+              onStop={stopListening}
+            />
+          )}
         </div>
 
         <Textarea
@@ -333,13 +337,12 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
         />
 
         <p className="text-xs text-muted-foreground">
-          {micStatus === 'recording' && (
-            <span className="font-medium text-red-500">● Enregistrement en cours…</span>
+          {/* Web Speech API : résultat instantané, pas d'état 'transcribing' */}
+          {isListening ? (
+            <span className="font-medium text-red-500">● En cours d&apos;écoute… (parlez maintenant)</span>
+          ) : (
+            'Mentionnez les plateformes, la date/heure et le ton souhaité.'
           )}
-          {micStatus === 'transcribing' && (
-            <span className="text-muted-foreground">Transcription en cours…</span>
-          )}
-          {micStatus === 'idle' && 'Mentionnez les plateformes, la date/heure et le ton souhaité.'}
         </p>
       </div>
 
@@ -505,54 +508,44 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
 // ─── Sous-composant : bouton micro ────────────────────────────────────────────
 
 /**
- * Bouton de dictée vocale avec retour visuel selon l'état du recorder.
+ * Bouton de dictée vocale adapté à l'interface useSpeechRecognition.
+ * Avec Web Speech API, pas d'état intermédiaire "transcribing" (résultat instantané).
  *
- * - `idle`         → icône Mic, bouton fantôme
- * - `recording`    → icône MicOff rouge, animation pulse, clic = stop
- * - `transcribing` → spinner, désactivé
+ * - `isListening: false` → icône Mic, bouton fantôme, clic = démarrer
+ * - `isListening: true`  → icône MicOff rouge + pulse, clic = arrêter
  *
- * @param status   - État courant du recorder
- * @param disabled - Désactivé quand la génération est en cours
- * @param onStart  - Démarre l'enregistrement
- * @param onStop   - Arrête l'enregistrement
+ * @param isListening - `true` si la reconnaissance est active
+ * @param disabled    - Désactivé quand la génération est en cours
+ * @param onStart     - Démarre la dictée vocale
+ * @param onStop      - Arrête la dictée vocale manuellement
  */
 function MicButton({
-  status,
+  isListening,
   disabled,
   onStart,
   onStop,
 }: {
-  status: 'idle' | 'recording' | 'transcribing'
+  isListening: boolean
   disabled: boolean
   onStart: () => void
   onStop: () => void
 }): React.JSX.Element {
-  const isRecording = status === 'recording'
-  const isTranscribing = status === 'transcribing'
-
   return (
     <button
       type="button"
-      onClick={isRecording ? onStop : onStart}
-      disabled={disabled || isTranscribing}
-      aria-label={
-        isRecording
-          ? 'Arrêter l\'enregistrement'
-          : isTranscribing
-            ? 'Transcription en cours…'
-            : 'Démarrer la dictée vocale'
-      }
+      onClick={isListening ? onStop : onStart}
+      disabled={disabled}
+      aria-label={isListening ? "Arrêter la dictée vocale" : 'Démarrer la dictée vocale'}
       className={[
         'flex size-7 items-center justify-center rounded-full transition-all',
-        isRecording
+        isListening
           ? 'animate-pulse bg-red-100 text-red-500 hover:bg-red-200'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        disabled || isTranscribing ? 'cursor-not-allowed opacity-50' : '',
+        disabled ? 'cursor-not-allowed opacity-50' : '',
       ].join(' ')}
     >
-      {isTranscribing ? (
-        <Loader2 className="size-3.5 animate-spin" />
-      ) : isRecording ? (
+      {/* Mic = prêt, MicOff = écoute active */}
+      {isListening ? (
         <MicOff className="size-3.5" />
       ) : (
         <Mic className="size-3.5" />

@@ -156,6 +156,8 @@ export async function schedulePost(
         publishedAt: post.publishedAt,
         status: post.status as 'SCHEDULED',
         latePostId: post.latePostId,
+        // platformPostUrl est null lors de la planification (rempli par Inngest après publication)
+        platformPostUrl: post.platformPostUrl,
         failureReason: post.failureReason,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,

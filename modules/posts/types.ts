@@ -28,6 +28,8 @@ export interface Post {
   publishedAt: Date | null
   status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED'
   latePostId: string | null
+  /** URL directe du post sur la plateforme sociale (ex: "https://tiktok.com/@handle/video/...") */
+  platformPostUrl: string | null
   failureReason: string | null
   createdAt: Date
   updatedAt: Date
