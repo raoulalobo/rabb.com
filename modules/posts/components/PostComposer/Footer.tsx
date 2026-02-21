@@ -27,7 +27,7 @@
 import { Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { getEffectiveCharLimit } from '@/modules/posts/schemas/post.schema'
+import { getCharLimit } from '@/modules/posts/schemas/post.schema'
 
 import { usePostComposerContext } from './context'
 
@@ -43,7 +43,10 @@ export function Footer(): React.JSX.Element {
     usePostComposerContext()
 
   // ─── Calcul de l'état des boutons ─────────────────────────────────────────
-  const charLimit = getEffectiveCharLimit(platforms)
+  // Limite la plus restrictive parmi les plateformes sélectionnées
+  const charLimit = platforms.length > 0
+    ? Math.min(...platforms.map((p) => getCharLimit(p)))
+    : 63206
   const isOverLimit = text.length > charLimit
   const hasText = text.trim().length > 0
   const hasPlatforms = platforms.length > 0

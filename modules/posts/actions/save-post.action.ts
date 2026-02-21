@@ -4,6 +4,9 @@
  * @description Server Actions pour la création et la mise à jour de posts.
  *   Valide les données avec Zod, vérifie la session, persiste en base de données.
  *
+ *   Modèle simplifié : 1 post = 1 plateforme (platform string, pas platforms[]).
+ *   Les posts sont créés individuellement par l'agent via /api/agent/create-posts.
+ *
  *   Deux actions exportées :
  *   - savePost : crée un nouveau post ou met à jour un post existant (selon postId)
  *   - deletePost : supprime un post (DRAFT ou SCHEDULED uniquement)
@@ -12,11 +15,10 @@
  *   (lib/inngest/functions/publish-scheduled-post.ts), pas ici.
  *
  * @example
- *   // Dans PostComposer.Footer :
+ *   // Sauvegarde d'un brouillon simple
  *   const result = await savePost({
- *     text: 'Mon post',
- *     platforms: ['instagram', 'tiktok'],
- *     scheduledFor: new Date('2024-03-15T10:00:00'),
+ *     text: 'Mon post Instagram',
+ *     platform: 'instagram',
  *   })
  *   if (result.success) {
  *     // result.post contient le post sauvegardé
@@ -46,12 +48,13 @@ function mapPrismaPost(record: {
   id: string
   userId: string
   text: string
-  platforms: string[]
+  platform: string
   mediaUrls: string[]
   scheduledFor: Date | null
   publishedAt: Date | null
   status: string
   latePostId: string | null
+  failureReason: string | null
   createdAt: Date
   updatedAt: Date
 }): Post {
@@ -59,12 +62,13 @@ function mapPrismaPost(record: {
     id: record.id,
     userId: record.userId,
     text: record.text,
-    platforms: record.platforms,
+    platform: record.platform,
     mediaUrls: record.mediaUrls,
     scheduledFor: record.scheduledFor,
     publishedAt: record.publishedAt,
     status: record.status as Post['status'],
     latePostId: record.latePostId,
+    failureReason: record.failureReason,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   }
@@ -80,7 +84,7 @@ function mapPrismaPost(record: {
  * - Si status explicitement fourni → utiliser ce statut
  * - Sinon → status = 'DRAFT'
  *
- * Si un postId est présent dans les données, c'est une mise à jour (PATCH).
+ * Si rawData contient un champ "id", c'est une mise à jour (PATCH).
  * Sinon c'est une création (POST).
  *
  * @param rawData - Données brutes du formulaire (non validées)
@@ -88,21 +92,10 @@ function mapPrismaPost(record: {
  *
  * @example
  *   // Création d'un brouillon
- *   const result = await savePost({ text: 'Mon post', platforms: ['instagram'] })
- *
- *   // Planification
- *   const result = await savePost({
- *     text: 'Post planifié',
- *     platforms: ['instagram'],
- *     scheduledFor: new Date('2024-03-15T10:00:00'),
- *   })
+ *   const result = await savePost({ text: 'Mon post', platform: 'instagram' })
  *
  *   // Mise à jour d'un post existant
- *   const result = await savePost({
- *     id: 'post_123',
- *     text: 'Texte modifié',
- *     platforms: ['instagram', 'tiktok'],
- *   })
+ *   const result = await savePost({ id: 'post_123', text: 'Texte modifié', platform: 'instagram' })
  */
 export async function savePost(rawData: unknown): Promise<SavePostResult> {
   // ─── Authentification ─────────────────────────────────────────────────────
@@ -112,7 +105,6 @@ export async function savePost(rawData: unknown): Promise<SavePostResult> {
   }
 
   // ─── Détection : création ou mise à jour ──────────────────────────────────
-  // Si rawData contient un champ "id", on tente la mise à jour
   const isUpdate =
     typeof rawData === 'object' &&
     rawData !== null &&
@@ -136,7 +128,6 @@ export async function savePost(rawData: unknown): Promise<SavePostResult> {
  * @returns SavePostResult
  */
 async function createPost(rawData: unknown, userId: string): Promise<SavePostResult> {
-  // Validation Zod côté serveur (défense en profondeur)
   const parsed = PostCreateSchema.safeParse(rawData)
   if (!parsed.success) {
     return {
@@ -145,7 +136,7 @@ async function createPost(rawData: unknown, userId: string): Promise<SavePostRes
     }
   }
 
-  const { text, platforms, mediaUrls, scheduledFor, status, platformOverrides } = parsed.data
+  const { text, platform, mediaUrls, scheduledFor, status } = parsed.data
 
   // Détermination du statut final
   const finalStatus = scheduledFor ? 'SCHEDULED' : (status ?? 'DRAFT')
@@ -155,20 +146,15 @@ async function createPost(rawData: unknown, userId: string): Promise<SavePostRes
       data: {
         userId,
         text,
-        platforms,
+        platform,
         mediaUrls: mediaUrls ?? [],
         scheduledFor: scheduledFor ?? null,
         status: finalStatus,
       },
     })
 
-    // Upsert des contenus spécifiques par plateforme (si des overrides existent)
-    // Chaque override crée ou met à jour un enregistrement PostPlatformContent
-    if (platformOverrides && Object.keys(platformOverrides).length > 0) {
-      await upsertPlatformContents(post.id, platformOverrides)
-    }
-
     // Invalide le cache de la liste des posts
+    revalidatePath('/compose')
     revalidatePath('/calendar')
     revalidatePath('/')
 
@@ -198,10 +184,9 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
     }
   }
 
-  const { id, text, platforms, mediaUrls, scheduledFor, status, platformOverrides } = parsed.data
+  const { id, text, platform, mediaUrls, scheduledFor, status } = parsed.data
 
   // ─── Ownership check ────────────────────────────────────────────────────────
-  // Vérifier que le post appartient à l'utilisateur avant de le modifier
   const existingPost = await prisma.post.findUnique({
     where: { id },
     select: { userId: true, status: true },
@@ -212,7 +197,6 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
   }
 
   if (existingPost.userId !== userId) {
-    // Ne pas révéler si le post existe ou non (sécurité)
     return { success: false, error: 'Post introuvable' }
   }
 
@@ -222,29 +206,21 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
   }
 
   // Détermination du statut final
-  const finalStatus = scheduledFor
-    ? 'SCHEDULED'
-    : (status ?? existingPost.status)
+  const finalStatus = scheduledFor ? 'SCHEDULED' : (status ?? existingPost.status)
 
   try {
     const post = await prisma.post.update({
       where: { id },
       data: {
-        // Seuls les champs présents dans rawData sont mis à jour
         ...(text !== undefined && { text }),
-        ...(platforms !== undefined && { platforms }),
+        ...(platform !== undefined && { platform }),
         ...(mediaUrls !== undefined && { mediaUrls }),
         ...(scheduledFor !== undefined && { scheduledFor }),
         status: finalStatus,
       },
     })
 
-    // Upsert des contenus spécifiques par plateforme (si des overrides existent)
-    if (platformOverrides && Object.keys(platformOverrides).length > 0) {
-      await upsertPlatformContents(id, platformOverrides)
-    }
-
-    // Invalide le cache des pages affectées
+    revalidatePath('/compose')
     revalidatePath('/calendar')
     revalidatePath('/')
 
@@ -253,60 +229,6 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
     console.error('[savePost] Erreur mise à jour post :', error)
     return { success: false, error: 'Erreur lors de la sauvegarde' }
   }
-}
-
-// ─── Helpers internes ─────────────────────────────────────────────────────────
-
-/**
- * Upsert les enregistrements PostPlatformContent pour un post donné.
- * Appelée après la création ou la mise à jour d'un Post pour persister les overrides.
- *
- * La logique est un upsert : si l'enregistrement existe déjà (même postId + platform),
- * on le met à jour ; sinon on le crée. Le status est reset à PENDING car le contenu
- * a changé et devra être re-publié.
- *
- * @param postId - ID du post parent
- * @param overrides - Map platform → {text, mediaUrls} depuis PostCreateSchema
- *
- * @example
- *   await upsertPlatformContents('post_abc', {
- *     twitter: { text: 'Tweet court', mediaUrls: [] },
- *     instagram: { text: 'Post Instagram plus long', mediaUrls: ['https://...'] },
- *   })
- */
-async function upsertPlatformContents(
-  postId: string,
-  overrides: Record<string, { text: string; mediaUrls: string[] }>,
-): Promise<void> {
-  // Upsert en parallèle pour les performances (chaque plateforme est indépendante)
-  await Promise.all(
-    Object.entries(overrides).map(([platform, content]) =>
-      prisma.postPlatformContent.upsert({
-        where: {
-          // Contrainte unique (postId, platform) définie dans schema.prisma
-          postId_platform: { postId, platform },
-        },
-        create: {
-          postId,
-          platform,
-          text: content.text,
-          mediaUrls: content.mediaUrls,
-          // Status PENDING : sera mis à jour par Inngest lors de la publication
-          status: 'PENDING',
-        },
-        update: {
-          text: content.text,
-          mediaUrls: content.mediaUrls,
-          // Reset le status car le contenu a changé → nécessite une re-publication
-          status: 'PENDING',
-          // Effacer les données de publication précédentes (si re-publication)
-          latePostId: null,
-          failureReason: null,
-          publishedAt: null,
-        },
-      }),
-    ),
-  )
 }
 
 // ─── deletePost ───────────────────────────────────────────────────────────────
@@ -321,17 +243,15 @@ async function upsertPlatformContents(
  * @example
  *   const result = await deletePost('post_abc123')
  *   if (result.success) {
- *     // Post supprimé, rediriger vers /calendar
+ *     // Post supprimé
  *   }
  */
 export async function deletePost(postId: string): Promise<{ success: boolean; error?: string }> {
-  // ─── Authentification ─────────────────────────────────────────────────────
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) {
     return { success: false, error: 'Non authentifié' }
   }
 
-  // ─── Ownership check + statut ──────────────────────────────────────────────
   const post = await prisma.post.findUnique({
     where: { id: postId },
     select: { userId: true, status: true },
@@ -348,6 +268,7 @@ export async function deletePost(postId: string): Promise<{ success: boolean; er
   try {
     await prisma.post.delete({ where: { id: postId } })
 
+    revalidatePath('/compose')
     revalidatePath('/calendar')
     revalidatePath('/')
 

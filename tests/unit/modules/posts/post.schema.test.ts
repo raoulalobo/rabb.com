@@ -2,10 +2,12 @@
  * @file tests/unit/modules/posts/post.schema.test.ts
  * @description Tests unitaires des schémas Zod et utilitaires du module posts.
  *   Vérifie :
- *   - PostCreateSchema (validation texte, plateformes, médias, planification)
+ *   - PostCreateSchema (validation texte, plateforme unique, médias, planification)
  *   - PostUpdateSchema (id requis, champs partiels)
- *   - getEffectiveCharLimit (limite par plateforme)
+ *   - getCharLimit (limite de caractères par plateforme)
  *   - MediaUploadRequestSchema (type MIME, taille)
+ *
+ *   Modèle simplifié : 1 post = 1 plateforme (platform string, pas platforms[]).
  */
 
 import { describe, expect, it } from 'vitest'
@@ -14,37 +16,42 @@ import {
   MediaUploadRequestSchema,
   PostCreateSchema,
   PostUpdateSchema,
-  getEffectiveCharLimit,
+  getCharLimit,
 } from '@/modules/posts/schemas/post.schema'
 
-// ─── getEffectiveCharLimit ────────────────────────────────────────────────────
+// ─── getCharLimit ─────────────────────────────────────────────────────────────
 
-describe('getEffectiveCharLimit', () => {
-  it('retourne 5000 si aucune plateforme sélectionnée', () => {
-    expect(getEffectiveCharLimit([])).toBe(5000)
+describe('getCharLimit', () => {
+  it('retourne 280 pour Twitter', () => {
+    expect(getCharLimit('twitter')).toBe(280)
   })
 
-  it('retourne la limite de Twitter (280) si Twitter est sélectionné', () => {
-    expect(getEffectiveCharLimit(['twitter'])).toBe(280)
+  it('retourne 2200 pour Instagram', () => {
+    expect(getCharLimit('instagram')).toBe(2200)
   })
 
-  it('retourne la limite la plus restrictive parmi plusieurs plateformes', () => {
-    // Twitter (280) est plus restrictif qu'Instagram (2200)
-    expect(getEffectiveCharLimit(['instagram', 'twitter'])).toBe(280)
+  it('retourne 2200 pour TikTok', () => {
+    expect(getCharLimit('tiktok')).toBe(2200)
   })
 
-  it('retourne la limite Instagram (2200) sans Twitter', () => {
-    expect(getEffectiveCharLimit(['instagram', 'facebook'])).toBe(2200)
+  it('retourne 5000 pour YouTube', () => {
+    expect(getCharLimit('youtube')).toBe(5000)
   })
 
-  it('retourne 5000 pour une plateforme inconnue (fallback)', () => {
-    expect(getEffectiveCharLimit(['unknown_platform'])).toBe(5000)
+  it('retourne 63206 pour Facebook', () => {
+    expect(getCharLimit('facebook')).toBe(63206)
   })
 
-  it('retourne la limite correcte pour une seule plateforme', () => {
-    expect(getEffectiveCharLimit(['bluesky'])).toBe(300)
-    expect(getEffectiveCharLimit(['linkedin'])).toBe(3000)
-    expect(getEffectiveCharLimit(['youtube'])).toBe(5000)
+  it('retourne 300 pour Bluesky', () => {
+    expect(getCharLimit('bluesky')).toBe(300)
+  })
+
+  it('retourne 3000 pour LinkedIn', () => {
+    expect(getCharLimit('linkedin')).toBe(3000)
+  })
+
+  it('retourne 63206 (max Facebook) pour une plateforme inconnue (fallback)', () => {
+    expect(getCharLimit('unknown_platform')).toBe(63206)
   })
 })
 
@@ -53,7 +60,7 @@ describe('getEffectiveCharLimit', () => {
 describe('PostCreateSchema', () => {
   const validPost = {
     text: 'Mon super post Instagram !',
-    platforms: ['instagram'],
+    platform: 'instagram',
   }
 
   it('valide un post minimal (texte + une plateforme)', () => {
@@ -92,23 +99,15 @@ describe('PostCreateSchema', () => {
     ).toBe(false)
   })
 
-  it('rejette si aucune plateforme sélectionnée', () => {
+  it('rejette si la plateforme est une chaîne vide', () => {
     expect(
-      PostCreateSchema.safeParse({ ...validPost, platforms: [] }).success,
+      PostCreateSchema.safeParse({ ...validPost, platform: '' }).success,
     ).toBe(false)
   })
 
-  it('rejette une plateforme inconnue', () => {
-    expect(
-      PostCreateSchema.safeParse({ ...validPost, platforms: ['myspace'] }).success,
-    ).toBe(false)
-  })
-
-  it('accepte plusieurs plateformes valides', () => {
-    const result = PostCreateSchema.safeParse({
-      ...validPost,
-      platforms: ['instagram', 'tiktok', 'facebook'],
-    })
+  it('accepte n\'importe quelle chaîne non vide comme plateforme', () => {
+    // Le schéma accepte n'importe quel identifiant de plateforme valide
+    const result = PostCreateSchema.safeParse({ ...validPost, platform: 'tiktok' })
     expect(result.success).toBe(true)
   })
 
@@ -212,7 +211,7 @@ describe('PostUpdateSchema', () => {
     const result = PostUpdateSchema.safeParse({
       id: 'post_abc123',
       text: 'Texte complet mis à jour',
-      platforms: ['instagram', 'tiktok'],
+      platform: 'instagram',
       mediaUrls: ['https://example.com/photo.jpg'],
       scheduledFor: futureDate,
       status: 'SCHEDULED',

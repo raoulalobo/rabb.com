@@ -1,13 +1,23 @@
 /**
  * @file app/api/posts/route.ts
- * @description Route Handler GET : liste les posts de l'utilisateur pour le calendrier.
- *   Accepte les paramètres de filtre : year, month (pour afficher un mois donné).
+ * @description Route Handler GET : liste les posts de l'utilisateur.
+ *   Supporte deux modes de filtrage :
  *
- *   GET /api/posts?year=2024&month=3
- *   → Response : Post[] (posts du mois, triés par scheduledFor)
+ *   Mode calendrier (défaut) :
+ *     GET /api/posts?year=2024&month=3
+ *     → Posts du mois (planifiés ou publiés dans cette période)
+ *
+ *   Mode brouillons :
+ *     GET /api/posts?status=DRAFT
+ *     → Posts DRAFT de l'utilisateur (pour /compose)
  *
  * @example
+ *   // Calendrier
  *   const res = await fetch('/api/posts?year=2024&month=3')
+ *   const posts = await res.json()
+ *
+ *   // Brouillons
+ *   const res = await fetch('/api/posts?status=DRAFT')
  *   const posts = await res.json()
  */
 
@@ -19,9 +29,9 @@ import { prisma } from '@/lib/prisma'
 
 /**
  * GET /api/posts
- * Retourne les posts d'un mois donné pour le calendrier.
+ * Retourne les posts selon le mode demandé (calendrier ou brouillons).
  *
- * @param request - Requête avec query params year et month (optionnels, défaut: mois actuel)
+ * @param request - Requête avec query params year, month (calendrier) ou status (brouillons)
  * @returns 200 avec la liste des posts ou 401 si non authentifié
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -31,8 +41,43 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  // ─── Paramètres de filtre (mois courant par défaut) ───────────────────────
   const { searchParams } = request.nextUrl
+
+  // ─── Mode brouillons : filtre par statut ──────────────────────────────────
+  // Activé si le paramètre `status` est présent (ex: ?status=DRAFT)
+  const statusParam = searchParams.get('status')
+  if (statusParam) {
+    const allowedStatuses = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
+    if (!allowedStatuses.includes(statusParam)) {
+      return NextResponse.json({ error: 'Statut invalide' }, { status: 400 })
+    }
+
+    const posts = await prisma.post.findMany({
+      where: {
+        userId: session.user.id,
+        status: statusParam as 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED',
+      },
+      select: {
+        id: true,
+        text: true,
+        platform: true,
+        mediaUrls: true,
+        status: true,
+        scheduledFor: true,
+        publishedAt: true,
+        latePostId: true,
+        failureReason: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
+
+    return NextResponse.json(posts)
+  }
+
+  // ─── Mode calendrier : filtre par mois ────────────────────────────────────
   const now = new Date()
   const year = parseInt(searchParams.get('year') ?? String(now.getFullYear()), 10)
   const month = parseInt(searchParams.get('month') ?? String(now.getMonth() + 1), 10)
@@ -43,39 +88,33 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // ─── Calcul de la plage de dates du mois ──────────────────────────────────
-  // Inclure les 7 jours avant/après pour afficher les semaines complètes du calendrier
   const firstDay = new Date(year, month - 1, 1)
   const lastDay = new Date(year, month, 0, 23, 59, 59)
 
-  // ─── Requête DB ───────────────────────────────────────────────────────────
+  // ─── Requête DB — mode calendrier ─────────────────────────────────────────
   const posts = await prisma.post.findMany({
     where: {
       userId: session.user.id,
       // Inclure les posts qui ont une date dans ce mois (planifiés OU publiés)
       OR: [
         // Posts planifiés dans ce mois
-        {
-          scheduledFor: { gte: firstDay, lte: lastDay },
-        },
+        { scheduledFor: { gte: firstDay, lte: lastDay } },
         // Posts publiés dans ce mois
-        {
-          publishedAt: { gte: firstDay, lte: lastDay },
-        },
+        { publishedAt: { gte: firstDay, lte: lastDay } },
         // Brouillons créés dans ce mois (sans date de planification)
-        {
-          scheduledFor: null,
-          createdAt: { gte: firstDay, lte: lastDay },
-        },
+        { scheduledFor: null, createdAt: { gte: firstDay, lte: lastDay } },
       ],
     },
     select: {
       id: true,
       text: true,
-      platforms: true,
+      platform: true,
       mediaUrls: true,
       status: true,
       scheduledFor: true,
       publishedAt: true,
+      latePostId: true,
+      failureReason: true,
       createdAt: true,
       updatedAt: true,
     },

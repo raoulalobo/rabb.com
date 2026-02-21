@@ -5,22 +5,21 @@
  *   Sauvegarde le post avec status SCHEDULED en DB, puis déclenche l'event Inngest
  *   "post/schedule" qui orchestre la publication différée via getlate.dev.
  *
- *   Cette action est appelée par PostComposer.Footer quand l'utilisateur
- *   clique sur "Planifier" avec une date sélectionnée.
+ *   Modèle simplifié : 1 post = 1 plateforme (platform string, pas platforms[]).
  *
  *   Workflow complet :
  *   1. Vérification de session
  *   2. Validation Zod (scheduledFor requis et dans le futur)
- *   3. Vérification des plateformes connectées (ownership)
+ *   3. Vérification de la plateforme connectée (ownership)
  *   4. Création ou mise à jour du post en DB (status: SCHEDULED)
  *   5. Envoi de l'event Inngest → publication différée
- *   6. Revalidation du cache /calendar
+ *   6. Revalidation du cache /calendar et /compose
  *
  * @example
- *   // Depuis PostComposer.Footer :
+ *   // Depuis PostComposeCard.tsx (action "Planifier") :
  *   const result = await schedulePost({
  *     text: 'Mon post',
- *     platforms: ['instagram', 'tiktok'],
+ *     platform: 'instagram',
  *     scheduledFor: new Date('2024-03-15T10:00:00'),
  *   })
  *   if (result.success) {
@@ -48,7 +47,7 @@ import type { SavePostResult } from '@/modules/posts/types'
  *
  * @example
  *   // Nouveau post planifié :
- *   const result = await schedulePost({ text: '...', platforms: ['instagram'], scheduledFor: date })
+ *   const result = await schedulePost({ text: '...', platform: 'instagram', scheduledFor: date })
  *
  *   // Mise à jour d'un brouillon en post planifié :
  *   const result = await schedulePost({ ... }, 'post_abc123')
@@ -77,14 +76,14 @@ export async function schedulePost(
     return { success: false, error: 'La date de publication est requise pour planifier' }
   }
 
-  const { text, platforms, mediaUrls, scheduledFor, platformOverrides } = parsed.data
+  const { text, platform, mediaUrls, scheduledFor } = parsed.data
 
-  // ─── Vérification des plateformes connectées ──────────────────────────────
-  // Contrôler que l'utilisateur a bien connecté toutes les plateformes demandées
+  // ─── Vérification de la plateforme connectée ──────────────────────────────
+  // Contrôler que l'utilisateur a bien connecté cette plateforme
   const connectedCount = await prisma.connectedPlatform.count({
     where: {
       userId: session.user.id,
-      platform: { in: platforms },
+      platform,
       isActive: true,
     },
   })
@@ -92,7 +91,7 @@ export async function schedulePost(
   if (connectedCount === 0) {
     return {
       success: false,
-      error: 'Aucune des plateformes sélectionnées n\'est connectée',
+      error: `La plateforme ${platform} n'est pas connectée`,
     }
   }
 
@@ -117,45 +116,18 @@ export async function schedulePost(
     const post = existingPostId
       ? await prisma.post.update({
           where: { id: existingPostId },
-          data: { text, platforms, mediaUrls: mediaUrls ?? [], scheduledFor, status: 'SCHEDULED' },
+          data: { text, platform, mediaUrls: mediaUrls ?? [], scheduledFor, status: 'SCHEDULED' },
         })
       : await prisma.post.create({
           data: {
             userId: session.user.id,
             text,
-            platforms,
+            platform,
             mediaUrls: mediaUrls ?? [],
             scheduledFor,
             status: 'SCHEDULED',
           },
         })
-
-    // ─── Upsert des overrides de plateformes ─────────────────────────────────
-    // Persister les contenus spécifiques par plateforme si des overrides existent
-    if (platformOverrides && Object.keys(platformOverrides).length > 0) {
-      await Promise.all(
-        Object.entries(platformOverrides).map(([platform, content]) =>
-          prisma.postPlatformContent.upsert({
-            where: { postId_platform: { postId: post.id, platform } },
-            create: {
-              postId: post.id,
-              platform,
-              text: content.text,
-              mediaUrls: content.mediaUrls,
-              status: 'PENDING',
-            },
-            update: {
-              text: content.text,
-              mediaUrls: content.mediaUrls,
-              status: 'PENDING',
-              latePostId: null,
-              failureReason: null,
-              publishedAt: null,
-            },
-          }),
-        ),
-      )
-    }
 
     // ─── Envoi de l'event Inngest ────────────────────────────────────────────
     // Inngest orchestre la publication à scheduledFor via step.sleepUntil()
@@ -167,7 +139,8 @@ export async function schedulePost(
       },
     })
 
-    // Invalide le cache du calendrier pour afficher le nouveau post planifié
+    // Invalide le cache des pages affectées
+    revalidatePath('/compose')
     revalidatePath('/calendar')
     revalidatePath('/')
 
@@ -177,12 +150,13 @@ export async function schedulePost(
         id: post.id,
         userId: post.userId,
         text: post.text,
-        platforms: post.platforms,
+        platform: post.platform,
         mediaUrls: post.mediaUrls,
         scheduledFor: post.scheduledFor,
         publishedAt: post.publishedAt,
         status: post.status as 'SCHEDULED',
         latePostId: post.latePostId,
+        failureReason: post.failureReason,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
       },

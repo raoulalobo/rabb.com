@@ -90,7 +90,7 @@ export const handlePostFailure = inngest.createFunction(
           userName: post.user.name ?? 'Utilisateur',
           // Extrait du texte (max 100 chars pour ne pas surcharger l'email)
           postText: post.text.substring(0, 100),
-          platforms: post.platforms,
+          platform: post.platform,
           failureReason,
           // Lien direct vers le post dans le compositeur
           postUrl: `${baseUrl}/compose?postId=${postId}`,

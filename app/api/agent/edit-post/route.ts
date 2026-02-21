@@ -1,0 +1,282 @@
+/**
+ * @file app/api/agent/edit-post/route.ts
+ * @description Route Handler : édition d'un post existant via une instruction libre.
+ *
+ *   Reçoit le postId, une instruction de modification et un pool de médias optionnel.
+ *   Charge le post courant (ownership check).
+ *   Appelle Claude Sonnet avec le contenu actuel + les règles de la plateforme.
+ *   Claude retourne le texte mis à jour + les médias sélectionnés.
+ *   Met à jour le post en DB.
+ *   Retourne le post mis à jour.
+ *
+ *   Flow complet :
+ *   1. Authentification (better-auth)
+ *   2. Validation Zod du body (postId + instruction + mediaPool optionnel)
+ *   3. Chargement du post avec ownership check (where: { id, userId })
+ *   4. Appel Claude Sonnet → tool_use "edit_post"
+ *      - Context : texte actuel + plateforme + règles
+ *   5. Extraction + mise à jour en DB
+ *   6. revalidatePath('/compose') + revalidatePath('/calendar')
+ *   7. Retour { post: Post }
+ *
+ * @example
+ *   const res = await fetch('/api/agent/edit-post', {
+ *     method: 'POST',
+ *     body: JSON.stringify({
+ *       postId: 'clx...',
+ *       instruction: 'Rends le texte plus engageant et ajoute 3 hashtags',
+ *       mediaPool: [],  // optionnel
+ *     }),
+ *   })
+ *   const { post } = await res.json()
+ */
+
+import { headers } from 'next/headers'
+import { revalidatePath } from 'next/cache'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+
+import { anthropic, AGENT_MODEL } from '@/lib/ai'
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
+
+// ─── Schémas de validation du body ────────────────────────────────────────────
+
+/** Schéma d'un média dans le pool (optionnel pour l'édition) */
+const PoolMediaSchema = z.object({
+  url: z.string().url(),
+  type: z.enum(['photo', 'video']),
+  filename: z.string(),
+})
+
+/** Schéma du body de la requête d'édition */
+const EditPostRequestSchema = z.object({
+  /** ID du post à modifier (doit appartenir à l'utilisateur connecté) */
+  postId: z.string().min(1, 'ID du post requis'),
+  /** Instruction libre de modification (ex: "rends le texte plus court") */
+  instruction: z.string().min(1, 'Instruction requise').max(2000),
+  /** Pool de médias disponibles (optionnel — si fourni, l'agent peut remplacer les médias) */
+  mediaPool: z.array(PoolMediaSchema).max(50).default([]),
+})
+
+// ─── Schéma de validation du résultat du tool Claude ──────────────────────────
+
+/** Schéma du résultat du tool edit_post retourné par Claude */
+const EditPostToolOutputSchema = z.object({
+  text: z.string().min(1).max(63206),
+  mediaUrls: z.array(z.string()).default([]),
+  scheduledFor: z.string().nullable().default(null),
+})
+
+// ─── Tool Claude : edit_post ──────────────────────────────────────────────────
+
+/**
+ * Définition du tool Anthropic pour l'édition d'un post.
+ * Claude remplit ce tool avec le contenu mis à jour du post.
+ */
+const EDIT_POST_TOOL: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
+  {
+    name: 'edit_post',
+    description: [
+      'Met à jour le contenu d\'un post existant selon l\'instruction de l\'utilisateur.',
+      'Respecte STRICTEMENT les contraintes de la plateforme cible (maxText, maxPhotos, etc.).',
+      'Conserve les médias actuels sauf si l\'instruction demande de les remplacer.',
+      'Retourne le texte mis à jour, les médias sélectionnés et la date de publication.',
+    ].join(' '),
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        text: {
+          type: 'string',
+          description: 'Texte mis à jour, adapté aux contraintes de la plateforme',
+        },
+        mediaUrls: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'URLs des médias à inclure dans le post (depuis les médias actuels ou le nouveau pool)',
+        },
+        scheduledFor: {
+          type: 'string',
+          description: 'Date/heure de publication en ISO 8601. null si pas de date précisée.',
+          nullable: true,
+        },
+      },
+      required: ['text', 'mediaUrls', 'scheduledFor'],
+    },
+  },
+]
+
+// ─── Handler POST ─────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/agent/edit-post
+ * Body : { postId: string, instruction: string, mediaPool?: PoolMedia[] }
+ * Réponse : { post: Post }
+ *
+ * Modifie un post existant selon l'instruction et retourne le post mis à jour.
+ */
+export async function POST(request: Request): Promise<NextResponse> {
+  // ── Vérification de la configuration Anthropic ────────────────────────────
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY manquante dans .env.local — agent désactivé' },
+      { status: 503 },
+    )
+  }
+
+  // ── Authentification ──────────────────────────────────────────────────────
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) {
+    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  }
+
+  // ── Validation du body ────────────────────────────────────────────────────
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Body JSON invalide' }, { status: 400 })
+  }
+
+  const parsed = EditPostRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Données invalides' },
+      { status: 400 },
+    )
+  }
+
+  const { postId, instruction, mediaPool } = parsed.data
+
+  // ── Chargement du post avec ownership check ───────────────────────────────
+  // Le filtre userId garantit que l'utilisateur ne peut éditer que ses propres posts
+  const post = await prisma.post.findFirst({
+    where: { id: postId, userId: session.user.id },
+    select: {
+      id: true,
+      platform: true,
+      text: true,
+      mediaUrls: true,
+      scheduledFor: true,
+      status: true,
+    },
+  })
+
+  if (!post) {
+    return NextResponse.json({ error: 'Post introuvable ou non autorisé' }, { status: 404 })
+  }
+
+  // Empêcher l'édition de posts déjà publiés ou en échec
+  if (post.status === 'PUBLISHED' || post.status === 'FAILED') {
+    return NextResponse.json(
+      { error: 'Ce post ne peut plus être modifié (déjà publié ou en échec)' },
+      { status: 409 },
+    )
+  }
+
+  // ── Construction du contexte pour Claude ──────────────────────────────────
+  const rules = PLATFORM_RULES[post.platform as keyof typeof PLATFORM_RULES]
+  const rulesDescription = rules
+    ? [
+        `- Max ${rules.maxText.toLocaleString('fr-FR')} caractères`,
+        rules.maxPhotos > 0 ? `- Max ${rules.maxPhotos} photo(s)` : '- Photos non supportées',
+        rules.maxVideos > 0 ? `- Max ${rules.maxVideos} vidéo(s)` : '- Vidéo non supportée',
+        rules.requiresMedia ? '- Média obligatoire' : '',
+      ].filter(Boolean).join('\n')
+    : 'Règles inconnues pour cette plateforme'
+
+  // Médias disponibles = médias actuels du post + nouveau pool (si fourni)
+  const allAvailableMediaUrls = [
+    ...new Set([...post.mediaUrls, ...mediaPool.map((m) => m.url)]),
+  ]
+
+  const systemPrompt = `Tu es un expert en social media. Tu dois modifier un post existant selon les instructions de l'utilisateur.
+
+## Post actuel
+- Plateforme : **${post.platform}**
+- Texte : "${post.text}"
+- Médias actuels : ${post.mediaUrls.length > 0 ? post.mediaUrls.join(', ') : 'aucun'}
+- Date de publication : ${post.scheduledFor ? post.scheduledFor.toISOString() : 'pas de date (brouillon)'}
+
+## Contraintes de la plateforme ${post.platform}
+${rulesDescription}
+
+## Médias disponibles
+${allAvailableMediaUrls.length > 0 ? allAvailableMediaUrls.join('\n') : 'Aucun média disponible'}
+
+## Règles
+1. Modifie uniquement ce qui est demandé dans l'instruction.
+2. Respecte STRICTEMENT les limites de caractères de la plateforme.
+3. Si l'instruction ne mentionne pas les médias, conserve les médias actuels.
+4. Si l'instruction ne mentionne pas de date, conserve la date actuelle.
+5. Retourne le texte complet (pas seulement les modifications).`
+
+  // ── Appel Claude Sonnet ───────────────────────────────────────────────────
+  try {
+    const response = await anthropic.messages.create({
+      model: AGENT_MODEL,
+      max_tokens: 2048,
+      system: systemPrompt,
+      tool_choice: { type: 'any' },
+      tools: EDIT_POST_TOOL,
+      messages: [{ role: 'user', content: instruction }],
+    })
+
+    // ── Extraction du résultat du tool ──────────────────────────────────────
+    const toolUseBlock = response.content.find((block) => block.type === 'tool_use')
+    if (!toolUseBlock || toolUseBlock.type !== 'tool_use') {
+      console.error('[edit-post] Claude n\'a pas appelé le tool :', response.content)
+      return NextResponse.json(
+        { error: 'L\'agent n\'a pas pu modifier le post. Veuillez réessayer.' },
+        { status: 500 },
+      )
+    }
+
+    // ── Validation du résultat du tool ──────────────────────────────────────
+    const toolOutputParsed = EditPostToolOutputSchema.safeParse(toolUseBlock.input)
+    if (!toolOutputParsed.success) {
+      console.error('[edit-post] Résultat tool invalide :', toolUseBlock.input)
+      return NextResponse.json(
+        { error: 'L\'agent a retourné un format inattendu. Veuillez réessayer.' },
+        { status: 500 },
+      )
+    }
+
+    const { text, mediaUrls, scheduledFor: newScheduledForStr } = toolOutputParsed.data
+
+    // Calculer la date et le statut mis à jour
+    const newScheduledDate = newScheduledForStr ? new Date(newScheduledForStr) : null
+    const isValidFutureDate = newScheduledDate !== null
+      && !isNaN(newScheduledDate.getTime())
+      && newScheduledDate > new Date()
+
+    // ── Mise à jour en DB ─────────────────────────────────────────────────
+    const updatedPost = await prisma.post.update({
+      where: { id: postId },
+      data: {
+        text,
+        // Filtrer les URLs vides ou invalides
+        mediaUrls: mediaUrls.filter((url) => url.startsWith('http')),
+        scheduledFor: isValidFutureDate ? newScheduledDate : null,
+        status: isValidFutureDate ? 'SCHEDULED' : 'DRAFT',
+        // Remettre à zéro les données de publication précédentes si on replanifie
+        latePostId: null,
+        failureReason: null,
+        publishedAt: null,
+      },
+    })
+
+    // ── Invalidation du cache ─────────────────────────────────────────────
+    revalidatePath('/compose')
+    revalidatePath('/calendar')
+
+    return NextResponse.json({ post: updatedPost })
+  } catch (error) {
+    console.error('[edit-post] Erreur :', error)
+    return NextResponse.json(
+      { error: 'Erreur lors de la modification du post. Veuillez réessayer.' },
+      { status: 500 },
+    )
+  }
+}

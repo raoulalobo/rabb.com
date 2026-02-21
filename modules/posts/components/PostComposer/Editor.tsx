@@ -25,7 +25,7 @@ import { useCallback } from 'react'
 
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 import type { Platform } from '@/modules/platforms/types'
-import { getEffectiveCharLimit } from '@/modules/posts/schemas/post.schema'
+import { getCharLimit } from '@/modules/posts/schemas/post.schema'
 
 import { usePostComposerContext } from './context'
 
@@ -58,7 +58,7 @@ export function Editor({
   // ─── Limite de caractères selon l'onglet actif ──────────────────────────────
   // Onglet "Tous" → limite la plus restrictive des plateformes sélectionnées
   // Onglet plateforme → limite spécifique à cette plateforme
-  const charLimit = getCharLimit(activePlatformTab, platforms)
+  const charLimit = computeCharLimit(activePlatformTab, platforms)
   const charCount = activeText.length
   const remaining = charLimit - charCount
   const isOverLimit = remaining < 0
@@ -149,16 +149,16 @@ export function Editor({
  * @returns Nombre max de caractères autorisés
  *
  * @example
- *   getCharLimit(null, ['instagram', 'twitter']) // 280 (min = twitter)
- *   getCharLimit('twitter', ['instagram', 'twitter']) // 280
- *   getCharLimit('instagram', ['instagram', 'twitter']) // 2200
+ *   computeCharLimit(null, ['instagram', 'twitter']) // 280 (min = twitter)
+ *   computeCharLimit('twitter', ['instagram', 'twitter']) // 280
+ *   computeCharLimit('instagram', ['instagram', 'twitter']) // 2200
  */
-function getCharLimit(activePlatformTab: Platform | null, platforms: string[]): number {
+function computeCharLimit(activePlatformTab: Platform | null, platforms: string[]): number {
   if (activePlatformTab === null) {
-    // Onglet "Tous" : limite globale la plus restrictive
-    return getEffectiveCharLimit(platforms)
+    // Onglet "Tous" : limite la plus restrictive parmi les plateformes sélectionnées
+    return platforms.length > 0 ? Math.min(...platforms.map((p) => getCharLimit(p))) : 63206
   }
-  // Onglet plateforme : limite spécifique
+  // Onglet plateforme : limite spécifique depuis les règles de la plateforme
   return PLATFORM_RULES[activePlatformTab].maxText
 }
 

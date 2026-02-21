@@ -2,7 +2,11 @@
  * @file prisma/schema.prisma
  * @description Schéma Prisma pour rabb.com.
  *   Modèles : User, Session, Account, Verification (gérés par better-auth)
- *   + ConnectedPlatform, Post, NotificationPrefs, AgentSession (métier rabb)
+ *   + ConnectedPlatform, Post, NotificationPrefs (métier rabb)
+ *
+ *   Nouveau modèle simplifié (post-refonte /compose) :
+ *   - Post.platform (String singulier) — 1 post = 1 plateforme
+ *   - AgentSession et PostPlatformContent supprimés
  *
  *   Prisma 7 : les URLs de connexion sont définies dans prisma.config.ts (migrations)
  *   et dans lib/prisma.ts via @prisma/adapter-pg (runtime).
@@ -46,7 +50,6 @@ model User {
   posts         Post[]
   platforms     ConnectedPlatform[]
   notifPrefs    NotificationPrefs?
-  agentSessions AgentSession[]
 
   @@map("users")
 }
@@ -140,15 +143,20 @@ model ConnectedPlatform {
 }
 
 /**
- * Post de contenu (texte + médias) destiné à être publié sur une ou plusieurs plateformes.
+ * Post de contenu (texte + médias) destiné à être publié sur UNE seule plateforme.
+ *
+ * Nouveau modèle simplifié : 1 post = 1 plateforme.
+ * L'agent crée N posts (un par plateforme) lors de la génération.
+ * Chaque post a son propre texte adapté et ses propres médias.
+ *
  * Cycle de vie : DRAFT → SCHEDULED → PUBLISHED (ou FAILED)
  */
 model Post {
   id            String     @id @default(cuid())
   userId        String
-  text          String     // Contenu textuel (max 2200 chars côté Zod)
+  text          String     // Contenu textuel adapté à la plateforme (max 63 206 chars)
   mediaUrls     String[]   @default([])   // URLs Supabase Storage
-  platforms     String[]   // Ex: ["instagram", "tiktok"]
+  platform      String     // Ex: "tiktok" — une seule plateforme par post
   status        PostStatus @default(DRAFT)
   scheduledFor  DateTime?  // Null si brouillon, défini si planifié
   publishedAt   DateTime?  // Rempli par Inngest après publication réussie
@@ -162,56 +170,10 @@ model Post {
   connectedPlatform   ConnectedPlatform? @relation(fields: [connectedPlatformId], references: [id])
   connectedPlatformId String?
 
-  // Contenus spécifiques par plateforme (overrides du contenu de base)
-  platformContents PostPlatformContent[]
-
-  // Session agent ayant produit ce post (relation optionnelle 1-1)
-  agentSession AgentSession?
-
   // Index composés pour les requêtes fréquentes (liste par user+status, planning par date)
   @@index([userId, status])
   @@index([scheduledFor])
   @@map("posts")
-}
-
-/**
- * Contenu spécifique à une plateforme pour un post donné.
- * Permet de personnaliser le texte et les médias par canal social.
- *
- * Logique d'override (opt-in) :
- * - Si un enregistrement existe pour (postId, platform) → utiliser ce contenu
- * - Sinon → utiliser le contenu de base du Post parent (text + mediaUrls)
- *
- * Cycle de vie :
- * - Créé par save-post.action.ts lors de la sauvegarde si l'utilisateur a personnalisé
- * - Mis à jour par publish-scheduled-post.ts lors de la publication (status, latePostId)
- */
-model PostPlatformContent {
-  id            String             @id @default(cuid())
-  postId        String
-  /** Nom de la plateforme : "instagram" | "tiktok" | "youtube" | etc. */
-  platform      String
-  /** Texte spécifique à cette plateforme (override du Post.text) */
-  text          String
-  /** URLs de médias spécifiques (override du Post.mediaUrls) */
-  mediaUrls     String[]           @default([])
-  /** Statut de la publication sur cette plateforme */
-  status        PostPlatformStatus @default(PENDING)
-  /** ID du post getlate.dev retourné après publication sur cette plateforme */
-  latePostId    String?
-  /** Raison d'échec si status = FAILED */
-  failureReason String?
-  /** Date de publication effective sur cette plateforme */
-  publishedAt   DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  // Un seul enregistrement par (post, plateforme)
-  @@unique([postId, platform])
-  @@index([postId])
-  @@map("post_platform_contents")
 }
 
 /**
@@ -229,19 +191,6 @@ enum PostStatus {
 }
 
 /**
- * Statuts de publication d'un PostPlatformContent.
- * Indique l'état de la publication sur une plateforme individuelle.
- * PENDING   : en attente de publication
- * PUBLISHED : publié avec succès sur cette plateforme
- * FAILED    : échec de publication sur cette plateforme (voir failureReason)
- */
-enum PostPlatformStatus {
-  PENDING
-  PUBLISHED
-  FAILED
-}
-
-/**
  * Préférences de notifications de l'utilisateur.
  * Relation 1-1 avec User, créée lors de l'inscription.
  */
@@ -254,62 +203,4 @@ model NotificationPrefs {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_prefs")
-}
-
-/**
- * Session de conversation multi-tours avec l'agent IA (AgentComposer).
- *
- * Cycle de vie :
- * - DRAFT     : en cours — l'utilisateur affine le plan en plusieurs tours
- * - VALIDATED : validé — le Post a été créé, session archivée
- *
- * Chaque tour de conversation est stocké dans `conversationHistory` (JSON).
- * Ce tableau permet de reconstruire les messages Anthropic pour le prochain tour,
- * en chaînant tool_use → tool_result entre chaque échange.
- *
- * Exemple de `conversationHistory` après 2 tours :
- * [
- *   { toolUseId: 'tu_abc', instruction: 'Poste sur Insta', planSnapshot: {...}, timestamp: '...' },
- *   { toolUseId: 'tu_def', instruction: 'Retire YouTube', planSnapshot: {...}, timestamp: '...' },
- * ]
- */
-model AgentSession {
-  id     String             @id @default(cuid())
-  userId String
-  status AgentSessionStatus @default(DRAFT)
-
-  // Pool de médias courant (JSON sérialisé de PoolMedia[])
-  // Sauvegardé à chaque raffinement pour permettre la reprise après fermeture du navigateur
-  mediaPool Json @default("[]")
-
-  // Plan courant (dernière version éditable par l'utilisateur).
-  // Null avant le premier tour, mis à jour après chaque raffinement.
-  currentPlan Json?
-
-  // Historique complet des tours pour la continuité multi-tours.
-  // Chaque entrée est un ConversationTurn : { toolUseId, instruction, planSnapshot, timestamp }
-  conversationHistory Json @default("[]")
-
-  // Lien optionnel vers le Post créé lors de la validation (relation 1-1)
-  postId String? @unique
-  post   Post?   @relation(fields: [postId], references: [id])
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Index sur (userId, status) pour retrouver rapidement la session DRAFT en cours
-  @@index([userId, status])
-  @@map("agent_sessions")
-}
-
-/**
- * Statut d'une session agent.
- * DRAFT     : en cours d'édition — l'utilisateur peut encore affiner
- * VALIDATED : terminée — le Post a été créé et la session est archivée
- */
-enum AgentSessionStatus {
-  DRAFT
-  VALIDATED
 }

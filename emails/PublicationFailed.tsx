@@ -10,7 +10,7 @@
  *     react: PublicationFailedEmail({
  *       userName: 'Marie',
  *       postText: 'Mon super post...',
- *       platforms: ['instagram', 'tiktok'],
+ *       platform: 'instagram',
  *       failureReason: 'Token expiré',
  *       postUrl: 'https://rabb.com/compose?postId=abc123',
  *     }),
@@ -37,8 +37,8 @@ interface PublicationFailedEmailProps {
   userName: string
   /** Début du texte du post (max 100 caractères) */
   postText: string
-  /** Plateformes sur lesquelles la publication a échoué */
-  platforms: string[]
+  /** Plateforme sur laquelle la publication a échoué (1 post = 1 plateforme) */
+  platform: string
   /** Message d'erreur de getlate.dev */
   failureReason: string
   /** URL directe vers le post dans le compositeur */
@@ -54,16 +54,17 @@ interface PublicationFailedEmailProps {
 export function PublicationFailedEmail({
   userName,
   postText,
-  platforms,
+  platform,
   failureReason,
   postUrl,
 }: PublicationFailedEmailProps): React.JSX.Element {
-  const platformLabels = platforms.join(', ')
+  // Capitalise le nom de la plateforme pour l'affichage
+  const platformLabel = platform.charAt(0).toUpperCase() + platform.slice(1)
 
   return (
     <Html lang="fr">
       <Head />
-      <Preview>⚠️ Échec de publication sur {platformLabels} — rabb</Preview>
+      <Preview>⚠️ Échec de publication sur {platformLabel} — rabb</Preview>
       <Body style={styles.body}>
         <Container style={styles.container}>
           {/* En-tête */}
@@ -73,7 +74,7 @@ export function PublicationFailedEmail({
 
           <Text style={styles.text}>
             Nous n&apos;avons pas pu publier votre post sur{' '}
-            <strong>{platformLabels}</strong>.
+            <strong>{platformLabel}</strong>.
           </Text>
 
           {/* Extrait du post */}
