@@ -82,7 +82,8 @@ export const publishScheduledPost = inngest.createFunction(
     }
 
     // ── Étape 3 : Récupérer le profil getlate.dev de la plateforme ───────────
-    // Chaque post a UNE seule plateforme → un seul profil à récupérer
+    // Chaque post a UNE seule plateforme → un seul profil à récupérer.
+    // lateProfileId = ID du workspace Late (MongoDB ObjectId) stocké lors de l'OAuth.
     const connectedPlatform = await step.run('recuperer-profil', async () => {
       return prisma.connectedPlatform.findFirst({
         where: {
@@ -109,15 +110,58 @@ export const publishScheduledPost = inngest.createFunction(
       throw new Error(`Profil ${post.platform} introuvable pour l'utilisateur`)
     }
 
+    // ── Étape 3b : Résoudre l'accountId Late depuis la liste des comptes ─────
+    // L'API Late POST /api/v1/posts attend platforms[].accountId (ID du compte social)
+    // qui est DIFFÉRENT du lateProfileId (ID du workspace/profil).
+    // On filtre les comptes par platform + profileId pour trouver le bon ID.
+    const lateAccountId = await step.run('recuperer-account-id', async () => {
+      const accounts = await late.accounts.list()
+
+      // Normalisation : Late peut retourner `id` ou `_id` selon le SDK
+      const account = accounts.find(
+        (a) => a.platform === post.platform
+          && (a.profileId === connectedPlatform.lateProfileId),
+      )
+
+      if (!account) {
+        // Fallback : si le profileId ne matche pas, prendre le premier compte de cette plateforme
+        // (cas où le mapping workspace/account a changé côté Late)
+        const fallback = accounts.find((a) => a.platform === post.platform)
+        if (fallback) {
+          console.warn(
+            `[publish-scheduled-post] profileId ${connectedPlatform.lateProfileId} introuvable,`
+            + ` fallback sur account ${fallback.id ?? fallback._id}`,
+          )
+          return fallback.id ?? fallback._id ?? null
+        }
+        return null
+      }
+
+      // Utiliser `id` en priorité (certains endpoints Late retournent `_id`)
+      return account.id ?? account._id ?? null
+    })
+
+    if (!lateAccountId) {
+      await prisma.post.update({
+        where: { id: postId },
+        data: {
+          status: 'FAILED',
+          failureReason: `Aucun compte Late trouvé pour ${post.platform} — vérifier la connexion`,
+        },
+      })
+      throw new Error(`Aucun account Late trouvé pour ${post.platform}`)
+    }
+
     // ── Étape 4 : Publier via getlate.dev avec publishNow ────────────────────
     // `publishNow: true` car Inngest a déjà attendu via step.sleepUntil().
     // Late publie immédiatement et retourne le statut par plateforme + l'URL du post.
+    // Format attendu par l'API : { content, platforms: [{platform, accountId}], publishNow }
     const latePost = await step.run('publier-post', async () => {
       return late.posts.create({
-        text: post.text,
-        // Un seul profileId : la publication est sur une seule plateforme
-        profileIds: [connectedPlatform.lateProfileId],
-        mediaUrls: post.mediaUrls.length > 0 ? post.mediaUrls : undefined,
+        // Late utilise `content` (et non `text`) pour le corps du post
+        content: post.text,
+        // `platforms` remplace `profileIds` — chaque entrée cible un compte social
+        platforms: [{ platform: post.platform, accountId: lateAccountId }],
         // Late publie immédiatement — Inngest a déjà géré le timing via sleepUntil
         publishNow: true,
       })

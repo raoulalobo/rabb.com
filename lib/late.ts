@@ -114,16 +114,51 @@ export interface LatePost {
   platforms?: LatePostPlatformResult[]
 }
 
-/** Paramètres pour créer un post */
+/**
+ * Compte social connecté dans Late (résultat de GET /api/v1/accounts/list-accounts).
+ * Chaque compte correspond à un profil social (TikTok, Instagram…) connecté à un workspace.
+ * L'`id` de ce compte est utilisé dans `platforms[].accountId` lors de la création d'un post.
+ */
+export interface LateAccount {
+  /** ID unique du compte social dans Late — à utiliser dans platforms[].accountId */
+  id: string
+  /** Alias MongoDB — certains endpoints retournent `_id` au lieu de `id` */
+  _id?: string
+  /** Plateforme sociale (ex: "instagram", "tiktok") */
+  platform: string
+  /** ID du workspace Late auquel ce compte appartient (= lateProfileId en DB) */
+  profileId: string
+  /** Nom d'affichage du compte (ex: "Raoul Alobo") */
+  displayName?: string
+  /** Handle/username du compte (ex: "@raoulalobo") */
+  username?: string
+}
+
+/** Paramètres pour créer un post via POST /api/v1/posts */
 export interface LateCreatePostParams {
-  text: string
-  profileIds: string[]
-  scheduledAt?: string
-  mediaUrls?: string[]
   /**
-   * Si `true`, Late publie immédiatement sans attendre `scheduledAt`.
-   * À utiliser avec Inngest : Inngest a déjà attendu via `step.sleepUntil()`,
-   * donc Late doit publier dès réception de la requête.
+   * Contenu textuel du post.
+   * Optionnel si tous les éléments `platforms` ont un `customContent`.
+   */
+  content: string
+  /**
+   * Plateformes cibles : un objet par compte social à publier.
+   * `accountId` est l'`id` d'un LateAccount (GET /api/v1/accounts/list-accounts).
+   * `platform` est l'identifiant de la plateforme (ex: "instagram", "tiktok").
+   */
+  platforms: Array<{
+    platform: string
+    accountId: string
+  }>
+  /**
+   * Date de publication planifiée (ISO 8601 UTC).
+   * Exclusif avec `publishNow`.
+   */
+  scheduledFor?: string
+  /**
+   * Si `true`, Late publie immédiatement dès réception de la requête.
+   * À utiliser avec Inngest : Inngest a déjà attendu via `step.sleepUntil()`.
+   * Exclusif avec `scheduledFor`.
    */
   publishNow?: boolean
 }
@@ -328,6 +363,30 @@ class LateClient {
      */
     get: (profileId: string) =>
       this.request<LateWorkspaceProfile>(`/api/v1/profiles/${profileId}`),
+  }
+
+  // ─── Comptes sociaux ─────────────────────────────────────────────────────────
+
+  /**
+   * Ressource "accounts" : comptes sociaux connectés à Late.
+   * Chaque compte appartient à un workspace (profileId) et correspond à un réseau social.
+   * L'`id` d'un compte est requis dans `platforms[].accountId` lors de la création d'un post.
+   */
+  readonly accounts = {
+    /**
+     * Liste tous les comptes sociaux connectés (dans la limite du plan).
+     * Utiliser l'`id` de chaque compte comme `accountId` dans late.posts.create().
+     *
+     * @returns Tableau de comptes sociaux connectés
+     *
+     * @example
+     *   const accounts = await late.accounts.list()
+     *   const tiktok = accounts.find(a => a.platform === 'tiktok')
+     *   // Utiliser tiktok.id dans platforms[].accountId
+     */
+    list: () =>
+      // Réponse : tableau direct de LateAccount (non enveloppé)
+      this.request<LateAccount[]>('/api/v1/accounts/list-accounts'),
   }
 
   // ─── Posts ───────────────────────────────────────────────────────────────────
