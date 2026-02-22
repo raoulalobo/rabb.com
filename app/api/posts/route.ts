@@ -187,8 +187,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 // ─── Statuts valides en mode compose ──────────────────────────────────────────
 
-/** Seuls DRAFT et SCHEDULED sont des statuts valides en mode compose */
-const COMPOSE_STATUSES = ['DRAFT', 'SCHEDULED'] as const
+/** DRAFT, SCHEDULED, PUBLISHED et FAILED sont des statuts valides en mode compose */
+const COMPOSE_STATUSES = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'] as const
 type ComposeStatus = (typeof COMPOSE_STATUSES)[number]
 
 async function handleComposeMode(
@@ -210,8 +210,8 @@ async function handleComposeMode(
     .map((p) => p.trim())
     .filter(Boolean)
 
-  // Filtre statuts : "DRAFT,SCHEDULED" → ["DRAFT", "SCHEDULED"]
-  // Absent ou vide = tout afficher (DRAFT + SCHEDULED par défaut)
+  // Filtre statuts : "DRAFT,SCHEDULED,FAILED" → ["DRAFT", "SCHEDULED", "FAILED"]
+  // Absent ou vide = tout afficher (DRAFT + SCHEDULED + PUBLISHED + FAILED par défaut)
   const rawStatuses = searchParams.get('statuses')
   const statusFilter: ComposeStatus[] = rawStatuses
     ? rawStatuses

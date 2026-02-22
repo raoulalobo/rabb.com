@@ -9,9 +9,9 @@
  *
  * @example
  *   import { late } from '@/lib/late'
- *   // Initier la connexion OAuth (endpoint correct getlate.dev)
- *   const { authUrl } = await late.connect.getUrl('instagram', 'https://rabb.com/api/platforms/callback')
- *   const post = await late.posts.create({ text: '...', platforms: [{ platform: 'instagram', accountId: '...' }] })
+ *   // Initier la connexion OAuth
+ *   const { authUrl } = await late.connect.getUrl('instagram', 'prof_abc', 'https://rabb.com/api/platforms/callback')
+ *   const post = await late.posts.create({ content: '...', platforms: [{ platform: 'instagram', accountId: '...' }] })
  */
 
 // ─── Types de l'API getlate.dev ────────────────────────────────────────────────
@@ -35,7 +35,7 @@ export type LatePlatform =
 /**
  * Workspace Late (profil conteneur).
  * Regroupe plusieurs comptes sociaux connectés d'un même utilisateur.
- * Créé via POST /api/v1/profiles avant d'initier le flux OAuth.
+ * Créé via POST /v1/profiles avant d'initier le flux OAuth.
  *
  * Note : Late utilise MongoDB → l'ID est "_id" (pas "id").
  */
@@ -47,14 +47,14 @@ export interface LateWorkspaceProfile {
 }
 
 /**
- * Réponse de GET /api/v1/profiles — tableau enveloppé dans { profiles: [...] }.
+ * Réponse de GET /v1/profiles — tableau enveloppé dans { profiles: [...] }.
  */
 export interface LateProfilesListResponse {
   profiles: LateWorkspaceProfile[]
 }
 
 /**
- * Réponse de l'endpoint GET /api/v1/connect/{platform}.
+ * Réponse de l'endpoint GET /v1/connect/{platform}.
  * Contient l'URL OAuth vers laquelle rediriger l'utilisateur.
  */
 export interface LateConnectResponse {
@@ -115,7 +115,7 @@ export interface LatePost {
 }
 
 /**
- * Compte social connecté dans Late (résultat de GET /api/v1/accounts/list-accounts).
+ * Compte social connecté dans Late (résultat de GET /v1/accounts/list-accounts).
  * Chaque compte correspond à un profil social (TikTok, Instagram…) connecté à un workspace.
  * L'`id` de ce compte est utilisé dans `platforms[].accountId` lors de la création d'un post.
  */
@@ -134,7 +134,7 @@ export interface LateAccount {
   username?: string
 }
 
-/** Paramètres pour créer un post via POST /api/v1/posts */
+/** Paramètres pour créer un post via POST /v1/posts */
 export interface LateCreatePostParams {
   /**
    * Contenu textuel du post.
@@ -143,7 +143,7 @@ export interface LateCreatePostParams {
   content: string
   /**
    * Plateformes cibles : un objet par compte social à publier.
-   * `accountId` est l'`id` d'un LateAccount (GET /api/v1/accounts/list-accounts).
+   * `accountId` est l'`id` d'un LateAccount (GET /v1/accounts/list-accounts).
    * `platform` est l'identifiant de la plateforme (ex: "instagram", "tiktok").
    */
   platforms: Array<{
@@ -212,11 +212,12 @@ class LateClient {
   private readonly apiKey: string
 
   constructor() {
-    // Base URL réelle du serveur getlate.dev.
-    // Note : api.getlate.dev ne résout pas en DNS — le vrai host est getlate.dev.
-    // Vérifié : GET https://getlate.dev/api/v1/connect/get-connect-url → 401 (auth requise ✅)
-    //           GET https://getlate.dev/v1/connect/get-connect-url       → 404 ❌
-    this.baseUrl = process.env.LATE_API_URL ?? 'https://getlate.dev'
+    // Base URL de l'API getlate.dev.
+    // Docs : https://docs.getlate.dev → base = https://api.getlate.dev, chemins en /v1/...
+    // Vercel résout api.getlate.dev correctement (même si absent du DNS local).
+    // Si LATE_API_URL est défini dans les variables d'environnement Vercel,
+    // il DOIT valoir "https://api.getlate.dev" (sans slash final, sans /api).
+    this.baseUrl = process.env.LATE_API_URL ?? 'https://api.getlate.dev'
     this.apiKey = process.env.LATE_API_KEY ?? ''
   }
 
@@ -224,13 +225,15 @@ class LateClient {
    * Effectue une requête HTTP vers l'API getlate.dev.
    * Ajoute automatiquement l'en-tête Authorization et Content-Type.
    *
-   * @param path - Chemin de l'endpoint (ex: '/api/v1/profiles')
+   * @param path - Chemin de l'endpoint (ex: '/v1/profiles')
    * @param init - Options fetch (method, body, etc.)
    * @returns Données parsées en JSON
    * @throws LateApiError si la réponse n'est pas OK
    */
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    // URL complète pour les logs de diagnostic (visible dans Vercel Function Logs)
+    const fullUrl = `${this.baseUrl}${path}`
+    const response = await fetch(fullUrl, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
@@ -240,16 +243,16 @@ class LateClient {
     })
 
     if (!response.ok) {
-      // Lire le corps brut pour diagnostiquer l'erreur (log + message)
+      // Logger l'URL COMPLÈTE (pas seulement le path) pour diagnostiquer les 405/404
       let message = `Erreur API getlate.dev : ${response.status}`
       let rawBody = ''
       try {
         rawBody = await response.text()
-        console.error(`[LateClient] ${response.status} ${path} →`, rawBody)
+        console.error(`[LateClient] ${response.status} ${init?.method ?? 'GET'} ${fullUrl} →`, rawBody)
         const parsed = JSON.parse(rawBody) as { message?: string }
         if (parsed.message) message = parsed.message
       } catch {
-        // Ignorer les erreurs de parsing
+        // Ignorer les erreurs de parsing du corps
         if (rawBody) console.error('[LateClient] corps non-JSON :', rawBody)
       }
       throw new LateApiError(response.status, message)
@@ -267,8 +270,8 @@ class LateClient {
    * Ressource "connect" : initiation du flux OAuth getlate.dev.
    * Utiliser cette ressource pour connecter un compte social.
    *
-   * Endpoint correct : GET /api/v1/connect/{platform}?profileId=...&redirect_url=...
-   * Vérifié par curl — retourne { authUrl, state } ✅
+   * Endpoint : GET /v1/connect/{platform}?profileId=...&redirect_url=...
+   * Docs : https://docs.getlate.dev/api-reference/connect
    */
   readonly connect = {
     /**
@@ -299,10 +302,10 @@ class LateClient {
      *   window.location.href = authUrl
      */
     getUrl: (platform: LatePlatform, profileId: string, redirectUrl: string) =>
-      // Endpoint correct : GET /api/v1/connect/{platform}?profileId=...&redirect_url=...
-      // Vérifié par curl : retourne { authUrl, state } ✅
+      // Endpoint : GET /v1/connect/{platform}?profileId=...&redirect_url=...
+      // Docs : https://docs.getlate.dev/api-reference/connect
       this.request<LateConnectResponse>(
-        `/api/v1/connect/${platform}?profileId=${profileId}&redirect_url=${encodeURIComponent(redirectUrl)}`,
+        `/v1/connect/${platform}?profileId=${profileId}&redirect_url=${encodeURIComponent(redirectUrl)}`,
       ),
   }
 
@@ -326,7 +329,7 @@ class LateClient {
      */
     list: () =>
       // Réponse enveloppée : { profiles: [...] } (pas un tableau direct)
-      this.request<LateProfilesListResponse>('/api/v1/profiles'),
+      this.request<LateProfilesListResponse>('/v1/profiles'),
 
     /**
      * Crée un workspace Late pour un utilisateur.
@@ -340,7 +343,7 @@ class LateClient {
      *   // Sauvegarder id dans User.lateWorkspaceId
      */
     create: (params: { name: string }) =>
-      this.request<LateWorkspaceProfile>('/api/v1/profiles', {
+      this.request<LateWorkspaceProfile>('/v1/profiles', {
         method: 'POST',
         body: JSON.stringify(params),
       }),
@@ -351,7 +354,7 @@ class LateClient {
      * @param profileId - ID du workspace Late à supprimer
      */
     delete: (profileId: string) =>
-      this.request<void>(`/api/v1/profiles/${profileId}`, {
+      this.request<void>(`/v1/profiles/${profileId}`, {
         method: 'DELETE',
       }),
 
@@ -362,7 +365,7 @@ class LateClient {
      * @returns Détails du workspace
      */
     get: (profileId: string) =>
-      this.request<LateWorkspaceProfile>(`/api/v1/profiles/${profileId}`),
+      this.request<LateWorkspaceProfile>(`/v1/profiles/${profileId}`),
   }
 
   // ─── Comptes sociaux ─────────────────────────────────────────────────────────
@@ -386,7 +389,7 @@ class LateClient {
      */
     list: () =>
       // Réponse : tableau direct de LateAccount (non enveloppé)
-      this.request<LateAccount[]>('/api/v1/accounts/list-accounts'),
+      this.request<LateAccount[]>('/v1/accounts/list-accounts'),
   }
 
   // ─── Posts ───────────────────────────────────────────────────────────────────
@@ -410,7 +413,7 @@ class LateClient {
      *   })
      */
     create: (params: LateCreatePostParams) =>
-      this.request<LatePost>('/api/v1/posts', {
+      this.request<LatePost>('/v1/posts', {
         method: 'POST',
         body: JSON.stringify(params),
       }),
@@ -421,7 +424,7 @@ class LateClient {
      * @param postId - ID du post getlate.dev
      */
     get: (postId: string) =>
-      this.request<LatePost>(`/api/v1/posts/${postId}`),
+      this.request<LatePost>(`/v1/posts/${postId}`),
 
     /**
      * Supprime un post planifié (non encore publié).
@@ -429,7 +432,7 @@ class LateClient {
      * @param postId - ID du post à annuler
      */
     delete: (postId: string) =>
-      this.request<void>(`/api/v1/posts/${postId}`, { method: 'DELETE' }),
+      this.request<void>(`/v1/posts/${postId}`, { method: 'DELETE' }),
 
     /**
      * Récupère les statistiques d'un post publié.
@@ -438,7 +441,7 @@ class LateClient {
      * @returns Statistiques par plateforme
      */
     stats: (postId: string) =>
-      this.request<LatePostStats[]>(`/api/v1/posts/${postId}/stats`),
+      this.request<LatePostStats[]>(`/v1/posts/${postId}/stats`),
   }
 
   // ─── Analytics ───────────────────────────────────────────────────────────────
@@ -457,7 +460,7 @@ class LateClient {
      */
     get: (profileId: string, params: { from: string; to: string }) => {
       const query = new URLSearchParams(params).toString()
-      return this.request<LatePostStats[]>(`/api/v1/profiles/${profileId}/analytics?${query}`)
+      return this.request<LatePostStats[]>(`/v1/profiles/${profileId}/analytics?${query}`)
     },
   }
 
@@ -474,7 +477,7 @@ class LateClient {
      * @returns Liste des messages inbox
      */
     list: (profileId: string) =>
-      this.request<LateInboxMessage[]>(`/api/v1/profiles/${profileId}/inbox`),
+      this.request<LateInboxMessage[]>(`/v1/profiles/${profileId}/inbox`),
 
     /**
      * Répond à un message inbox.
@@ -483,7 +486,7 @@ class LateClient {
      * @param text - Texte de la réponse
      */
     reply: (messageId: string, text: string) =>
-      this.request<void>(`/api/v1/inbox/${messageId}/reply`, {
+      this.request<void>(`/v1/inbox/${messageId}/reply`, {
         method: 'POST',
         body: JSON.stringify({ text }),
       }),

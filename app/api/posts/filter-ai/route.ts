@@ -11,7 +11,7 @@
  *   5. Retour { statuses, platforms, dateRange, queryText }
  *
  *   Les filtres retournés sont appliqués côté serveur via /api/posts?compose=1&statuses=...
- *   Seuls DRAFT et SCHEDULED sont des statuts valides (mode compose).
+ *   DRAFT, SCHEDULED, PUBLISHED et FAILED sont des statuts valides (mode compose).
  *
  * @example
  *   const res = await fetch('/api/posts/filter-ai', {
@@ -53,7 +53,7 @@ const filterTool = {
   name: 'extract_post_filters',
   description:
     'Extrait les critères de recherche depuis la description utilisateur pour filtrer ' +
-    'une liste de posts (brouillons et planifiés).',
+    'une liste de posts (brouillons, planifiés, publiés ou échoués).',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -61,11 +61,12 @@ const filterTool = {
         type: 'array',
         items: {
           type: 'string',
-          enum: ['DRAFT', 'SCHEDULED'],
+          enum: ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'],
         },
         description:
-          'Statuts des posts : DRAFT = brouillon (pas encore planifié), ' +
-          'SCHEDULED = planifié (date définie). Omettre si non spécifié.',
+          'Statuts des posts : DRAFT = brouillon, SCHEDULED = planifié, ' +
+          'PUBLISHED = publié avec succès, FAILED = échec de publication. ' +
+          'Omettre si non spécifié.',
       },
       platforms: {
         type: 'array',
@@ -101,7 +102,7 @@ const filterTool = {
  */
 export interface ExtractedFilters {
   /** Statuts filtrés — vide = tout afficher (DRAFT + SCHEDULED par défaut) */
-  statuses: ('DRAFT' | 'SCHEDULED')[]
+  statuses: ('DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED')[]
   /** Plateformes filtrées — vide = tout afficher */
   platforms: string[]
   /**
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const systemPrompt = [
     `Tu es un assistant d'extraction de filtres pour une application de planification de posts sur les réseaux sociaux.`,
     `Aujourd'hui est le ${today}.`,
-    `L'utilisateur décrit ce qu'il cherche dans sa liste de posts (brouillons et planifiés).`,
+    `L'utilisateur décrit ce qu'il cherche dans sa liste de posts (brouillons, planifiés, publiés ou échoués).`,
     `Utilise TOUJOURS le tool extract_post_filters pour retourner les filtres structurés.`,
     `N'extrais que ce qui est explicitement mentionné ou clairement implicite.`,
     `Si un critère n'est pas spécifié, ne l'inclus pas dans le résultat.`,
@@ -164,6 +165,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     `- "posts tiktok planifiés" → { statuses: ["SCHEDULED"], platforms: ["tiktok"] }`,
     `- "posts instagram de la semaine prochaine" → { platforms: ["instagram"], from: "...", to: "..." }`,
     `- "tiktok" → { platforms: ["tiktok"] }`,
+    `- "posts échoués" → { statuses: ["FAILED"] }`,
+    `- "posts publiés cette semaine" → { statuses: ["PUBLISHED"], from: "...", to: "..." }`,
   ].join('\n')
 
   // ── Appel Claude Sonnet ────────────────────────────────────────────────────
@@ -189,7 +192,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Cast du résultat Sonnet (input_schema garantit la structure)
     const input = toolUse.input as {
-      statuses?: ('DRAFT' | 'SCHEDULED')[]
+      statuses?: ('DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED')[]
       platforms?: string[]
       from?: string
       to?: string
