@@ -52,6 +52,11 @@ export interface ComposeFilters {
    * Appliqué côté serveur via le paramètre `statuses` de /api/posts.
    */
   statuses: Post['status'][]
+  /**
+   * Mot-clé de recherche dans le contenu des posts (vide = pas de filtre texte).
+   * Transmis à l'API via ?search=<mot> → filtre Prisma ILIKE '%mot%'.
+   */
+  queryText: string
 }
 
 // ─── Clés de cache TanStack Query ─────────────────────────────────────────────
@@ -94,7 +99,8 @@ export const postQueryKeys = {
  *   // → ['posts', 'compose', ['instagram'], undefined, ['DRAFT']]
  */
 export const composeQueryKey = (filters: ComposeFilters): readonly unknown[] =>
-  ['posts', 'compose', filters.platforms, filters.dateRange, filters.statuses] as const
+  // queryText inclus dans la clé → TanStack Query recharge la page 1 à chaque nouveau mot-clé
+  ['posts', 'compose', filters.platforms, filters.dateRange, filters.statuses, filters.queryText] as const
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
 
@@ -173,6 +179,11 @@ export async function fetchComposePage(
   // Vide = serveur applique DRAFT+SCHEDULED par défaut
   if (filters.statuses.length > 0) {
     params.set('statuses', filters.statuses.join(','))
+  }
+
+  // Filtre texte libre — mot-clé extrait par IA (vide = pas de filtre texte)
+  if (filters.queryText) {
+    params.set('search', filters.queryText)
   }
 
   const res = await fetch(`/api/posts?${params.toString()}`)

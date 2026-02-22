@@ -150,10 +150,20 @@ export function PostComposeList({
   /** Libellé court de la recherche active — vide si aucun filtre IA actif */
   const [activeQueryText, setActiveQueryText] = useState<string>('')
 
+  // ── Mot-clé de recherche textuelle extrait par l'IA ───────────────────────
+  /** Transmis à l'API via ?search=<mot> → filtre Prisma ILIKE '%mot%'. Vide = pas de filtre */
+  const [activeSearchQuery, setActiveSearchQuery] = useState<string>('')
+
   // ── Filtre courant (mémorisé pour stabilité des références) ───────────────
   const filters: ComposeFilters = useMemo(
-    () => ({ platforms: selectedPlatforms, dateRange, statuses: selectedStatuses }),
-    [selectedPlatforms, dateRange, selectedStatuses],
+    () => ({
+      platforms: selectedPlatforms,
+      dateRange,
+      statuses: selectedStatuses,
+      // queryText déclenche un refetch serveur quand il change (inclus dans queryKey)
+      queryText: activeSearchQuery,
+    }),
+    [selectedPlatforms, dateRange, selectedStatuses, activeSearchQuery],
   )
 
   // ── useInfiniteQuery ──────────────────────────────────────────────────────
@@ -173,7 +183,7 @@ export function PostComposeList({
     // Évite un round-trip réseau au premier rendu.
     // Dès qu'un filtre est activé, TanStack Query fetche depuis la page 1.
     initialData:
-      selectedPlatforms.length === 0 && !dateRange && selectedStatuses.length === 0
+      selectedPlatforms.length === 0 && !dateRange && selectedStatuses.length === 0 && !activeSearchQuery
         ? ({
             pages: [{ posts: initialPosts, nextCursor: initialNextCursor }],
             pageParams: [undefined],
@@ -375,7 +385,15 @@ export function PostComposeList({
    */
   const handleFiltersApplied = (filters: ExtractedFilters): void => {
     setSelectedPlatforms(filters.platforms)
-    setSelectedStatuses(filters.statuses as Post['status'][])
+    // statuses vide = "tous les posts" (Sonnet n'a pas détecté de statut précis)
+    // → mapper vers les 4 statuts pour forcer le changement de queryKey + refetch.
+    // Sans ce mapping : queryKey identique → TanStack Query ne refetch pas
+    // → initialData SSR (DRAFT+SCHEDULED) reste affiché indéfiniment.
+    setSelectedStatuses(
+      filters.statuses.length > 0
+        ? (filters.statuses as Post['status'][])
+        : ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'],
+    )
     // Convertir les dates string ISO en Date pour react-day-picker DateRange
     setDateRange(
       filters.dateRange
@@ -384,6 +402,8 @@ export function PostComposeList({
     )
     // Stocker le texte de la requête pour affichage dans le bouton
     setActiveQueryText(filters.queryText)
+    // Mot-clé de contenu extrait par Claude → transmis à l'API via ?search=
+    setActiveSearchQuery(filters.search ?? '')
   }
 
   // ── Switch vers la vue calendrier ─────────────────────────────────────────
@@ -408,11 +428,17 @@ export function PostComposeList({
     setSelectedStatuses([])
     setDateRange(undefined)
     setActiveQueryText('')
+    // Réinitialiser le mot-clé de recherche textuelle
+    setActiveSearchQuery('')
   }
 
   // ── Indicateur de filtre actif ────────────────────────────────────────────
+  // Inclure activeSearchQuery : un mot-clé seul doit activer le bouton X et changer l'apparence
   const hasActiveFilter =
-    selectedPlatforms.length > 0 || selectedStatuses.length > 0 || !!dateRange?.from
+    selectedPlatforms.length > 0 ||
+    selectedStatuses.length > 0 ||
+    !!dateRange?.from ||
+    !!activeSearchQuery
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
 

@@ -88,6 +88,14 @@ const filterTool = {
           'Date de fin ISO 8601 pour filtrer sur scheduledFor. ' +
           'Omettre si non spécifié.',
       },
+      search: {
+        type: 'string',
+        description:
+          'Mots-clés à rechercher dans le texte des posts, séparés par un espace. ' +
+          'Extraire TOUS les sujets mentionnés (un ou plusieurs). ' +
+          'Exemple : "foot", "promo soldes", "lancement produit". ' +
+          "Omettre si aucun sujet de contenu n'est mentionné.",
+      },
     },
     // Tous les champs sont optionnels — Sonnet ne retourne que ce qu'il détecte
     required: [] as string[],
@@ -112,6 +120,8 @@ export interface ExtractedFilters {
   dateRange: { from: string; to: string } | null
   /** Texte original de la requête utilisateur (pour affichage dans le bouton) */
   queryText: string
+  /** Mot-clé de contenu extrait par Claude — undefined si aucun sujet mentionné */
+  search?: string
 }
 
 // ─── Handler POST ──────────────────────────────────────────────────────────────
@@ -167,6 +177,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     `- "tiktok" → { platforms: ["tiktok"] }`,
     `- "posts échoués" → { statuses: ["FAILED"] }`,
     `- "posts publiés cette semaine" → { statuses: ["PUBLISHED"], from: "...", to: "..." }`,
+    `- "posts sur le foot" → { search: "foot" }`,
+    `- "posts sur le foot et le basket" → { search: "foot basket" }`,
+    `- "posts avec promo soldes" → { search: "promo soldes" }`,
+    `- "posts instagram sur le lancement produit" → { platforms: ["instagram"], search: "lancement produit" }`,
   ].join('\n')
 
   // ── Appel Claude Sonnet ────────────────────────────────────────────────────
@@ -196,6 +210,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       platforms?: string[]
       from?: string
       to?: string
+      search?: string
     }
 
     // ── Construction du résultat ────────────────────────────────────────────
@@ -212,6 +227,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             }
           : null,
       queryText: query,
+      // Normalisation en minuscules pour correspondre au filtre Prisma insensible à la casse
+      search: input.search?.toLowerCase(),
     }
 
     return NextResponse.json(filters)

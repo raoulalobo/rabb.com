@@ -111,34 +111,39 @@ export const publishScheduledPost = inngest.createFunction(
     }
 
     // ── Étape 3b : Résoudre l'accountId Late depuis la liste des comptes ─────
-    // L'API Late POST /api/v1/posts attend platforms[].accountId (ID du compte social)
-    // qui est DIFFÉRENT du lateProfileId (ID du workspace/profil).
-    // On filtre les comptes par platform + profileId pour trouver le bon ID.
+    // L'API Late POST /v1/posts attend platforms[].accountId (ID du compte social = _id).
+    // C'est DIFFÉRENT du lateProfileId (ID du workspace/profil).
+    //
+    // Structure de LateAccount : { _id, platform, profileId: { _id, name } | string }
+    // On compare profileId._id (ou profileId si string) avec lateProfileId du ConnectedPlatform.
     const lateAccountId = await step.run('recuperer-account-id', async () => {
       const accounts = await late.accounts.list()
 
-      // Normalisation : Late peut retourner `id` ou `_id` selon le SDK
+      // Extraire l'_id du profileId (qui peut être objet ou string selon l'endpoint)
+      const resolveProfileId = (profileId: { _id: string; name: string } | string): string =>
+        typeof profileId === 'string' ? profileId : profileId._id
+
       const account = accounts.find(
         (a) => a.platform === post.platform
-          && (a.profileId === connectedPlatform.lateProfileId),
+          && resolveProfileId(a.profileId) === connectedPlatform.lateProfileId,
       )
 
       if (!account) {
-        // Fallback : si le profileId ne matche pas, prendre le premier compte de cette plateforme
+        // Fallback : prendre le premier compte de cette plateforme
         // (cas où le mapping workspace/account a changé côté Late)
         const fallback = accounts.find((a) => a.platform === post.platform)
         if (fallback) {
           console.warn(
             `[publish-scheduled-post] profileId ${connectedPlatform.lateProfileId} introuvable,`
-            + ` fallback sur account ${fallback.id ?? fallback._id}`,
+            + ` fallback sur account ${fallback._id ?? fallback.id}`,
           )
-          return fallback.id ?? fallback._id ?? null
+          return fallback._id ?? fallback.id ?? null
         }
         return null
       }
 
-      // Utiliser `id` en priorité (certains endpoints Late retournent `_id`)
-      return account.id ?? account._id ?? null
+      // Utiliser `_id` en priorité (Late utilise MongoDB ObjectId)
+      return account._id ?? account.id ?? null
     })
 
     if (!lateAccountId) {
@@ -155,13 +160,38 @@ export const publishScheduledPost = inngest.createFunction(
     // ── Étape 4 : Publier via getlate.dev avec publishNow ────────────────────
     // `publishNow: true` car Inngest a déjà attendu via step.sleepUntil().
     // Late publie immédiatement et retourne le statut par plateforme + l'URL du post.
-    // Format attendu par l'API : { content, platforms: [{platform, accountId}], publishNow }
+    //
+    // Champs requis par l'API :
+    //   - profileId : ID du workspace Late (MongoDB ObjectId)
+    //   - content   : texte du post
+    //   - platforms : [{ platform, accountId }] (accountId = _id du LateAccount)
+    //   - mediaItems : médias (requis pour TikTok / Instagram — sans eux → 400)
     const latePost = await step.run('publier-post', async () => {
       return late.posts.create({
+        // ID du workspace Late (requis — sans ça, l'API retourne une erreur)
+        profileId: connectedPlatform.lateProfileId,
         // Late utilise `content` (et non `text`) pour le corps du post
         content: post.text,
-        // `platforms` remplace `profileIds` — chaque entrée cible un compte social
+        // `platforms` : chaque entrée cible un compte social (_id du LateAccount)
         platforms: [{ platform: post.platform, accountId: lateAccountId }],
+        // mediaItems : médias joints au post (obligatoire pour TikTok/Instagram vidéo)
+        // On mappe les URLs Supabase Storage vers le format LateMediaItem
+        ...(post.mediaUrls.length > 0 && {
+          mediaItems: post.mediaUrls.map((url) => ({
+            // Déduire le type à partir de l'extension (mp4/mov → video, sinon image)
+            type: /\.(mp4|mov|avi|webm)$/i.test(url) ? ('video' as const) : ('image' as const),
+            url,
+            // Déduire le mimeType à partir de l'extension
+            mimeType: /\.(mp4|mov)$/i.test(url) ? 'video/mp4'
+              : /\.mov$/i.test(url) ? 'video/quicktime'
+              : /\.webm$/i.test(url) ? 'video/webm'
+              : /\.gif$/i.test(url) ? 'image/gif'
+              : /\.png$/i.test(url) ? 'image/png'
+              : 'image/jpeg',
+            // Extraire le nom de fichier depuis l'URL
+            filename: url.split('/').pop() ?? 'media',
+          })),
+        }),
         // Late publie immédiatement — Inngest a déjà géré le timing via sleepUntil
         publishNow: true,
       })
@@ -196,10 +226,11 @@ export const publishScheduledPost = inngest.createFunction(
         where: { id: postId },
         data: {
           status: 'PUBLISHED',
-          publishedAt: latePost.publishedAt ? new Date(latePost.publishedAt) : new Date(),
+          publishedAt: new Date(),
           latePostId,
-          // URL directe du post publié (ex: "https://tiktok.com/@handle/video/...")
-          platformPostUrl: platformResult.platformPostUrl ?? null,
+          // platformPostUrl peut être absent (ex: TikTok retourne platformPostId).
+          // On prend platformPostUrl si disponible, sinon platformPostId.
+          platformPostUrl: platformResult.platformPostUrl ?? platformResult.platformPostId ?? null,
           failureReason: null,
         },
       })
@@ -209,7 +240,7 @@ export const publishScheduledPost = inngest.createFunction(
       published: true,
       platform: post.platform,
       latePostId,
-      platformPostUrl: platformResult.platformPostUrl ?? null,
+      platformPostUrl: platformResult.platformPostUrl ?? platformResult.platformPostId ?? null,
     }
   },
 )

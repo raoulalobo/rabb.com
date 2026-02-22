@@ -90,8 +90,14 @@ export interface LatePostPlatformResult {
    * URL directe du post publié sur la plateforme sociale.
    * Ex: "https://www.tiktok.com/@handle/video/123456789"
    * Disponible uniquement si `status === 'success'`.
+   * Note : peut être absent sur TikTok (utiliser platformPostId à la place).
    */
   platformPostUrl?: string
+  /**
+   * ID du post publié sur la plateforme (ex: TikTok retourne "v_pub_url~v2-...").
+   * Peut être utilisé pour construire l'URL ou tracker le post.
+   */
+  platformPostId?: string
 }
 
 /** Post publié ou planifié via getlate.dev */
@@ -115,41 +121,94 @@ export interface LatePost {
 }
 
 /**
- * Compte social connecté dans Late (résultat de GET /v1/accounts/list-accounts).
+ * Compte social connecté dans Late (résultat de GET /v1/accounts).
  * Chaque compte correspond à un profil social (TikTok, Instagram…) connecté à un workspace.
- * L'`id` de ce compte est utilisé dans `platforms[].accountId` lors de la création d'un post.
+ * L'`_id` de ce compte est utilisé dans `platforms[].accountId` lors de la création d'un post.
+ *
+ * Note : profileId est retourné comme objet { _id, name } par l'API (pas une string).
+ * Utiliser `a.profileId._id` pour comparer avec `connectedPlatform.lateProfileId`.
  */
 export interface LateAccount {
   /** ID unique du compte social dans Late — à utiliser dans platforms[].accountId */
-  id: string
-  /** Alias MongoDB — certains endpoints retournent `_id` au lieu de `id` */
-  _id?: string
+  _id: string
+  /** Alias — certains endpoints retournent `id` au lieu de `_id` */
+  id?: string
   /** Plateforme sociale (ex: "instagram", "tiktok") */
   platform: string
-  /** ID du workspace Late auquel ce compte appartient (= lateProfileId en DB) */
-  profileId: string
+  /**
+   * Workspace Late auquel ce compte appartient.
+   * L'API retourne un objet `{ _id, name }` (pas une string directe).
+   * Comparer via `profileId._id === connectedPlatform.lateProfileId`.
+   */
+  profileId: { _id: string; name: string } | string
   /** Nom d'affichage du compte (ex: "Raoul Alobo") */
   displayName?: string
   /** Handle/username du compte (ex: "@raoulalobo") */
   username?: string
 }
 
+/**
+ * Réponse de GET /v1/accounts — enveloppée dans { accounts: [...] }.
+ */
+interface LateAccountsListResponse {
+  accounts: LateAccount[]
+  hasAnalyticsAccess: boolean
+}
+
+/**
+ * Élément média à joindre à un post via POST /v1/posts.
+ * Utiliser des URLs HTTPS publiquement accessibles (ex: Supabase Storage public).
+ *
+ * @example
+ *   {
+ *     type: 'video',
+ *     url: 'https://storage.supabase.co/...',
+ *     mimeType: 'video/mp4',
+ *     filename: 'mon-video.mp4',
+ *   }
+ */
+export interface LateMediaItem {
+  /** Type du média : 'image' | 'video' | 'gif' | 'document' */
+  type: 'image' | 'video' | 'gif' | 'document'
+  /** URL HTTPS publique du fichier (ex: Supabase Storage) */
+  url: string
+  /** Type MIME du fichier (ex: 'video/mp4', 'image/jpeg') */
+  mimeType?: string
+  /** Nom du fichier original (ex: 'mon-video.mp4') */
+  filename?: string
+  /** Taille en octets */
+  size?: number
+}
+
 /** Paramètres pour créer un post via POST /v1/posts */
 export interface LateCreatePostParams {
   /**
-   * Contenu textuel du post.
-   * Optionnel si tous les éléments `platforms` ont un `customContent`.
+   * ID du workspace Late (MongoDB ObjectId).
+   * Requis — correspond à `ConnectedPlatform.lateProfileId` en DB.
+   * Récupéré via `late.profiles.list()` ou stocké lors de l'OAuth.
    */
-  content: string
+  profileId: string
+  /**
+   * Contenu textuel du post.
+   * Optionnel si tous les éléments `platforms` ont un `customContent`,
+   * ou si des médias sont attachés (ex: TikTok vidéo sans légende).
+   */
+  content?: string
   /**
    * Plateformes cibles : un objet par compte social à publier.
-   * `accountId` est l'`id` d'un LateAccount (GET /v1/accounts/list-accounts).
+   * `accountId` est l'`_id` d'un LateAccount (GET /v1/accounts).
    * `platform` est l'identifiant de la plateforme (ex: "instagram", "tiktok").
    */
   platforms: Array<{
     platform: string
     accountId: string
   }>
+  /**
+   * Médias à joindre au post (images, vidéos).
+   * Obligatoire pour TikTok (qui exige une vidéo ou image).
+   * URLs doivent être publiquement accessibles en HTTPS.
+   */
+  mediaItems?: LateMediaItem[]
   /**
    * Date de publication planifiée (ISO 8601 UTC).
    * Exclusif avec `publishNow`.
@@ -161,6 +220,15 @@ export interface LateCreatePostParams {
    * Exclusif avec `scheduledFor`.
    */
   publishNow?: boolean
+}
+
+/**
+ * Réponse de POST /v1/posts (création d'un post).
+ * L'API enveloppe le post dans `{ post: LatePost, message: string }`.
+ */
+interface LateCreatePostResponse {
+  post: LatePost
+  message: string
 }
 
 /** Statistiques d'un post */
@@ -378,18 +446,21 @@ class LateClient {
   readonly accounts = {
     /**
      * Liste tous les comptes sociaux connectés (dans la limite du plan).
-     * Utiliser l'`id` de chaque compte comme `accountId` dans late.posts.create().
+     * Utiliser `a._id` comme `accountId` dans late.posts.create().
+     *
+     * Note : comparer `a.profileId._id` (objet) avec `connectedPlatform.lateProfileId`.
      *
      * @returns Tableau de comptes sociaux connectés
      *
      * @example
      *   const accounts = await late.accounts.list()
      *   const tiktok = accounts.find(a => a.platform === 'tiktok')
-     *   // Utiliser tiktok.id dans platforms[].accountId
+     *   // Utiliser tiktok._id dans platforms[].accountId
      */
     list: () =>
-      // Réponse : tableau direct de LateAccount (non enveloppé)
-      this.request<LateAccount[]>('/v1/accounts/list-accounts'),
+      // Réponse enveloppée : { accounts: [...], hasAnalyticsAccess: bool }
+      // On unwrap pour retourner directement le tableau de comptes.
+      this.request<LateAccountsListResponse>('/v1/accounts').then((res) => res.accounts),
   }
 
   // ─── Posts ───────────────────────────────────────────────────────────────────
@@ -399,24 +470,29 @@ class LateClient {
    */
   readonly posts = {
     /**
-     * Crée et planifie un post via getlate.dev.
-     * Si scheduledAt est défini, le post est planifié ; sinon il est publié immédiatement.
+     * Crée et publie (ou planifie) un post via getlate.dev.
      *
-     * @param params - Données du post (texte, profils cibles, date de planification)
+     * Champs requis : `profileId` + `platforms` + `mediaItems` (si TikTok/Instagram).
+     * Réponse enveloppée → unwrap automatique vers `LatePost`.
+     *
+     * @param params - Données du post (profileId, content, platforms, mediaItems…)
      * @returns Post créé avec son ID getlate.dev
      *
      * @example
      *   const post = await late.posts.create({
-     *     text: 'Mon premier post 🎉',
-     *     profileIds: ['prof_abc123'],
-     *     scheduledAt: '2024-03-15T10:00:00Z',
+     *     profileId: 'prof_abc123',
+     *     content: 'Mon premier post 🎉',
+     *     platforms: [{ platform: 'tiktok', accountId: 'acc_xyz' }],
+     *     mediaItems: [{ type: 'video', url: 'https://...', mimeType: 'video/mp4' }],
+     *     publishNow: true,
      *   })
      */
     create: (params: LateCreatePostParams) =>
-      this.request<LatePost>('/v1/posts', {
+      // L'API retourne { post: LatePost, message: string } — unwrap vers LatePost
+      this.request<LateCreatePostResponse>('/v1/posts', {
         method: 'POST',
         body: JSON.stringify(params),
-      }),
+      }).then((res) => res.post),
 
     /**
      * Récupère un post par son ID.

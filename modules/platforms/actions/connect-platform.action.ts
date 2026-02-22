@@ -71,29 +71,23 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     let lateWorkspaceId = user?.lateWorkspaceId
 
     if (!lateWorkspaceId) {
-      // Premier connect : récupérer un workspace Late existant OU en créer un nouveau.
-      // On liste d'abord car le plan Free autorise seulement 2 workspaces au total.
-      console.log('[connectPlatform] Recherche workspace Late pour:', session.user.id)
-      // Réponse Late : { profiles: [...] } avec _id MongoDB sur chaque profil
-      const { profiles: existingProfiles } = await late.profiles.list()
-      console.log('[connectPlatform] Workspaces Late existants:', existingProfiles.length)
+      // lateWorkspaceId manquant = le hook d'inscription a échoué (Late était indisponible).
+      // → Créer un nouveau workspace Late DÉDIÉ à cet utilisateur.
+      //
+      // ⚠️ Ne pas utiliser late.profiles.list() : il retourne TOUS les workspaces du compte
+      //    Late de rabb.com (tous utilisateurs confondus). Réutiliser le premier / le défaut
+      //    reviendrait à assigner le workspace d'un autre utilisateur → violation d'isolation.
+      console.log('[connectPlatform] lateWorkspaceId absent → création workspace Late pour:', session.user.id)
 
-      if (existingProfiles.length > 0) {
-        // Réutiliser le premier workspace existant (priorité : isDefault, sinon le premier)
-        const defaultProfile = existingProfiles.find((p) => p.isDefault) ?? existingProfiles[0]
-        lateWorkspaceId = defaultProfile._id
-        console.log('[connectPlatform] Réutilisation workspace Late:', lateWorkspaceId)
-      } else {
-        // Aucun workspace : en créer un nouveau
-        const workspace = await late.profiles.create({
-          name: user?.name ?? session.user.email ?? 'rabb user',
-        })
-        // Late utilise _id (MongoDB) et non id
-        lateWorkspaceId = workspace._id
-        console.log('[connectPlatform] Workspace Late créé:', lateWorkspaceId)
-      }
+      const workspace = await late.profiles.create({
+        name: user?.name ?? session.user.email ?? 'rabb user',
+      })
+      // Late utilise _id (ObjectId MongoDB) et non id
+      lateWorkspaceId = workspace._id
+      console.log('[connectPlatform] Workspace Late créé:', lateWorkspaceId)
 
-      // Sauvegarder l'ID pour les prochains connects (évite une requête Late à chaque fois)
+      // Persister l'ID : tous les prochains connects (même des semaines plus tard)
+      // retrouveront ce workspace via la branche `else` (User.lateWorkspaceId déjà défini).
       await prisma.user.update({
         where: { id: session.user.id },
         data: { lateWorkspaceId },

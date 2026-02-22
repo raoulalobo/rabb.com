@@ -33,7 +33,7 @@ export const anthropic = new Anthropic({
 })
 
 /** Modèle Claude utilisé pour l'agent composer */
-export const AGENT_MODEL = 'claude-sonnet-4-6' as const
+export const AGENT_MODEL = 'claude-opus-4-6' as const
 
 // ─── OpenAI Whisper ───────────────────────────────────────────────────────────
 

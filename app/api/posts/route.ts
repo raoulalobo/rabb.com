@@ -231,6 +231,15 @@ async function handleComposeMode(
   const fromParam = searchParams.get('from')
   const toParam = searchParams.get('to')
 
+  // Filtre texte libre — mots-clés extraits par IA, séparés par des espaces.
+  // Chaque mot doit apparaître dans le texte du post (logique AND).
+  // Exemple : ?search=foot         → WHERE text ILIKE '%foot%'
+  // Exemple : ?search=foot+basket  → WHERE text ILIKE '%foot%' AND text ILIKE '%basket%'
+  const keywords = (searchParams.get('search') ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
   // ── Construction du filtre WHERE ───────────────────────────────────────────
 
   // Filtre de date — appliqué uniquement si `from` est présent
@@ -256,6 +265,17 @@ async function handleComposeMode(
         ...(platformFilter.length > 0 && { platform: { in: platformFilter } }),
         // Filtre date optionnel — sur scheduledFor
         ...dateFilter,
+        // Filtre texte optionnel — chaque mot-clé doit apparaître dans le texte du post.
+        // 1 mot  → condition simple :    WHERE text ILIKE '%foot%'
+        // N mots → AND :  WHERE text ILIKE '%foot%' AND text ILIKE '%basket%'
+        ...(keywords.length === 1 && {
+          text: { contains: keywords[0]!, mode: 'insensitive' as const },
+        }),
+        ...(keywords.length > 1 && {
+          AND: keywords.map((kw) => ({
+            text: { contains: kw, mode: 'insensitive' as const },
+          })),
+        }),
       },
       select: POST_SELECT,
       orderBy: [
