@@ -6,7 +6,8 @@
  *   Charge les plateformes connectées de l'user.
  *   Appelle Claude Sonnet avec le tool "create_posts_per_platform".
  *   Claude produit un PostDraft par plateforme mentionnée dans l'instruction.
- *   Persiste chaque PostDraft comme un Post DRAFT en DB.
+ *   Persiste chaque PostDraft comme un Post DRAFT ou SCHEDULED en DB.
+ *   Déclenche un event Inngest "post/schedule" pour chaque post SCHEDULED.
  *   Retourne les posts créés.
  *
  *   Flow complet :
@@ -15,8 +16,9 @@
  *   3. Chargement des plateformes connectées de l'utilisateur
  *   4. Appel Claude Sonnet → tool_use "create_posts_per_platform"
  *   5. Extraction + validation des PostDraft depuis le tool_use
- *   6. Création en DB : prisma.post.createMany() avec status DRAFT
- *   7. Retour { posts: Post[] }
+ *   6. Création en DB : prisma.post.createMany() avec status DRAFT ou SCHEDULED
+ *   7. Envoi des events Inngest "post/schedule" pour chaque post SCHEDULED
+ *   8. Retour { posts: Post[] }
  *
  * @example
  *   const res = await fetch('/api/agent/create-posts', {
@@ -39,6 +41,7 @@ import { z } from 'zod'
 
 import { anthropic, AGENT_MODEL } from '@/lib/ai'
 import { auth } from '@/lib/auth'
+import { inngest } from '@/lib/inngest/client'
 import { prisma } from '@/lib/prisma'
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 import type { PoolMedia, PostDraft } from '@/modules/posts/types'
@@ -114,7 +117,8 @@ const CREATE_POSTS_TOOL: Parameters<typeof anthropic.messages.create>[0]['tools'
               },
               scheduledFor: {
                 type: 'string',
-                description: 'Date/heure de publication en ISO 8601 (ex: "2024-03-15T09:00:00.000Z"). null si pas de date précisée.',
+                // Exemple dynamique : demain à cette heure (toujours dans le futur)
+                description: `Date/heure de publication en ISO 8601 UTC (ex: "${new Date(Date.now() + 86_400_000).toISOString()}"). null si pas de date précisée. Doit être strictement dans le futur par rapport à l'horodatage fourni dans le system prompt.`,
                 nullable: true,
               },
             },
@@ -188,7 +192,9 @@ function buildSystemPrompt(
 
 ## Date et heure actuelles
 ${dateStr} (fuseau Europe/Paris)
-Utilise cette date pour interpréter les expressions temporelles ("demain", "lundi prochain", "dans 2 heures", etc.).
+Horodatage ISO UTC exact : ${now.toISOString()}
+Utilise cet horodatage comme référence absolue pour calculer les expressions temporelles
+("dans 10 minutes", "demain matin", "lundi prochain", etc.).
 Toutes les dates de publication dans le tool doivent être en ISO 8601 UTC.
 
 ## Plateformes connectées de l'utilisateur
@@ -206,7 +212,11 @@ ${mediaSection}
 6. Adapte le ton : LinkedIn professionnel, TikTok/Instagram créatif et accessible, Twitter concis.
 7. Si l'utilisateur précise une heure ou un jour, calcule la date ISO exacte.
 8. Si aucune date n'est précisée : scheduledFor = null (brouillon, pas de date de publication).
-9. Si aucun média n'est dans le pool : mediaUrls = [] (ne pas inventer d'URLs).`
+9. Si aucun média n'est dans le pool : mediaUrls = [] (ne pas inventer d'URLs).
+10. Si l'utilisateur dit "maintenant", "tout de suite", "immédiatement" ou similaire :
+    scheduledFor = horodatage ISO UTC exact + 120 secondes
+    (ex: "${new Date(Date.now() + 120_000).toISOString()}")
+    Ce buffer de 2 min garantit que la date est encore dans le futur lors de la validation en DB.`
 }
 
 // ─── Handler POST ─────────────────────────────────────────────────────────────
@@ -339,6 +349,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       orderBy: { createdAt: 'desc' },
       take: postDrafts.length,
     })
+
+    // ── Déclenchement des events Inngest pour les posts planifiés ──────────
+    // Filtre uniquement les posts avec status SCHEDULED (date valide dans le futur).
+    // Les posts DRAFT (scheduledFor = null) ne déclenchent pas d'event.
+    const scheduledPosts = createdPosts.filter((p) => p.status === 'SCHEDULED')
+    if (scheduledPosts.length > 0) {
+      await Promise.all(
+        scheduledPosts.map((post) =>
+          inngest.send({
+            name: 'post/schedule',
+            data: {
+              // ID du post en DB pour que la fonction Inngest puisse le retrouver
+              postId: post.id,
+              // scheduledFor est forcément non-null ici (filtré par status SCHEDULED)
+              scheduledFor: post.scheduledFor!.toISOString(),
+            },
+          }),
+        ),
+      )
+    }
 
     return NextResponse.json({ posts: createdPosts })
   } catch (error) {
