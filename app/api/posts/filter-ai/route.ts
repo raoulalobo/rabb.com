@@ -159,12 +159,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { query } = parsed.data
 
   // ── Date du jour (pour les expressions relatives : "cette semaine", "demain"…) ──
-  const today = new Date().toISOString().split('T')[0]!
+  // Inclure le nom du jour en français pour éviter les erreurs de calcul "mercredi prochain"
+  // quand le modèle doit déduire le jour de la semaine depuis une date ISO seule.
+  const DAY_NAMES_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as const
+  const now = new Date()
+  const todayIso = now.toISOString().split('T')[0]!
+  const todayLabel = `${todayIso} (${DAY_NAMES_FR[now.getUTCDay()]})`
 
   // ── Prompt système ─────────────────────────────────────────────────────────
   const systemPrompt = [
     `Tu es un assistant d'extraction de filtres pour une application de planification de posts sur les réseaux sociaux.`,
-    `Aujourd'hui est le ${today}.`,
+    `Aujourd'hui est le ${todayLabel}.`,
     `L'utilisateur décrit ce qu'il cherche dans sa liste de posts (brouillons, planifiés, publiés ou échoués).`,
     `Utilise TOUJOURS le tool extract_post_filters pour retourner les filtres structurés.`,
     `N'extrais que ce qui est explicitement mentionné ou clairement implicite.`,
