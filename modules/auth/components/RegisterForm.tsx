@@ -224,10 +224,6 @@ function getErrorMessage(code?: string, message?: string): string {
   }
   if (msg.includes('password')) return 'Le mot de passe ne respecte pas les critères requis.'
   if (msg.includes('too many')) return 'Trop de tentatives. Attends quelques minutes avant de réessayer.'
-  // Capacité Late atteinte — le hook before d'inscription a bloqué la création
-  if (msg.includes('late_capacity_reached')) {
-    return "Les inscriptions sont temporairement suspendues. Réessaie dans quelques heures."
-  }
 
   return 'Une erreur est survenue. Réessaie.'
 }

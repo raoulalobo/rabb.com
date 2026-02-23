@@ -26,37 +26,12 @@ import { Calendar, ImageIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
+import {
+  STATUS_BADGE_CLASSES,
+  STATUS_CHIP_CLASSES,
+  STATUS_LABELS,
+} from '@/modules/posts/utils/status-styles'
 import type { Post } from '@/modules/posts/types'
-
-// ─── Constantes de style par statut ───────────────────────────────────────────
-
-/** Classes Tailwind du chip selon le statut du post */
-const STATUS_STYLES: Record<Post['status'], string> = {
-  DRAFT: 'bg-muted/80 text-muted-foreground',
-  SCHEDULED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  PUBLISHED: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-  FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-}
-
-/** Libellés français par statut */
-const STATUS_LABELS: Record<Post['status'], string> = {
-  DRAFT: 'Brouillon',
-  SCHEDULED: 'Planifié',
-  PUBLISHED: 'Publié',
-  FAILED: 'Échoué',
-}
-
-/**
- * Classes Tailwind du Badge dans le popover selon le statut.
- * On surcharge le variant par défaut avec des classes custom pour respecter
- * le code couleur métier.
- */
-const STATUS_BADGE_CLASSES: Record<Post['status'], string> = {
-  DRAFT: 'bg-muted text-muted-foreground border-0',
-  SCHEDULED: 'bg-blue-100 text-blue-700 border-0 dark:bg-blue-900/40 dark:text-blue-300',
-  PUBLISHED: 'bg-green-100 text-green-700 border-0 dark:bg-green-900/40 dark:text-green-300',
-  FAILED: 'bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-300',
-}
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -109,7 +84,8 @@ export function CalendarPostChip({
   post,
   interactive = false,
 }: CalendarPostChipProps): React.JSX.Element {
-  const style = STATUS_STYLES[post.status]
+  // Couleur sémantique du chip selon le statut (source : status-styles.ts)
+  const style = STATUS_CHIP_CLASSES[post.status]
 
   // Heure de planification ou publication (si disponible)
   const dateToShow = post.scheduledFor ?? post.publishedAt

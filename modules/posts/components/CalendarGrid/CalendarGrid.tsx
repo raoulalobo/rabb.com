@@ -322,7 +322,8 @@ function CalendarCell({
   return (
     <div
       className={[
-        'min-h-[90px] p-1.5',
+        // min-h réduite sur mobile (60px) pour éviter un scroll excessif sur petits écrans
+        'min-h-[60px] p-1 md:min-h-[90px] md:p-1.5',
         showBottomBorder ? 'border-b border-border' : '',
         showRightBorder ? 'border-r border-border' : '',
         !isCurrentMonth ? 'bg-muted/20' : '',

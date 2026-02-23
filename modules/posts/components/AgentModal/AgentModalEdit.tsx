@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import { useSpeechRecognition } from '@/modules/posts/hooks/useSpeechRecognition'
+import { useAppStore } from '@/store/app.store'
 import type { Post, PoolMedia, UploadingFile } from '@/modules/posts/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -91,7 +92,11 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
   const config = PLATFORM_CONFIG[post.platform as keyof typeof PLATFORM_CONFIG]
 
   // ── Dictée vocale (Web Speech API — natif, aucun appel serveur) ──────────
+  // Préférence utilisateur : délai de silence avant arrêt automatique du micro
+  const speechSilenceTimeoutMs = useAppStore((s) => s.speechSilenceTimeoutMs)
+
   const { isListening, startListening, stopListening, isSupported } = useSpeechRecognition({
+    silenceTimeoutMs: speechSilenceTimeoutMs,
     /** Appende le texte transcrit à l'instruction existante */
     onResult: (text) => {
       setInstruction((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))

@@ -75,13 +75,16 @@ export function Footer(): React.JSX.Element {
         </p>
       )}
 
-      {/* Boutons d'action */}
-      <div className="flex items-center justify-end gap-2">
-        {/* Bouton Brouillon */}
+      {/* Boutons d'action
+          Mobile : colonne inversée (Planifier en haut = action principale visible en premier)
+          Desktop (sm+) : ligne alignée à droite */}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+        {/* Bouton Brouillon — w-full sur mobile, auto sur desktop */}
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="w-full sm:w-auto"
           onClick={saveDraft}
           disabled={!canSubmit}
           aria-label="Enregistrer comme brouillon"
@@ -101,6 +104,7 @@ export function Footer(): React.JSX.Element {
           <Button
             type="button"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={schedulePost}
             disabled={!canSchedule}
             aria-label={`Planifier pour le ${scheduledFor.toLocaleDateString('fr-FR')}`}

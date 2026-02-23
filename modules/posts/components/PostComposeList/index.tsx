@@ -43,6 +43,7 @@ import type { Post } from '@/modules/posts/types'
 
 import { AIFilterModal } from './AIFilterModal'
 import { PostComposeCard } from './PostComposeCard'
+import { PostDetailModal } from './PostDetailModal'
 
 import type { ExtractedFilters } from './AIFilterModal'
 import type { InfiniteData } from '@tanstack/react-query'
@@ -352,6 +353,22 @@ export function PostComposeList({
     })
   }
 
+  // ── État du modal PostDetailModal ─────────────────────────────────────────
+  /** Post dont on affiche le détail (null = modal fermé) */
+  const [detailPost, setDetailPost] = useState<Post | null>(null)
+  /** Contrôle l'ouverture du PostDetailModal (Radix Dialog controlled) */
+  const [detailOpen, setDetailOpen] = useState(false)
+
+  /**
+   * Ouvre le modal de détail pour le post sélectionné.
+   *
+   * @param post - Post dont on souhaite afficher les détails
+   */
+  const handleOpenDetail = (post: Post): void => {
+    setDetailPost(post)
+    setDetailOpen(true)
+  }
+
   // ── État de la modale AgentModal ──────────────────────────────────────────
   type ModalMode = 'create' | 'edit'
   const [modalOpen, setModalOpen] = useState(false)
@@ -448,14 +465,42 @@ export function PostComposeList({
   // Supprimer avertissement ESLint pour la variable non utilisée (prête pour réactivation)
   void availablePlatforms
 
+  // IMPORTANT : wrapper <div> (non fragment) pour corriger le gap sticky.
+  //
+  // Problème résolu : compose/page.tsx utilise `space-y-6` sur son wrapper.
+  // `space-y-6` applique `margin-top: 24px` sur chaque enfant direct.
+  // Avec un fragment `<>`, la toolbar sticky était un enfant direct du wrapper
+  // → elle recevait margin-top: 24px → ce gap 24px est transparent (la marge
+  // est hors du fond bg-background) → les cartes glissaient dans ce gap lors
+  // du scroll et restaient visibles derrière la toolbar.
+  //
+  // Solution : cette <div> est l'unique enfant de compose/page.tsx issu de
+  // PostComposeList → space-y-6 s'applique sur cette <div>, pas sur la toolbar.
+  // La toolbar à l'intérieur démarre directement à top: 0, sans gap transparent.
   return (
-    <>
+    <div>
       {/* ── Barre d'outils ──────────────────────────────────────────────────── */}
-      {/* sticky : reste visible en haut du scroll container (<main overflow-y-auto>)
-          bg-background : fond opaque pour masquer les cartes qui défilent dessous
-          z-10 : passe devant les cartes (z-index supérieur)
-          py-3 : padding pour que le fond couvre bien le bord supérieur */}
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-background py-3">
+      {/*
+       * sticky : reste visible en haut du scroll container (<main overflow-y-auto>)
+       * bg-background : fond opaque pour masquer les cartes qui défilent dessous
+       * z-10 : passe devant les cartes (z-index supérieur)
+       * py-3 : padding visuel interne
+       * border-b : séparateur visuel
+       *
+       * -top-4 md:-top-6 : compense le padding de <main> (p-4=16px mobile, p-6=24px desktop).
+       *   `sticky top:0` colle au bord de la content-box du scroll container (APRÈS le padding).
+       *   Avec top: -padding_main, on colle au bord de la padding-box (bord HAUT du viewport),
+       *   ce qui garantit aucun gap transparent entre y=0 et le fond de la toolbar.
+       *
+       *   Formule : top = -(padding-top de <main>)
+       *     Mobile  → p-4  = 1rem  = 16px → -top-4
+       *     Desktop → p-6  = 1.5rem = 24px → md:-top-6
+       *
+       * -mt-4 md:-mt-6 + pt-7 md:pt-9 : décale visuellement la toolbar vers le haut
+       *   sans modifier l'espace occupé dans le flux normal.
+       *   pt = py-3 (12px) + |top offset| pour que les boutons restent à la bonne hauteur.
+       */}
+      <div className="sticky -top-4 md:-top-6 z-10 flex items-center justify-between gap-3 bg-background py-3 border-b border-border">
 
         {/* Bouton "Nouveau post" — masqué en vue calendrier (lecture seule) */}
         {view === 'list' && (
@@ -552,8 +597,10 @@ export function PostComposeList({
       </div>
 
       {/* ── Vue Calendrier ──────────────────────────────────────────────────── */}
+      {/* mt-4 : 16px d'espacement entre la toolbar et le contenu (espace-y-6 du parent
+          ne s'applique plus à ces éléments depuis le passage au wrapper <div>) */}
       {view === 'calendar' && (
-        <>
+        <div className="mt-4">
           {/* Information : vue lecture seule */}
           <p className="text-xs text-muted-foreground">
             Vue calendrier — cliquez sur un post pour voir ses détails.
@@ -565,13 +612,17 @@ export function PostComposeList({
            * Technique "breakout" : left-1/2 + -translate-x-1/2 permet de sortir
            * du container max-w-3xl de la page /compose.
            *
-           * Largeur : calc(100vw - 15rem - 3rem)
-           *   - 15rem = sidebar fixe (w-60)
-           *   - 3rem  = padding horizontal du <main> (p-6 = 1.5rem de chaque côté)
+           * Largeur responsive (main padding + sidebar) :
+           *   Mobile (< md) : calc(100vw - 2rem)
+           *     - 0rem  = pas de sidebar (cachée sur mobile)
+           *     - 2rem  = padding du <main> p-4 (1rem de chaque côté)
+           *   Desktop (md+) : calc(100vw - 15rem - 3rem)
+           *     - 15rem = sidebar fixe (w-60)
+           *     - 3rem  = padding du <main> p-6 (1.5rem de chaque côté)
            * → Le calendrier occupe exactement la largeur utile du <main>,
            *   sans débordement ni scrollbar horizontale.
            */}
-          <div className="relative left-1/2 w-[calc(100vw-15rem-3rem)] -translate-x-1/2">
+          <div className="relative left-1/2 w-[calc(100vw-2rem)] -translate-x-1/2 md:w-[calc(100vw-15rem-3rem)]">
             <CalendarGrid
               initialYear={calendarInit.year}
               initialMonth={calendarInit.month}
@@ -580,12 +631,14 @@ export function PostComposeList({
               // onMonthChange non nécessaire — pas d'invalidation cache depuis le calendrier
             />
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Vue Liste ───────────────────────────────────────────────────────── */}
+      {/* mt-4 : 16px d'espacement entre la toolbar et le contenu (espace-y-6 du parent
+          ne s'applique plus à ces éléments depuis le passage au wrapper <div>) */}
       {view === 'list' && (
-        <>
+        <div className="mt-4">
           {/* Barre de statut — compteur + indicateur de filtre actif */}
           {allPosts.length > 0 && hasActiveFilter && (
             <p className="text-sm text-muted-foreground">
@@ -644,6 +697,7 @@ export function PostComposeList({
                   post={post}
                   onEdit={handleOpenEdit}
                   onDelete={handlePostDeleted}
+                  onDetail={handleOpenDetail}
                 />
               ))}
             </div>
@@ -666,8 +720,28 @@ export function PostComposeList({
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
           )}
-        </>
+        </div>
       )}
+
+      {/* ── PostDetailModal — affichage complet d'un post ───────────────────── */}
+      {/*
+       * Rendu en dehors des vues liste/calendrier pour éviter les conflits de z-index
+       * avec les cards et le calendrier.
+       * detailPost conserve sa valeur même après la fermeture (lastPostRef dans PostDetailModal)
+       * pour que l'animation de fermeture affiche encore le contenu.
+       */}
+      <PostDetailModal
+        post={detailPost}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onEdit={(post) => {
+          // Ferme le détail, ouvre l'AgentModal en mode édition
+          setSelectedPost(post)
+          setModalMode('edit')
+          setModalOpen(true)
+        }}
+        onDelete={handlePostDeleted}
+      />
 
       {/* ── AgentModal — mode création ──────────────────────────────────────── */}
       {modalMode === 'create' && (
@@ -697,6 +771,6 @@ export function PostComposeList({
         currentQuery={activeQueryText}
         onFiltersApplied={handleFiltersApplied}
       />
-    </>
+    </div>
   )
 }

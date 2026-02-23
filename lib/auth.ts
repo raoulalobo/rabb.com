@@ -11,13 +11,16 @@
  *   Hooks de base de données :
  *   - Après inscription → création automatique des NotificationPrefs par défaut
  *
+ *   Note : le workspace Late (lateWorkspaceId) n'est plus créé à l'inscription.
+ *   Il est créé à la demande (lazy) lors du premier connectPlatform().
+ *   → Évite de consommer des ressources Late pour les utilisateurs inactifs.
+ *
  * @see https://better-auth.com/docs
  */
 
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 
-import { LateApiError, late } from '@/lib/late'
 import { prisma } from '@/lib/prisma'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -72,49 +75,12 @@ export const auth = betterAuth({
     user: {
       create: {
         /**
-         * Avant la création d'un utilisateur : crée son workspace Late (conteneur
-         * qui regroupera ses comptes sociaux connectés).
-         *
-         * Deux comportements :
-         * - Si Late accepte (200) → injecte `lateWorkspaceId` dans les données
-         *   de l'utilisateur, il sera sauvegardé en DB dès la création.
-         * - Si Late refuse (403 capacité atteinte) → lève une erreur qui bloque
-         *   l'inscription. Le message "LATE_CAPACITY_REACHED" est intercepté
-         *   par RegisterForm pour afficher un message clair à l'utilisateur.
-         * - Si Late est indisponible (autre erreur) → log + inscription autorisée
-         *   sans workspace (le workspace sera créé au premier connect).
-         *
-         * @param user - Données de l'utilisateur avant insertion en DB
-         * @returns Données enrichies avec `lateWorkspaceId`, ou undefined si erreur non bloquante
-         */
-        before: async (user) => {
-          try {
-            const workspace = await late.profiles.create({
-              name: user.name ?? user.email,
-            })
-            // Injecter l'ID du workspace Late directement dans l'enregistrement User
-            // → sauvegardé en DB en même temps que le user, sans update supplémentaire
-            return {
-              data: {
-                ...user,
-                lateWorkspaceId: workspace._id,
-              },
-            }
-          } catch (error) {
-            if (error instanceof LateApiError && error.status === 403) {
-              // Capacité Late atteinte → bloquer l'inscription
-              // Le code "LATE_CAPACITY_REACHED" est reconnu par RegisterForm
-              throw new Error('LATE_CAPACITY_REACHED')
-            }
-            // Autre erreur (réseau, API down…) → ne pas bloquer l'inscription
-            // lateWorkspaceId restera null, créé au premier connect
-            console.error('[auth] Impossible de créer le workspace Late:', error)
-          }
-        },
-
-        /**
          * Après la création d'un utilisateur, crée ses préférences de notifications
          * avec les valeurs par défaut (emailOnFailure: true, emailWeeklyRecap: true).
+         *
+         * Note : lateWorkspaceId reste null à ce stade — le workspace Late est créé
+         * à la demande (lazy) lors du premier connectPlatform() dans
+         * modules/platforms/actions/connect-platform.action.ts.
          *
          * @param user - L'utilisateur nouvellement créé
          */

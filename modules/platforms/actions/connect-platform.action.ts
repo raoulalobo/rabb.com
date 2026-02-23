@@ -71,7 +71,7 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     let lateWorkspaceId = user?.lateWorkspaceId
 
     if (!lateWorkspaceId) {
-      // lateWorkspaceId manquant = le hook d'inscription a échoué (Late était indisponible).
+      // lateWorkspaceId absent = premier connect de cet utilisateur (création lazy).
       // → Créer un nouveau workspace Late DÉDIÉ à cet utilisateur.
       //
       // ⚠️ Ne pas utiliser late.profiles.list() : il retourne TOUS les workspaces du compte
@@ -104,6 +104,16 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
   } catch (error) {
     // Log complet de l'erreur réelle pour diagnostiquer la cause exacte
     console.error('[connectPlatform] erreur:', error)
+
+    // Capacité Late atteinte (403) : trop de workspaces créés sur ce compte Late API.
+    // Message orienté utilisateur — aucun détail technique exposé.
+    if (error instanceof LateApiError && error.status === 403) {
+      return {
+        success: false,
+        error: "Les connexions sont temporairement suspendues. Réessaie dans quelques heures.",
+      }
+    }
+
     if (error instanceof LateApiError) {
       return {
         success: false,

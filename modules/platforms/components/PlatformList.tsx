@@ -15,7 +15,7 @@
 'use client'
 
 import type { LatePlatform } from '@/lib/late'
-import { PRIORITY_PLATFORMS } from '@/modules/platforms/constants'
+import { DISPLAYED_PLATFORMS } from '@/modules/platforms/constants'
 import { useConnectPlatform, useDisconnectPlatform } from '@/modules/platforms/hooks/useConnectPlatform'
 import { usePlatforms } from '@/modules/platforms/hooks/usePlatforms'
 
@@ -24,7 +24,8 @@ import { PlatformCardSkeleton } from './PlatformCardSkeleton'
 
 /**
  * Liste complète des plateformes sociales.
- * Affiche les 4 prioritaires + toutes les autres déjà connectées.
+ * Affiche les 6 plateformes affichées par défaut (DISPLAYED_PLATFORMS : les 4 prioritaires
+ * + Twitter + Snapchat) + toutes les autres déjà connectées.
  * Gère les états de chargement et les actions connect/disconnect.
  */
 export function PlatformList(): React.JSX.Element {
@@ -32,18 +33,18 @@ export function PlatformList(): React.JSX.Element {
   const { connect, connectingPlatform } = useConnectPlatform()
   const { disconnect, disconnectingId } = useDisconnectPlatform()
 
-  if (isLoading) return <PlatformCardSkeleton count={4} />
+  if (isLoading) return <PlatformCardSkeleton count={6} />
 
   // Construire la liste à afficher :
-  // 1. Toujours afficher les 4 plateformes prioritaires
-  // 2. Ajouter les plateformes secondaires si elles sont connectées
-  const connectedSecondary = platforms.filter(
-    (p) => !PRIORITY_PLATFORMS.includes(p.platform as LatePlatform),
+  // 1. Toujours afficher les 6 plateformes de DISPLAYED_PLATFORMS
+  // 2. Ajouter les plateformes restantes si elles sont déjà connectées
+  const connectedOther = platforms.filter(
+    (p) => !DISPLAYED_PLATFORMS.includes(p.platform as LatePlatform),
   )
 
   const platformsToShow: LatePlatform[] = [
-    ...PRIORITY_PLATFORMS,
-    ...connectedSecondary.map((p) => p.platform as LatePlatform),
+    ...DISPLAYED_PLATFORMS,
+    ...connectedOther.map((p) => p.platform as LatePlatform),
   ]
 
   return (

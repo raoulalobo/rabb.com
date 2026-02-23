@@ -10,8 +10,9 @@
 
 import { Suspense } from 'react'
 
-
 import { CalendarGridSkeleton } from '@/modules/posts/components/CalendarGrid/CalendarGridSkeleton'
+import { STATUS_CHIP_CLASSES, STATUS_LABELS } from '@/modules/posts/utils/status-styles'
+import type { Post } from '@/modules/posts/types'
 
 import { CalendarClient } from './CalendarClient'
 
@@ -57,22 +58,23 @@ export default function CalendarPage(): React.JSX.Element {
 /**
  * Légende des couleurs de statut affichée au-dessus de la grille.
  */
+/**
+ * Légende des couleurs de statut affichée au-dessus de la grille.
+ * Les classes et libellés proviennent de status-styles.ts (source de vérité)
+ * pour rester cohérents avec les chips de la grille.
+ */
 function StatusLegend(): React.JSX.Element {
-  const statuses = [
-    { label: 'Brouillon', className: 'bg-muted/80 text-muted-foreground' },
-    { label: 'Planifié', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-    { label: 'Publié', className: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-    { label: 'Échoué', className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
-  ]
+  // Ordre d'affichage souhaité dans la légende
+  const orderedStatuses: Post['status'][] = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
 
   return (
     <div className="flex flex-wrap gap-2">
-      {statuses.map(({ label, className }) => (
+      {orderedStatuses.map((status) => (
         <span
-          key={label}
-          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${className}`}
+          key={status}
+          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${STATUS_CHIP_CLASSES[status]}`}
         >
-          {label}
+          {STATUS_LABELS[status]}
         </span>
       ))}
     </div>

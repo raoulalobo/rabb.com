@@ -44,8 +44,13 @@ export default function DashboardLayout({
         {/* Header : toggle sidebar + menu utilisateur */}
         <Header />
 
-        {/* Contenu de la page avec scroll vertical si nécessaire */}
-        <main className="flex-1 overflow-y-auto p-6">
+        {/* Contenu de la page avec scroll vertical si nécessaire.
+            p-4 sur mobile (16px), p-6 sur desktop (24px) — plus aéré sans gaspiller d'espace.
+            bg-background : fond explicite pour que la zone de padding de <main> ait la même
+            couleur que les toolbars sticky (bg-background). Sans ça, les éléments collants
+            à top: 0 peuvent laisser apparaître du contenu dans le gap entre y=0 et le fond
+            de la toolbar. */}
+        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
           {children}
         </main>
       </div>

@@ -20,6 +20,7 @@ import { PlatformCardSkeleton } from '@/modules/platforms/components/PlatformCar
 import { PlatformList } from '@/modules/platforms/components/PlatformList'
 
 import { SettingsToastHandler } from './SettingsToastHandler'
+import { SpeechSettings } from './SpeechSettings'
 
 /**
  * Page des paramètres.
@@ -54,6 +55,18 @@ export default function SettingsPage(): React.JSX.Element {
         <Suspense fallback={<PlatformCardSkeleton count={4} />}>
           <PlatformList />
         </Suspense>
+      </section>
+
+      {/* ── Section : Dictée vocale ── */}
+      <section>
+        <div className="mb-4">
+          <h2 className="text-base font-semibold">Dictée vocale</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Règle le comportement du micro lors de la saisie vocale.
+          </p>
+        </div>
+        {/* Client Component : lit/écrit speechSilenceTimeoutMs dans le store Zustand persisté */}
+        <SpeechSettings />
       </section>
 
       {/* ── Section : Profil (placeholder MVP) ── */}

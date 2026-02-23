@@ -27,6 +27,7 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
+import { STATUS_BADGE_CLASSES, STATUS_LABELS } from '@/modules/posts/utils/status-styles'
 import type { Post } from '@/modules/posts/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -38,6 +39,8 @@ interface PostComposeCardProps {
   onEdit: (post: Post) => void
   /** Callback appelé après la suppression réussie du post */
   onDelete: (postId: string) => void
+  /** Callback appelé quand l'utilisateur clique sur le corps de la carte (ouvre le modal de détail) */
+  onDetail?: (post: Post) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,31 +59,6 @@ function formatScheduledDate(date: Date): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-/**
- * Retourne les classes CSS du badge selon le statut du post.
- *
- * @param status - Statut du post
- * @returns Classes Tailwind pour le badge
- */
-function getStatusBadgeVariant(status: Post['status']): 'default' | 'secondary' | 'outline' {
-  switch (status) {
-    case 'DRAFT':
-      return 'secondary'
-    case 'SCHEDULED':
-      return 'default'
-    default:
-      return 'outline'
-  }
-}
-
-/** Labels lisibles des statuts */
-const STATUS_LABELS: Record<Post['status'], string> = {
-  DRAFT: 'Brouillon',
-  SCHEDULED: 'Planifié',
-  PUBLISHED: 'Publié',
-  FAILED: 'Échoué',
 }
 
 // ─── Helper détection type de média ──────────────────────────────────────────
@@ -108,7 +86,7 @@ function isVideoUrl(url: string): boolean {
  * Carte d'un post DRAFT dans la liste de composition.
  * Affiche les informations essentielles du post et les actions disponibles.
  */
-export function PostComposeCard({ post, onEdit, onDelete }: PostComposeCardProps): React.JSX.Element {
+export function PostComposeCard({ post, onEdit, onDelete, onDetail }: PostComposeCardProps): React.JSX.Element {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const config = PLATFORM_CONFIG[post.platform as keyof typeof PLATFORM_CONFIG]
@@ -136,7 +114,26 @@ export function PostComposeCard({ post, onEdit, onDelete }: PostComposeCardProps
   }
 
   return (
-    <div className="flex gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm">
+    /*
+     * onClick sur l'ensemble de la carte → ouvre le modal de détail (si onDetail est fourni).
+     * Les boutons d'action (Modifier / Supprimer) appellent e.stopPropagation() via leur
+     * div wrapper pour ne pas déclencher ce handler lors d'un clic sur les boutons.
+     *
+     * Accessibilité : role="button" + tabIndex + onKeyDown permettent la navigation clavier
+     * (Tab pour focus, Entrée/Espace pour activer) quand onDetail est actif.
+     */
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div
+      className={[
+        'flex gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm',
+        onDetail ? 'cursor-pointer hover:border-border/80' : '',
+      ].join(' ')}
+      onClick={() => onDetail?.(post)}
+      role={onDetail ? 'button' : undefined}
+      tabIndex={onDetail ? 0 : undefined}
+      onKeyDown={onDetail ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDetail(post) } } : undefined}
+      aria-label={onDetail ? `Voir les détails du post ${post.platform}` : undefined}
+    >
       {/* ── Icône de plateforme ───────────────────────────────────────────── */}
       <div
         className="flex size-8 shrink-0 items-center justify-center rounded-md"
@@ -162,7 +159,8 @@ export function PostComposeCard({ post, onEdit, onDelete }: PostComposeCardProps
           <span className="text-xs font-semibold text-foreground">
             {config?.label ?? post.platform}
           </span>
-          <Badge variant={getStatusBadgeVariant(post.status)} className="text-xs py-0">
+          {/* Badge couleur sémantique importé depuis status-styles.ts (source de vérité) */}
+          <Badge variant="outline" className={`text-xs py-0 ${STATUS_BADGE_CLASSES[post.status]}`}>
             {STATUS_LABELS[post.status]}
           </Badge>
         </div>
@@ -227,7 +225,14 @@ export function PostComposeCard({ post, onEdit, onDelete }: PostComposeCardProps
       </div>
 
       {/* ── Actions ───────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-start gap-1.5">
+      {/*
+       * stopPropagation sur cette div : empêche le clic sur Modifier ou Supprimer
+       * de remonter jusqu'à l'onClick de la carte parente (qui ouvrirait le modal de détail).
+       */}
+      <div
+        className="flex shrink-0 items-start gap-1.5"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Bouton Modifier — ouvre l'AgentModal en mode édition */}
         <Button
           variant="outline"

@@ -61,6 +61,16 @@ const PLATFORMS = [
     icon: '/icons/facebook.svg',
     color: '#1877F2',
   },
+  {
+    name: 'X (Twitter)',
+    icon: '/icons/twitter.svg',
+    color: '#000000',
+  },
+  {
+    name: 'Snapchat',
+    icon: '/icons/snapchat.svg',
+    color: '#FFFC00',
+  },
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -201,11 +211,16 @@ export default function HomePage(): React.JSX.Element {
               Compatible avec
             </p>
 
-            <div className="flex items-center gap-5">
+            {/*
+             * flex-wrap : les badges passent à la ligne sur mobile si l'espace manque.
+             * justify-center : toujours centré quelle que soit la largeur.
+             * gap-3 : espacement réduit par rapport aux 4 logos (gap-5) pour tenir en une ligne sur desktop.
+             */}
+            <div className="flex flex-wrap items-center justify-center gap-3">
               {PLATFORMS.map((platform) => (
                 <div
                   key={platform.name}
-                  className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3.5 py-2 shadow-sm transition-shadow hover:shadow-md"
+                  className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm transition-shadow hover:shadow-md"
                   title={platform.name}
                 >
                   {/* Icone SVG de la plateforme — taille fixe pour l'alignement */}

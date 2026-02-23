@@ -3,7 +3,8 @@
  * @module layout
  * @description Barre de navigation latérale du dashboard.
  *   - Affiche le logo rabb et les liens de navigation principaux
- *   - Largeur fixe w-60 (240px), toujours visible, sans comportement rétractable
+ *   - Responsive : visible en desktop (md+), cachée sur mobile
+ *   - Sur mobile, la navigation est assurée par MobileSidebar (Sheet)
  *
  * Navigation principale (MVP) :
  *   - Dashboard (/) → vue d'ensemble rapide
@@ -15,7 +16,7 @@
  *
  * @example
  *   // app/(dashboard)/layout.tsx
- *   <Sidebar />
+ *   <Sidebar />  // visible uniquement sur md+
  */
 
 'use client'
@@ -47,9 +48,10 @@ interface NavItem {
 
 /**
  * Liste des items de navigation du dashboard (MVP).
+ * Exportée pour être réutilisée par MobileSidebar sans duplication.
  * Ordre : du plus fréquent au moins fréquent selon les cas d'usage créateur.
  */
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Composer', href: '/compose', icon: PenSquare },
   { label: 'Calendrier', href: '/calendar', icon: Calendar },
@@ -62,7 +64,8 @@ const NAV_ITEMS: NavItem[] = [
 
 /**
  * Sidebar de navigation principale du dashboard.
- * Largeur fixe w-60 (240px), toujours visible, sans toggle.
+ * Visible uniquement en desktop (md+) via `hidden md:flex`.
+ * Sur mobile, la navigation est gérée par MobileSidebar (Sheet).
  *
  * @returns Barre latérale avec logo, navigation et indicateur de route active
  */
@@ -71,7 +74,8 @@ export function Sidebar(): React.JSX.Element {
   const pathname = usePathname()
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r bg-sidebar">
+    // hidden md:flex : invisible sur mobile, flex-col sur desktop (≥ 768px)
+    <aside className="hidden md:flex h-full w-60 flex-col border-r bg-sidebar">
       {/* ── Logo ─────────────────────────────────────────────────────── */}
       <div className="flex h-16 items-center border-b px-4">
         <Link href="/dashboard" className="flex items-center gap-2">

@@ -30,6 +30,32 @@ export default function SettingsLoading(): React.JSX.Element {
         <PlatformCardSkeleton count={4} />
       </section>
 
+      {/* ── Section dictée vocale skeleton ── */}
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        {/* Reproduit la carte SpeechSettings : icône + texte + valeur + slider + boutons */}
+        <div className="rounded-xl border border-border p-5 space-y-5">
+          <div className="flex items-start gap-3">
+            <Skeleton className="size-8 rounded-md shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-3/4" />
+            </div>
+            <Skeleton className="h-8 w-12 shrink-0" />
+          </div>
+          <Skeleton className="h-2 w-full rounded-full" />
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-6 w-10 rounded-md" />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Section profil skeleton ── */}
       <section className="space-y-4">
         <div className="space-y-1">

@@ -189,6 +189,19 @@ export const PRIORITY_PLATFORMS: LatePlatform[] = [
 ]
 
 /**
+ * Plateformes affichées par défaut dans la page Paramètres (Settings).
+ * Inclut les 4 prioritaires + Twitter et Snapchat, qui sont mis en avant
+ * sans être dans les priorités du MVP (pas de media-type restriction forte).
+ * Les autres plateformes (LinkedIn, Reddit, etc.) restent masquées tant
+ * qu'elles ne sont pas connectées.
+ */
+export const DISPLAYED_PLATFORMS: LatePlatform[] = [
+  ...PRIORITY_PLATFORMS,
+  'twitter',
+  'snapchat',
+]
+
+/**
  * Toutes les plateformes getlate.dev (prioritaires + secondaires).
  * Ordonnées : prioritaires d'abord.
  */

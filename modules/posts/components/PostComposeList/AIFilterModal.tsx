@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useSpeechRecognition } from '@/modules/posts/hooks/useSpeechRecognition'
+import { useAppStore } from '@/store/app.store'
 
 // ─── Export du type pour les consommateurs ─────────────────────────────────────
 
@@ -113,8 +114,12 @@ export function AIFilterModal({
     setQuery((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text))
   }, [])
 
+  // Préférence utilisateur : délai de silence avant arrêt automatique du micro
+  const speechSilenceTimeoutMs = useAppStore((s) => s.speechSilenceTimeoutMs)
+
   const { isListening, startListening, stopListening, isSupported } = useSpeechRecognition({
     onResult: handleVoiceResult,
+    silenceTimeoutMs: speechSilenceTimeoutMs,
   })
 
   // ── Recherche IA ───────────────────────────────────────────────────────────
