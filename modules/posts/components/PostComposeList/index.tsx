@@ -230,9 +230,12 @@ export function PostComposeList({
    */
   const calendarFilter = useCallback(
     (posts: Post[]): Post[] => {
-      // Statuts actifs : ceux du filtre IA s'il est actif, sinon DRAFT+SCHEDULED par défaut
+      // Statuts actifs : ceux du filtre IA s'il est actif, sinon tous les statuts par défaut
+      // (cohérent avec le SSR page.tsx et l'API /api/posts qui renvoient aussi les 4 statuts)
       const activeStatuses: Post['status'][] =
-        selectedStatuses.length > 0 ? selectedStatuses : ['DRAFT', 'SCHEDULED']
+        selectedStatuses.length > 0
+          ? selectedStatuses
+          : ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
 
       return posts.filter(
         (p) =>
@@ -448,7 +451,11 @@ export function PostComposeList({
   return (
     <>
       {/* ── Barre d'outils ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3">
+      {/* sticky : reste visible en haut du scroll container (<main overflow-y-auto>)
+          bg-background : fond opaque pour masquer les cartes qui défilent dessous
+          z-10 : passe devant les cartes (z-index supérieur)
+          py-3 : padding pour que le fond couvre bien le bord supérieur */}
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-background py-3">
 
         {/* Bouton "Nouveau post" — masqué en vue calendrier (lecture seule) */}
         {view === 'list' && (

@@ -5,7 +5,7 @@
  *   Ne jamais appeler l'API getlate.dev directement depuis les composants.
  *
  *   Authentification : LATE_API_KEY dans l'en-tête Authorization (Bearer).
- *   Base URL : https://api.getlate.dev (configurable via LATE_API_URL).
+ *   Base URL : https://getlate.dev/api (configurable via LATE_API_URL).
  *
  * @example
  *   import { late } from '@/lib/late'
@@ -281,11 +281,11 @@ class LateClient {
 
   constructor() {
     // Base URL de l'API getlate.dev.
-    // Docs : https://docs.getlate.dev → base = https://api.getlate.dev, chemins en /v1/...
-    // Vercel résout api.getlate.dev correctement (même si absent du DNS local).
-    // Si LATE_API_URL est défini dans les variables d'environnement Vercel,
-    // il DOIT valoir "https://api.getlate.dev" (sans slash final, sans /api).
-    this.baseUrl = process.env.LATE_API_URL ?? 'https://api.getlate.dev'
+    // Docs : https://docs.getlate.dev → base = https://getlate.dev/api, chemins en /v1/...
+    // Exemple : https://getlate.dev/api/v1/posts (confirmé par la doc officielle)
+    // Si LATE_API_URL est défini dans les variables d'environnement,
+    // il DOIT valoir "https://getlate.dev/api" (sans slash final).
+    this.baseUrl = process.env.LATE_API_URL ?? 'https://getlate.dev/api'
     this.apiKey = process.env.LATE_API_KEY ?? ''
   }
 

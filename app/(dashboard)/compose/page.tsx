@@ -62,8 +62,8 @@ async function fetchInitialPosts(userId: string): Promise<InitialPostsResult> {
   const posts = await prisma.post.findMany({
     where: {
       userId,
-      // Charger les brouillons ET les posts planifiés (pas encore publiés)
-      status: { in: ['DRAFT', 'SCHEDULED'] },
+      // Charger tous les statuts : brouillons, planifiés, publiés et échoués
+      status: { in: ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'] },
     },
     select: {
       id: true,
