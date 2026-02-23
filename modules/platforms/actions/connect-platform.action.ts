@@ -119,8 +119,16 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     // Log complet de l'erreur réelle pour diagnostiquer la cause exacte
     console.error('[connectPlatform] erreur:', error)
 
-    // Capacité Late atteinte (403) : trop de workspaces créés sur ce compte Late API.
-    // Message orienté utilisateur — aucun détail technique exposé.
+    // Plateforme encore en beta chez getlate.dev (ex: Snapchat).
+    // → Informer l'utilisateur clairement plutôt que d'afficher un message générique.
+    if (error instanceof LateApiError && error.code === 'PLATFORM_BETA_RESTRICTED') {
+      return {
+        success: false,
+        error: `${validPlatform.charAt(0).toUpperCase() + validPlatform.slice(1)} n'est pas encore disponible. La connexion sera activée dès que getlate.dev ouvrira l'intégration au public.`,
+      }
+    }
+
+    // Autre 403 (quota Late atteint, clé API invalide, etc.)
     if (error instanceof LateApiError && error.status === 403) {
       return {
         success: false,

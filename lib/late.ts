@@ -259,12 +259,19 @@ export interface LateInboxMessage {
 
 /**
  * Erreur retournée par l'API getlate.dev.
- * Encapsule le code HTTP et le message d'erreur.
+ * Encapsule le code HTTP, le message d'erreur, et le code fonctionnel optionnel.
+ *
+ * @example
+ *   // Réponse 403 beta : { error: "...", code: "PLATFORM_BETA_RESTRICTED" }
+ *   error.status === 403
+ *   error.code   === 'PLATFORM_BETA_RESTRICTED'
  */
 export class LateApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** Code fonctionnel renvoyé par getlate.dev (ex: 'PLATFORM_BETA_RESTRICTED') */
+    public readonly code?: string,
   ) {
     super(message)
     this.name = 'LateApiError'
@@ -313,17 +320,22 @@ class LateClient {
     if (!response.ok) {
       // Logger l'URL COMPLÈTE (pas seulement le path) pour diagnostiquer les 405/404
       let message = `Erreur API getlate.dev : ${response.status}`
+      let code: string | undefined
       let rawBody = ''
       try {
         rawBody = await response.text()
         console.error(`[LateClient] ${response.status} ${init?.method ?? 'GET'} ${fullUrl} →`, rawBody)
-        const parsed = JSON.parse(rawBody) as { message?: string }
-        if (parsed.message) message = parsed.message
+        // getlate.dev utilise "error" (pas "message") + "code" fonctionnel optionnel
+        // ex: { "error": "Snapchat is in beta", "code": "PLATFORM_BETA_RESTRICTED" }
+        const parsed = JSON.parse(rawBody) as { message?: string; error?: string; code?: string }
+        if (parsed.error) message = parsed.error
+        else if (parsed.message) message = parsed.message
+        if (parsed.code) code = parsed.code
       } catch {
         // Ignorer les erreurs de parsing du corps
         if (rawBody) console.error('[LateClient] corps non-JSON :', rawBody)
       }
-      throw new LateApiError(response.status, message)
+      throw new LateApiError(response.status, message, code)
     }
 
     // 204 No Content : pas de corps JSON
