@@ -86,12 +86,26 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
       lateWorkspaceId = workspace._id
       console.log('[connectPlatform] Workspace Late créé:', lateWorkspaceId)
 
-      // Persister l'ID : tous les prochains connects (même des semaines plus tard)
-      // retrouveront ce workspace via la branche `else` (User.lateWorkspaceId déjà défini).
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { lateWorkspaceId },
-      })
+      // Persister l'ID EN PRIORITÉ avant tout autre appel réseau.
+      // ⚠️ Si cette sauvegarde échoue, le workspace Late existe mais son ID est perdu.
+      // → Le log ci-dessous permet la récupération manuelle via Supabase SQL Editor :
+      //   UPDATE "User" SET "lateWorkspaceId" = '<id>' WHERE id = '<userId>'
+      try {
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { lateWorkspaceId },
+        })
+      } catch (prismaError) {
+        // Log critique : le workspace Late existe mais n'est pas enregistré en DB.
+        // → Récupérer manuellement via :
+        //   UPDATE "User" SET "lateWorkspaceId" = '<lateWorkspaceId>' WHERE id = '<userId>'
+        console.error(
+          `[connectPlatform] ⚠️ CRITIQUE : workspace Late créé (${lateWorkspaceId}) mais` +
+          ` NON SAUVEGARDÉ en DB pour userId=${session.user.id}. Erreur Prisma :`,
+          prismaError,
+        )
+        throw prismaError
+      }
     } else {
       console.log('[connectPlatform] Workspace Late existant (DB):', lateWorkspaceId)
     }

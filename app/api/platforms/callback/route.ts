@@ -12,6 +12,12 @@
  *   - username   : Handle / nom d'affichage du compte social
  *   - error      : (optionnel) Code d'erreur si l'OAuth a échoué
  *
+ *   Filet de sécurité — lateWorkspaceId :
+ *   Si connectPlatform.action.ts a créé le workspace Late mais échoué à persister
+ *   son ID en DB (timeout réseau, crash serveur), ce callback reçoit quand même
+ *   le profileId de getlate.dev et le sauvegarde automatiquement dans User.lateWorkspaceId
+ *   si celui-ci est encore NULL. Opération idempotente : sans effet si l'ID est déjà renseigné.
+ *
  * @example
  *   // URL de callback réelle reçue après OAuth TikTok :
  *   GET /api/platforms/callback?connected=tiktok&profileId=69985455009128c947b08ca5&username=raoulalobo
@@ -96,6 +102,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       avatarUrl,
       isActive: true,
     },
+  })
+
+  // Filet de sécurité : sync automatique du lateWorkspaceId si absent.
+  // Scénario couvert : connectPlatform.action.ts a appelé late.profiles.create()
+  // et obtenu le lateWorkspaceId, mais la sauvegarde Prisma (User.lateWorkspaceId)
+  // a échoué avant de s'exécuter (erreur réseau, timeout DB, crash serveur).
+  // Le workspace existe dans Late mais son ID est perdu en DB → lateWorkspaceId = NULL.
+  // getlate.dev renvoie toujours le même profileId dans ce callback → on le récupère ici.
+  // updateMany avec where: { lateWorkspaceId: null } est idempotent :
+  // aucune mise à jour si l'ID est déjà présent (cas nominal ~100% du temps).
+  await prisma.user.updateMany({
+    where: {
+      id: session.user.id,
+      lateWorkspaceId: null, // uniquement si non encore enregistré
+    },
+    data: { lateWorkspaceId: lateProfileId },
   })
 
   // Redirection vers settings avec indicateur de succès (pour toast)

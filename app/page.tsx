@@ -205,15 +205,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               </Link>
             </Button>
 
-            {/* CTA secondaire — ancre vers la section demo (future) */}
-            <Button
-              variant="ghost"
-              size="lg"
-              className="h-12 rounded-xl px-8 text-base font-medium text-gray-600 hover:text-gray-900"
-              asChild
-            >
-              <Link href="#demo">Voir une demo</Link>
-            </Button>
           </div>
 
           {/* ── Logos plateformes ──────────────────────────────────────────── */}
