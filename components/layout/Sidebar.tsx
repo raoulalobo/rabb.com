@@ -7,9 +7,8 @@
  *   - Sur mobile, la navigation est assurée par MobileSidebar (Sheet)
  *
  * Navigation principale (MVP) :
- *   - Dashboard (/) → vue d'ensemble rapide
+ *   - Dashboard (/dashboard) → vue d'ensemble rapide
  *   - Compose (/compose) → créer un post
- *   - Calendar (/calendar) → calendrier de planification
  *   - Analytics (/analytics) → statistiques
  *   - Inbox (/inbox) → messages unifiés
  *   - Settings (/settings) → compte et réseaux
@@ -23,11 +22,11 @@
 
 import {
   BarChart2,
-  Calendar,
   Inbox,
   LayoutDashboard,
   PenSquare,
   Settings,
+  UserCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -54,9 +53,9 @@ interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Composer', href: '/compose', icon: PenSquare },
-  { label: 'Calendrier', href: '/calendar', icon: Calendar },
   { label: 'Analytics', href: '/analytics', icon: BarChart2 },
   { label: 'Inbox', href: '/inbox', icon: Inbox },
+  { label: 'Profil', href: '/profile', icon: UserCircle },
   { label: 'Paramètres', href: '/settings', icon: Settings },
 ]
 

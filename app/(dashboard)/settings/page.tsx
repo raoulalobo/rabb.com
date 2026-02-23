@@ -3,8 +3,7 @@
  * @description Page des paramètres utilisateur (/settings).
  *   Sections :
  *   - Réseaux sociaux connectés (PlatformList)
- *   - Profil utilisateur (à venir)
- *   - Notifications (à venir)
+ *   - Dictée vocale (SpeechSettings)
  *
  *   Gère les query params success/error du callback OAuth pour afficher des toasts.
  *
@@ -67,19 +66,6 @@ export default function SettingsPage(): React.JSX.Element {
         </div>
         {/* Client Component : lit/écrit speechSilenceTimeoutMs dans le store Zustand persisté */}
         <SpeechSettings />
-      </section>
-
-      {/* ── Section : Profil (placeholder MVP) ── */}
-      <section>
-        <div className="mb-4">
-          <h2 className="text-base font-semibold">Profil</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Nom, email et mot de passe.
-          </p>
-        </div>
-        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Disponible prochainement
-        </div>
       </section>
     </div>
   )

@@ -36,6 +36,7 @@ model User {
   email           String    @unique
   name            String?
   avatarUrl       String?
+  description     String?   // Bio/description publique du profil (max 500 chars)
   emailVerified   Boolean   @default(false)
   image           String?   // Champ requis par better-auth OAuth (photo de profil Google)
   // ID du workspace Late (profil conteneur qui regroupe les comptes sociaux connectés).

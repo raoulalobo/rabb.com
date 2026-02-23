@@ -14,8 +14,10 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 
 import { Button } from '@/components/ui/button'
+import { auth } from '@/lib/auth'
 
 import type { Metadata } from 'next'
 
@@ -79,12 +81,17 @@ const PLATFORMS = [
  * Page d'accueil publique de rabb.com.
  *
  * Sections :
- * 1. Navbar fixe — logo + CTA connexion/inscription
+ * 1. Navbar fixe — logo + CTA adapté selon l'état de session
+ *    - Connecté   → bouton "Tableau de bord →"
+ *    - Déconnecté → "Se connecter" + "Essayer gratuitement"
  * 2. Hero pleine hauteur — badge, H1 avec gradient, sous-titre, CTAs, plateformes
  *
  * @returns Page d'accueil Server Component (JSX)
  */
-export default function HomePage(): React.JSX.Element {
+export default async function HomePage(): Promise<React.JSX.Element> {
+  // Vérification de session côté serveur pour adapter la navbar
+  const session = await auth.api.getSession({ headers: await headers() })
+  const isLoggedIn = !!session?.user
   return (
     /*
      * Conteneur racine avec le fond dot grid.
@@ -115,15 +122,27 @@ export default function HomePage(): React.JSX.Element {
             rabb
           </Link>
 
-          {/* Actions de navigation */}
+          {/* Actions de navigation — adaptées selon l'état de session */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Se connecter</Link>
-            </Button>
-
-            <Button size="sm" asChild>
-              <Link href="/register">Essayer gratuitement</Link>
-            </Button>
+            {isLoggedIn ? (
+              /* Connecté → accès direct au dashboard */
+              <Button size="sm" asChild>
+                <Link href="/dashboard">
+                  Tableau de bord
+                  <span aria-hidden="true" className="ml-1">&rarr;</span>
+                </Link>
+              </Button>
+            ) : (
+              /* Déconnecté → boutons d'authentification */
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">Se connecter</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/register">Essayer gratuitement</Link>
+                </Button>
+              </>
+            )}
           </div>
         </nav>
       </header>

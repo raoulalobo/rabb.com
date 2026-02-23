@@ -11,6 +11,15 @@
  *   - Non connecté → null (ne devrait pas arriver dans le dashboard)
  *   - Connecté (email) → initiale du nom en fallback
  *   - Connecté (Google OAuth) → photo de profil Google
+ *   - Connecté + avatar uploadé → photo Supabase Storage (avatarUrl)
+ *
+ *   Priorité d'affichage de l'avatar :
+ *   1. avatarUrl (upload manuel via /profile) — lu depuis /api/user/me via TanStack Query
+ *   2. user.image (photo Google OAuth) — lu depuis la session better-auth
+ *   3. Initiale du nom ou de l'email (fallback)
+ *
+ *   L'appel à /api/user/me est nécessaire car better-auth ne stocke pas avatarUrl
+ *   dans le cookie de session (champ Prisma custom non inclus dans le token).
  *
  * @example
  *   // components/layout/Header.tsx
@@ -20,7 +29,8 @@
 
 'use client'
 
-import { LogOut, Settings } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { LogOut, Settings, UserCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -35,6 +45,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { signOut } from '@/lib/auth-client'
+import type { UserMeResponse } from '@/app/api/user/me/route'
 import { useSession } from '@/modules/auth/hooks/useSession'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -70,6 +81,28 @@ export function UserMenu(): React.JSX.Element | null {
   const router = useRouter()
   const { user, isLoading } = useSession()
 
+  // ── Fetch du profil complet depuis /api/user/me ────────────────────────────
+  // Nécessaire pour récupérer avatarUrl (champ Prisma custom non inclus dans
+  // le cookie de session better-auth). La query est activée uniquement si
+  // l'utilisateur est connecté (enabled: !!user).
+  // staleTime court (30s) pour refléter rapidement les changements d'avatar.
+  const { data: profile } = useQuery<UserMeResponse>({
+    queryKey: ['user', 'me'],
+    queryFn: async () => {
+      const res = await fetch('/api/user/me')
+      if (!res.ok) throw new Error('Erreur lors du chargement du profil')
+      return res.json() as Promise<UserMeResponse>
+    },
+    enabled: !!user,
+    staleTime: 30 * 1000, // 30s — délai court pour refléter les mises à jour d'avatar
+  })
+
+  // ── Source de l'avatar : avatarUrl (upload) > image (OAuth) > fallback ─────
+  // Priorité : 1. avatarUrl uploadé manuellement via /profile
+  //            2. user.image fourni par Google OAuth
+  //            3. Initiale du nom/email (AvatarFallback)
+  const avatarSrc = profile?.avatarUrl ?? user?.image ?? null
+
   // ── État de chargement : skeleton rond identique en taille à l'avatar ──────
   if (isLoading) {
     return <Skeleton className="size-8 rounded-full" />
@@ -96,10 +129,10 @@ export function UserMenu(): React.JSX.Element | null {
           aria-label="Menu utilisateur"
         >
           <Avatar className="size-8 cursor-pointer">
-            {/* Photo de profil (Google OAuth) — affichée si disponible */}
-            {user.image && (
+            {/* Photo de profil — avatarUrl uploadé ou image OAuth Google */}
+            {avatarSrc && (
               <AvatarImage
-                src={user.image}
+                src={avatarSrc}
                 alt={user.name ?? user.email}
               />
             )}
@@ -126,6 +159,14 @@ export function UserMenu(): React.JSX.Element | null {
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
+
+        {/* Lien vers le profil */}
+        <DropdownMenuItem asChild>
+          <Link href="/profile" className="flex w-full items-center gap-2">
+            <UserCircle className="size-4" />
+            <span>Mon profil</span>
+          </Link>
+        </DropdownMenuItem>
 
         {/* Lien vers les paramètres */}
         <DropdownMenuItem asChild>
