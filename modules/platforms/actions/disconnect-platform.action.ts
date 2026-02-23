@@ -2,14 +2,15 @@
  * @file modules/platforms/actions/disconnect-platform.action.ts
  * @module platforms
  * @description Server Action : déconnecte un réseau social.
- *   Supprime le profil getlate.dev (révoque les tokens OAuth) et la ligne en DB.
+ *   Révoque l'accès OAuth du compte social individuel chez getlate.dev et supprime la ligne en DB.
  *
  *   Flux :
  *   1. Validation Zod de l'ID reçu
  *   2. Vérification de la session better-auth
- *   3. Récupération du lateProfileId depuis la DB
- *   4. Suppression du profil getlate.dev
- *   5. Suppression de la ligne ConnectedPlatform en DB
+ *   3. Récupération du ConnectedPlatform depuis la DB
+ *   4. late.accounts.list() → trouver le LateAccount correspondant (platform + workspaceId)
+ *   5. late.accounts.delete(account._id) → révocation OAuth individuelle (pas le workspace entier)
+ *   6. Suppression de la ligne ConnectedPlatform en DB
  *
  * @example
  *   // Dans un Client Component
@@ -66,11 +67,31 @@ export async function disconnectPlatform(connectedPlatformId: unknown): Promise<
     return { success: false, error: 'Plateforme non trouvée.' }
   }
 
-  // 4. Supprimer le profil getlate.dev (révoque les tokens OAuth)
+  // 4. Révoquer l'accès OAuth du compte social individuel chez getlate.dev.
+  //
+  //    Architecture : ConnectedPlatform.lateProfileId = workspace Late (≠ account Late).
+  //    late.profiles.delete() supprime le workspace entier → 400 si d'autres comptes
+  //    y sont rattachés. Il faut cibler le compte social précis via DELETE /v1/accounts/{id}.
+  //
+  //    Flux :
+  //    a) late.accounts.list() → trouver le LateAccount dont platform + workspaceId correspond
+  //    b) late.accounts.delete(account._id) → révocation OAuth du compte individuel
+  //    c) 404 = compte déjà révoqué chez Late → continuer (idempotent)
   try {
-    await late.profiles.delete(connectedPlatform.lateProfileId)
+    const allAccounts = await late.accounts.list()
+
+    // Normaliser profileId (Late retourne parfois un objet, parfois une string)
+    const match = allAccounts.find((a) => {
+      const workspaceId = typeof a.profileId === 'object' ? a.profileId._id : a.profileId
+      return a.platform === connectedPlatform.platform && workspaceId === connectedPlatform.lateProfileId
+    })
+
+    if (match) {
+      await late.accounts.delete(match._id)
+    }
+    // Si aucun compte trouvé, il a déjà été révoqué côté Late → continuer
   } catch (error) {
-    // Si getlate.dev retourne 404, le profil n'existe déjà plus → continuer
+    // 404 = compte inexistant chez Late → déjà révoqué, on continue
     if (!(error instanceof LateApiError && error.status === 404)) {
       return { success: false, error: 'Impossible de révoquer l\'accès. Réessaie.' }
     }

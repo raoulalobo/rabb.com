@@ -473,6 +473,24 @@ class LateClient {
       // Réponse enveloppée : { accounts: [...], hasAnalyticsAccess: bool }
       // On unwrap pour retourner directement le tableau de comptes.
       this.request<LateAccountsListResponse>('/v1/accounts').then((res) => res.accounts),
+
+    /**
+     * Révoque l'accès OAuth d'un compte social individuel.
+     * À utiliser pour déconnecter une plateforme sans supprimer le workspace Late.
+     *
+     * ⚠️ Ne PAS utiliser `late.profiles.delete()` pour déconnecter un compte :
+     *   cette méthode supprime le workspace entier et échoue (400) si d'autres
+     *   comptes y sont encore rattachés.
+     *
+     * @param accountId - `_id` du LateAccount (obtenu via late.accounts.list())
+     *
+     * @example
+     *   const accounts = await late.accounts.list()
+     *   const account = accounts.find(a => a.platform === 'tiktok')
+     *   if (account) await late.accounts.delete(account._id)
+     */
+    delete: (accountId: string) =>
+      this.request<void>(`/v1/accounts/${accountId}`, { method: 'DELETE' }),
   }
 
   // ─── Posts ───────────────────────────────────────────────────────────────────
