@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 
 import { auth } from '@/lib/auth'
+import { inngest } from '@/lib/inngest/client'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -63,6 +64,15 @@ export async function DELETE(
   // ── Suppression ──────────────────────────────────────────────────────────
   try {
     await prisma.post.delete({ where: { id: postId } })
+
+    // Annuler le run Inngest en attente si le post était planifié.
+    // Sans cet event, le run resterait en état sleeping jusqu'à scheduledFor
+    // avant de retourner { skipped: true } ("run zombie").
+    // Le `cancelOn` défini dans publish-scheduled-post.ts corrèle les deux
+    // events via data.postId → Inngest annule immédiatement le run correspondant.
+    if (post.status === 'SCHEDULED') {
+      await inngest.send({ name: 'post/cancel', data: { postId } })
+    }
 
     // Invalide les caches des pages affectées
     revalidatePath('/compose')

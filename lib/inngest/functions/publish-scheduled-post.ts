@@ -44,6 +44,12 @@ export const publishScheduledPost = inngest.createFunction(
     name: 'Publier un post planifié',
     // 3 retries avec backoff exponentiel en cas d'erreur réseau ou API
     retries: 3,
+    // Annule le run en état sleeping si l'event 'post/cancel' arrive avec le même postId.
+    // `match: 'data.postId'` corrèle l'event déclencheur (post/schedule) avec l'event
+    // d'annulation (post/cancel) via le champ data.postId identique.
+    // Sans ce mécanisme, le run resterait "zombie" en sleeping jusqu'à scheduledFor
+    // avant de retourner { skipped: true } une fois le post introuvable.
+    cancelOn: [{ event: 'post/cancel', match: 'data.postId' }],
   },
   { event: 'post/schedule' },
   async ({ event, step }) => {
