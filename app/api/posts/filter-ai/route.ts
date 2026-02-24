@@ -158,13 +158,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { query } = parsed.data
 
-  // ── Date du jour (pour les expressions relatives : "cette semaine", "demain"…) ──
-  // Inclure le nom du jour en français pour éviter les erreurs de calcul "mercredi prochain"
-  // quand le modèle doit déduire le jour de la semaine depuis une date ISO seule.
-  const DAY_NAMES_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'] as const
+  // ── Date du jour en heure locale Paris (Europe/Paris) ─────────────────────
+  // ⚠️ Ne PAS utiliser new Date().toISOString() : retourne la date UTC, qui peut
+  //    être le jour PRÉCÉDENT pour un utilisateur parisien entre minuit et 1h00.
+  //    Exemple : 00h30 Paris (mardi 24) = 23h30 UTC (lundi 23) → LLM croirait
+  //    que c'est lundi, calculerait "mercredi prochain" = mercredi 25 au lieu de 25 ✓,
+  //    mais "demain" = mardi 24 au lieu de mercredi 25.
+  //
+  //    Solution : Intl.DateTimeFormat avec timeZone: 'Europe/Paris' donne toujours
+  //    la date locale correcte indépendamment du fuseau du serveur (UTC ou Paris).
   const now = new Date()
-  const todayIso = now.toISOString().split('T')[0]!
-  const todayLabel = `${todayIso} (${DAY_NAMES_FR[now.getUTCDay()]})`
+  const parisParts = new Intl.DateTimeFormat('fr-FR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'long',
+    timeZone: 'Europe/Paris',
+  }).formatToParts(now)
+  const p = Object.fromEntries(parisParts.map((x) => [x.type, x.value]))
+  // Reconstruire en ISO YYYY-MM-DD (fr-FR donne jour/mois/année, donc on inverse)
+  const todayIso = `${p.year}-${p.month}-${p.day}`
+  const todayLabel = `${todayIso} (${p.weekday})`
 
   // ── Prompt système ─────────────────────────────────────────────────────────
   const systemPrompt = [

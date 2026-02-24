@@ -36,7 +36,6 @@
  *   const res = await fetch('/api/posts?status=DRAFT')
  */
 
-import { endOfDay, startOfDay } from 'date-fns'
 import { headers } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -242,14 +241,26 @@ async function handleComposeMode(
 
   // ── Construction du filtre WHERE ───────────────────────────────────────────
 
-  // Filtre de date — appliqué uniquement si `from` est présent
+  // Filtre de date — appliqué uniquement si `from` est présent.
+  //
+  // ⚠️ Ne PAS utiliser date-fns startOfDay/endOfDay : ils opèrent dans le fuseau
+  //    LOCAL du serveur. Sur une machine Paris (UTC+1), startOfDay("2026-02-27T00:00:00Z")
+  //    retourne 2026-02-26T23:00:00Z — le filtre Prisma commence alors la veille,
+  //    ce qui inclut des posts du 26 et exclut des posts du 27.
+  //
+  //    Solution : extraire la partie YYYY-MM-DD du paramètre ISO et construire
+  //    des bornes UTC explicites (T00:00:00Z / T23:59:59Z), indépendantes
+  //    du fuseau du serveur.
+  //
+  // fromParam est une string ISO UTC : "2026-02-27T00:00:00.000Z"
+  // → on extrait la date UTC : "2026-02-27"
+  // → on construit les bornes du jour entier en UTC
   const dateFilter =
     fromParam
       ? {
           scheduledFor: {
-            // Début du jour de `from` jusqu'à la fin du jour de `to` (ou `from` si absent)
-            gte: startOfDay(new Date(fromParam)),
-            lte: endOfDay(new Date(toParam ?? fromParam)),
+            gte: new Date(`${fromParam.substring(0, 10)}T00:00:00.000Z`),
+            lte: new Date(`${(toParam ?? fromParam).substring(0, 10)}T23:59:59.999Z`),
           },
         }
       : {}
