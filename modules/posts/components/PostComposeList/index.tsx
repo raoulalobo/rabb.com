@@ -29,7 +29,6 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Loader2, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { AgentModal } from '@/modules/posts/components/AgentModal'
@@ -38,11 +37,8 @@ import type { ComposeFilters, ComposePage } from '@/modules/posts/queries/posts.
 import type { Post } from '@/modules/posts/types'
 
 import { AIFilterModal } from './AIFilterModal'
-import { BulkActionBar } from './BulkActionBar'
 import { PostComposeCard } from './PostComposeCard'
 import { PostDetailModal } from './PostDetailModal'
-import { WeekCoverageStrip } from './WeekCoverageStrip'
-import { WeeklyProgressBar } from './WeeklyProgressBar'
 
 import type { ExtractedFilters } from './AIFilterModal'
 import type { InfiniteData } from '@tanstack/react-query'
@@ -106,7 +102,7 @@ interface PostComposeListProps {
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
- * Liste des posts DRAFT+SCHEDULED avec infinite scroll, filtre IA et toggle calendrier.
+ * Liste des posts DRAFT+SCHEDULED avec infinite scroll et filtre IA.
  *
  * @param initialPosts        - Posts SSR à hydrater dans le cache TanStack Query
  * @param initialNextCursor   - Curseur SSR pour déclencher l'infinite scroll si besoin
@@ -209,7 +205,6 @@ export function PostComposeList({
   // ── Infinite scroll — IntersectionObserver ────────────────────────────────
   // Le sentinel (div invisible en bas de liste) déclenche fetchNextPage
   // quand il entre dans le viewport (avec une marge de 200px).
-  // Non rendu en vue calendrier.
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -294,33 +289,6 @@ export function PostComposeList({
   }
 
   /**
-   * Met à jour un post replanifié dans toutes les pages du cache, puis re-trie.
-   * Réutilise la même logique que handlePostUpdated (même algorithme flatten/replace/sort/paginate).
-   * Appelé par PostComposeCard après une replanification inline réussie.
-   *
-   * @param updatedPost - Post mis à jour retourné par PATCH /api/posts/[id]
-   */
-  const handlePostRescheduled = (updatedPost: Post): void => {
-    queryClient.setQueryData<ComposeData>(getKey(), (old) => {
-      if (!old) return old
-
-      const allLoaded = old.pages.flatMap((page) => page.posts)
-      const replaced = allLoaded.map((p) => (p.id === updatedPost.id ? updatedPost : p))
-      const sorted = sortComposePosts(replaced)
-
-      let offset = 0
-      const newPages = old.pages.map((page) => {
-        const size = page.posts.length
-        const newPosts = sorted.slice(offset, offset + size)
-        offset += size
-        return { ...page, posts: newPosts }
-      })
-
-      return { ...old, pages: newPages }
-    })
-  }
-
-  /**
    * Supprime un post de toutes les pages du cache (optimiste — sans rechargement).
    * Appelé par PostComposeCard après la suppression réussie.
    *
@@ -338,110 +306,6 @@ export function PostComposeList({
       }
     })
   }
-
-  // ── Sélection groupée ─────────────────────────────────────────────────────
-
-  /** Ensemble des IDs de posts sélectionnés */
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  /** true dès qu'au moins un post est sélectionné */
-  const isSelecting = selectedIds.size > 0
-  /** true pendant la suppression groupée */
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
-
-  // Vider la sélection quand les filtres changent (les posts affichés changent)
-  useEffect(() => {
-    setSelectedIds(new Set())
-  }, [filters])
-
-  /**
-   * Bascule la sélection d'un post (ajoute ou retire son ID de la sélection).
-   *
-   * @param postId - ID du post à basculer
-   */
-  const handleToggleSelect = useCallback((postId: string): void => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(postId)) {
-        next.delete(postId)
-      } else {
-        next.add(postId)
-      }
-      return next
-    })
-  }, [])
-
-  /**
-   * Sélectionne tous les posts DRAFT/SCHEDULED chargés.
-   * PUBLISHED et FAILED sont exclus (non supprimables).
-   */
-  const handleSelectAll = useCallback((): void => {
-    const deletableIds = allPosts
-      .filter((p) => p.status === 'DRAFT' || p.status === 'SCHEDULED')
-      .map((p) => p.id)
-    setSelectedIds(new Set(deletableIds))
-  }, [allPosts])
-
-  /** Désélectionne tout et quitte le mode sélection */
-  const handleClearSelection = useCallback((): void => {
-    setSelectedIds(new Set())
-  }, [])
-
-  /**
-   * Retire en une seule passe plusieurs posts du cache TanStack Query.
-   * Plus efficace que d'appeler handlePostDeleted en boucle (évite N re-renders).
-   *
-   * @param postIds - IDs des posts supprimés avec succès
-   */
-  const handleBulkDeleted = useCallback((postIds: string[]): void => {
-    const idsSet = new Set(postIds)
-    queryClient.setQueryData<ComposeData>(getKey(), (old) => {
-      if (!old) return old
-      return {
-        ...old,
-        pages: old.pages.map((page) => ({
-          ...page,
-          posts: page.posts.filter((p) => !idsSet.has(p.id)),
-        })),
-      }
-    })
-  }, [queryClient, getKey]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  /**
-   * Supprime en parallèle tous les posts sélectionnés qui sont DRAFT ou SCHEDULED.
-   * Les posts PUBLISHED/FAILED dans la sélection sont silencieusement ignorés.
-   * Met à jour le cache optimistement après les appels API.
-   */
-  const handleBulkDelete = async (): Promise<void> => {
-    if (isBulkDeleting) return
-    setIsBulkDeleting(true)
-
-    // Filtrer : seuls les DRAFT/SCHEDULED peuvent être supprimés
-    const deletableIds = [...selectedIds].filter((id) => {
-      const p = allPosts.find((post) => post.id === id)
-      return p?.status === 'DRAFT' || p?.status === 'SCHEDULED'
-    })
-
-    // DELETE en parallèle (fire-and-forget — on collecte les succès)
-    const results = await Promise.allSettled(
-      deletableIds.map((id) => fetch(`/api/posts/${id}`, { method: 'DELETE' })),
-    )
-
-    // Retirer du cache uniquement les posts effectivement supprimés (200 OK)
-    const succeededIds = deletableIds.filter((_, i) => {
-      const r = results[i]
-      return r.status === 'fulfilled' && r.value.ok
-    })
-
-    handleBulkDeleted(succeededIds)
-    setSelectedIds(new Set())
-    setIsBulkDeleting(false)
-  }
-
-  // Nombre de posts DRAFT/SCHEDULED parmi les posts chargés (pour "Tout sélectionner")
-  const totalDeletable = useMemo(
-    () => allPosts.filter((p) => p.status === 'DRAFT' || p.status === 'SCHEDULED').length,
-    [allPosts],
-  )
 
   // ── État du modal PostDetailModal ─────────────────────────────────────────
   /** Post dont on affiche le détail (null = modal fermé) */
@@ -526,7 +390,6 @@ export function PostComposeList({
     setSelectedStatuses([])
     setDateRange(undefined)
     setActiveQueryText('')
-    // Réinitialiser le mot-clé de recherche textuelle
     setActiveSearchQuery('')
   }
 
@@ -641,25 +504,6 @@ export function PostComposeList({
         </div>
       </div>
 
-      {/* ── Progression + couverture hebdomadaires ───────────────────────────── */}
-      {/*
-       * Les deux widgets sont masqués quand des filtres sont actifs :
-       * allPosts ne reflète qu'un sous-ensemble → les comptages seraient incorrects.
-       * WeeklyProgressBar est masquée si la liste est vide (état initial sans posts).
-       * WeekCoverageStrip se masque automatiquement si les 7 jours sont couverts.
-       */}
-      {!hasActiveFilter && allPosts.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {/* Barre de progression : N/5 posts planifiés cette semaine */}
-          <WeeklyProgressBar posts={allPosts} />
-          {/* Trous de planning : pills des 7 prochains jours */}
-          <WeekCoverageStrip
-            posts={allPosts}
-            onCreateForDay={() => handleOpenCreate()}
-          />
-        </div>
-      )}
-
       {/* ── Liste des posts ─────────────────────────────────────────────────── */}
       {/* mt-4 : 16px d'espacement entre la toolbar et le contenu (espace-y-6 du parent
           ne s'applique plus à ces éléments depuis le passage au wrapper <div>) */}
@@ -722,11 +566,7 @@ export function PostComposeList({
                   post={post}
                   onEdit={handleOpenEdit}
                   onDelete={handlePostDeleted}
-                  onReschedule={handlePostRescheduled}
                   onDetail={handleOpenDetail}
-                  isSelected={selectedIds.has(post.id)}
-                  isSelecting={isSelecting}
-                  onToggleSelect={handleToggleSelect}
                 />
               ))}
             </div>
@@ -797,21 +637,6 @@ export function PostComposeList({
         onOpenChange={setAiModalOpen}
         currentQuery={activeQueryText}
         onFiltersApplied={handleFiltersApplied}
-      />
-
-      {/* ── BulkActionBar — actions groupées (slide-in depuis le bas) ─────────── */}
-      {/*
-       * Rendu en dehors du flux principal pour bénéficier du `fixed` sans
-       * être contraint par un ancestor overflow:hidden.
-       * La barre gère elle-même sa visibilité via count et les transitions CSS.
-       */}
-      <BulkActionBar
-        count={selectedIds.size}
-        totalDeletable={totalDeletable}
-        onDelete={() => void handleBulkDelete()}
-        onSelectAll={handleSelectAll}
-        onClear={handleClearSelection}
-        isDeleting={isBulkDeleting}
       />
     </div>
   )

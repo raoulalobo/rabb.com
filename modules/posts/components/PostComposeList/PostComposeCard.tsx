@@ -8,34 +8,25 @@
  *   - Texte tronqué à 2 lignes
  *   - Vignettes des médias (max 3 affichées + compteur)
  *   - Badge statut (DRAFT / SCHEDULED / PUBLISHED / FAILED)
- *   - Date planifiée cliquable → Popover de replanification inline
- *   - Bouton "+ Planifier" pour les DRAFT sans date
+ *   - Date planifiée (texte simple, non cliquable)
  *   - Actions : Modifier (ouvre AgentModal en mode edit) · Supprimer
- *
- *   Replanification inline :
- *   - Clic sur la date → Popover avec Calendar shadcn + sélecteurs heure/minute
- *   - Clic sur "+ Planifier" (DRAFT sans date) → même Popover
- *   - "Confirmer" → PATCH /api/posts/[id] → onReschedule(updatedPost)
- *   - "Supprimer la date" → PATCH { scheduledFor: null } → retour en DRAFT
  *
  * @example
  *   <PostComposeCard
  *     post={post}
  *     onEdit={(post) => { setSelectedPost(post); setModalOpen(true) }}
  *     onDelete={(postId) => { removePostFromList(postId) }}
- *     onReschedule={(updatedPost) => { updatePostInList(updatedPost) }}
+ *     onDetail={(post) => { setDetailPost(post); setDetailOpen(true) }}
  *   />
  */
 
 'use client'
 
-import { Calendar, CalendarClock, Check, Loader2, Pencil, Play, Trash2, X } from 'lucide-react'
+import { Calendar, Loader2, Pencil, Play, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar as CalendarPicker } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from '@/modules/posts/utils/status-styles'
 import type { Post } from '@/modules/posts/types'
@@ -49,17 +40,8 @@ interface PostComposeCardProps {
   onEdit: (post: Post) => void
   /** Callback appelé après la suppression réussie du post */
   onDelete: (postId: string) => void
-  /** Callback appelé après une replanification réussie avec le post mis à jour */
-  onReschedule: (updatedPost: Post) => void
   /** Callback appelé quand l'utilisateur clique sur le corps de la carte (ouvre le modal de détail) */
   onDetail?: (post: Post) => void
-  // ── Sélection groupée ──────────────────────────────────────────────────────
-  /** true si ce post est actuellement sélectionné (mode actions groupées) */
-  isSelected?: boolean
-  /** true si au moins un post est sélectionné dans la liste (mode sélection actif) */
-  isSelecting?: boolean
-  /** Callback pour basculer la sélection de ce post */
-  onToggleSelect?: (postId: string) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,129 +79,21 @@ function isVideoUrl(url: string): boolean {
   return VIDEO_EXTENSIONS.test(url)
 }
 
-// ─── Constantes de l'heure ────────────────────────────────────────────────────
-
-/** Heures disponibles dans le sélecteur (0-23) */
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-
-/** Minutes disponibles (quarts d'heure) */
-const MINUTES = ['00', '15', '30', '45']
-
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
  * Carte d'un post dans la liste de composition.
- * Affiche les informations essentielles du post et les actions disponibles,
- * dont la replanification inline via un Popover Calendar.
+ * Affiche les informations essentielles du post et les actions disponibles.
  */
 export function PostComposeCard({
   post,
   onEdit,
   onDelete,
-  onReschedule,
   onDetail,
-  isSelected = false,
-  isSelecting = false,
-  onToggleSelect,
 }: PostComposeCardProps): React.JSX.Element {
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // ── État du popover de replanification ──────────────────────────────────
-  const [rescheduleOpen, setRescheduleOpen] = useState(false)
-  /** Jour sélectionné dans le Calendar (undefined = aucun) */
-  const [pickedDate, setPickedDate] = useState<Date | undefined>(undefined)
-  /** Heure sélectionnée "HH" */
-  const [pickedHour, setPickedHour] = useState('09')
-  /** Minute sélectionnée "MM" */
-  const [pickedMinute, setPickedMinute] = useState('00')
-  const [isRescheduling, setIsRescheduling] = useState(false)
-
   const config = PLATFORM_CONFIG[post.platform as keyof typeof PLATFORM_CONFIG]
-
-  // Seuls DRAFT et SCHEDULED peuvent être replanifiés
-  const canReschedule = post.status === 'DRAFT' || post.status === 'SCHEDULED'
-
-  /**
-   * Initialise le picker depuis la date existante du post (ou valeurs par défaut).
-   * Appelé à l'ouverture du popover pour pré-remplir les sélecteurs.
-   */
-  const initPicker = (): void => {
-    if (post.scheduledFor) {
-      const d = new Date(post.scheduledFor)
-      setPickedDate(d)
-      setPickedHour(String(d.getHours()).padStart(2, '0'))
-      setPickedMinute(String(d.getMinutes()).padStart(2, '0'))
-    } else {
-      // Pas de date existante : initialiser au lendemain à 09h00
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      setPickedDate(tomorrow)
-      setPickedHour('09')
-      setPickedMinute('00')
-    }
-  }
-
-  /**
-   * Confirme la replanification : appelle PATCH /api/posts/[id] avec la date construite.
-   * Met à jour la liste via onReschedule (update optimiste dans le parent).
-   */
-  const handleConfirmReschedule = async (): Promise<void> => {
-    if (!pickedDate || isRescheduling) return
-    setIsRescheduling(true)
-
-    // Combiner la date du Calendar et les sélecteurs heure/minute
-    const dt = new Date(pickedDate)
-    dt.setHours(parseInt(pickedHour, 10), parseInt(pickedMinute, 10), 0, 0)
-
-    try {
-      const res = await fetch(`/api/posts/${post.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledFor: dt.toISOString() }),
-      })
-
-      if (res.ok) {
-        const updatedPost = await res.json() as Post
-        onReschedule(updatedPost)
-        setRescheduleOpen(false)
-      } else {
-        console.error('[PostComposeCard] Erreur replanification :', res.status)
-      }
-    } catch (err) {
-      console.error('[PostComposeCard] Erreur replanification :', err)
-    }
-
-    setIsRescheduling(false)
-  }
-
-  /**
-   * Supprime la date planifiée (scheduledFor = null → statut DRAFT).
-   * Appelle PATCH /api/posts/[id] avec { scheduledFor: null }.
-   */
-  const handleRemoveDate = async (): Promise<void> => {
-    if (isRescheduling) return
-    setIsRescheduling(true)
-
-    try {
-      const res = await fetch(`/api/posts/${post.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledFor: null }),
-      })
-
-      if (res.ok) {
-        const updatedPost = await res.json() as Post
-        onReschedule(updatedPost)
-        setRescheduleOpen(false)
-      } else {
-        console.error('[PostComposeCard] Erreur suppression date :', res.status)
-      }
-    } catch (err) {
-      console.error('[PostComposeCard] Erreur suppression date :', err)
-    }
-
-    setIsRescheduling(false)
-  }
 
   /**
    * Supprime le post via l'API et notifie le parent.
@@ -246,103 +120,41 @@ export function PostComposeCard({
   return (
     /*
      * onClick sur l'ensemble de la carte → ouvre le modal de détail (si onDetail est fourni).
-     * Les boutons d'action (Modifier / Supprimer / Replanifier) appellent e.stopPropagation()
+     * Les boutons d'action (Modifier / Supprimer) appellent e.stopPropagation()
      * via leur div wrapper pour ne pas déclencher ce handler.
      *
      * Accessibilité : role="button" + tabIndex + onKeyDown permettent la navigation clavier.
      */
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
-      className={[
-        // `group` active les variants group-hover sur les enfants (checkbox overlay)
-        'group flex gap-3 rounded-xl border bg-card p-4 transition-all hover:shadow-sm',
-        // Highlight quand sélectionné
-        isSelected
-          ? 'border-primary/50 ring-2 ring-primary/20'
-          : 'border-border hover:border-border/80',
-        // Curseur selon le mode
-        isSelecting || onDetail ? 'cursor-pointer' : '',
-      ].join(' ')}
-      onClick={
-        isSelecting
-          // Mode sélection : clic sur la carte → toggle (le checkbox gère aussi via stopPropagation)
-          ? () => onToggleSelect?.(post.id)
-          : () => onDetail?.(post)
-      }
-      role={isSelecting || onDetail ? 'button' : undefined}
-      tabIndex={isSelecting || onDetail ? 0 : undefined}
+      className="flex gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:shadow-sm hover:border-border/80 cursor-pointer"
+      onClick={() => onDetail?.(post)}
+      role={onDetail ? 'button' : undefined}
+      tabIndex={onDetail ? 0 : undefined}
       onKeyDown={
-        isSelecting || onDetail
+        onDetail
           ? (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                isSelecting ? onToggleSelect?.(post.id) : onDetail?.(post)
+                onDetail(post)
               }
             }
           : undefined
       }
-      aria-label={
-        isSelecting
-          ? `${isSelected ? 'Désélectionner' : 'Sélectionner'} le post ${post.platform}`
-          : onDetail
-            ? `Voir les détails du post ${post.platform}`
-            : undefined
-      }
+      aria-label={onDetail ? `Voir les détails du post ${post.platform}` : undefined}
     >
-      {/* ── Icône de plateforme + checkbox overlay (style Gmail) ─────────── */}
-      {/*
-       * Conteneur relatif : le checkbox se superpose exactement à l'icône.
-       * Logique de visibilité :
-       *   - Normal  : icône visible, checkbox invisible (opacity-0)
-       *   - Hover   : icône disparaît (group-hover:opacity-0), checkbox apparaît
-       *   - Sélectionné ou mode sélection : checkbox toujours visible
-       */}
-      <div className="relative shrink-0 size-8">
-        {/* Icône plateforme */}
-        <div
-          className={[
-            'flex size-8 items-center justify-center rounded-md transition-opacity',
-            // Masquer l'icône au hover ou si sélectionné/mode sélection
-            isSelected || isSelecting
-              ? 'opacity-0'
-              : 'opacity-100 group-hover:opacity-0',
-          ].join(' ')}
-          style={{ backgroundColor: config?.bgColor ?? '#f5f5f5' }}
-        >
-          {config ? (
-            <img src={config.iconPath} alt={config.label} className="size-5 object-contain" />
-          ) : (
-            <span className="text-xs font-bold text-muted-foreground uppercase">
-              {post.platform.slice(0, 2)}
-            </span>
-          )}
-        </div>
-
-        {/* Checkbox overlay — apparaît au hover ou en mode sélection */}
-        <div
-          className={[
-            'absolute inset-0 flex items-center justify-center rounded-md transition-opacity',
-            'bg-muted/60',
-            isSelected || isSelecting
-              ? 'opacity-100'
-              : 'opacity-0 group-hover:opacity-100',
-          ].join(' ')}
-          onClick={(e) => {
-            // stopPropagation : évite le double-toggle (checkbox + carte parente)
-            e.stopPropagation()
-            onToggleSelect?.(post.id)
-          }}
-          aria-hidden="true"
-        >
-          <input
-            type="checkbox"
-            checked={isSelected}
-            readOnly
-            // tabIndex=-1 : la carte parente est déjà focusable, évite double tab stop
-            tabIndex={-1}
-            className="size-4 cursor-pointer accent-primary"
-          />
-        </div>
+      {/* ── Icône de plateforme ───────────────────────────────────────────── */}
+      <div
+        className="flex size-8 shrink-0 items-center justify-center rounded-md"
+        style={{ backgroundColor: config?.bgColor ?? '#f5f5f5' }}
+      >
+        {config ? (
+          <img src={config.iconPath} alt={config.label} className="size-5 object-contain" />
+        ) : (
+          <span className="text-xs font-bold text-muted-foreground uppercase">
+            {post.platform.slice(0, 2)}
+          </span>
+        )}
       </div>
 
       {/* ── Contenu principal ─────────────────────────────────────────────── */}
@@ -404,156 +216,22 @@ export function PostComposeCard({
           </div>
         )}
 
-        {/* ── Date planifiée cliquable (popover de replanification) ─────── */}
-        {/*
-         * stopPropagation : empêche le clic sur le trigger du popover de remonter
-         * jusqu'à l'onClick de la carte parente (qui ouvrirait le modal de détail).
-         */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <Popover
-            open={rescheduleOpen}
-            onOpenChange={(open) => {
-              // À l'ouverture : initialiser le picker depuis la date existante
-              if (open) initPicker()
-              setRescheduleOpen(open)
-            }}
-          >
-            {post.scheduledFor ? (
-              /* Date existante : chip cliquable */
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={!canReschedule}
-                  className={[
-                    'flex items-center gap-1 text-xs text-muted-foreground rounded px-1 -ml-1',
-                    canReschedule
-                      ? 'hover:text-foreground hover:bg-muted transition-colors cursor-pointer'
-                      : 'cursor-default',
-                  ].join(' ')}
-                  title={canReschedule ? 'Cliquer pour replanifier' : undefined}
-                >
-                  <Calendar className="size-3 shrink-0" />
-                  <span>{formatScheduledDate(post.scheduledFor)}</span>
-                </button>
-              </PopoverTrigger>
-            ) : canReschedule ? (
-              /* Pas de date : bouton "+ Planifier" discret */
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground rounded px-1 -ml-1 transition-colors"
-                >
-                  <CalendarClock className="size-3 shrink-0" />
-                  <span>Planifier</span>
-                </button>
-              </PopoverTrigger>
-            ) : null}
-
-            {/* ── Contenu du Popover ─────────────────────────────────── */}
-            <PopoverContent
-              className="w-auto p-0"
-              align="start"
-              side="bottom"
-              // stopPropagation : évite que les clics dans le popover ferment des modals parents
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex flex-col">
-                {/* Calendrier pour sélectionner le jour */}
-                <CalendarPicker
-                  mode="single"
-                  selected={pickedDate}
-                  onSelect={setPickedDate}
-                  // Désactiver les jours passés (replanification = futur uniquement)
-                  disabled={(day) => day < new Date(new Date().setHours(0, 0, 0, 0))}
-                  initialFocus
-                />
-
-                {/* Sélecteurs heure / minute */}
-                <div className="flex items-center gap-2 border-t px-3 py-2.5">
-                  <span className="text-xs text-muted-foreground shrink-0">Heure :</span>
-
-                  {/* Sélecteur heure */}
-                  <select
-                    value={pickedHour}
-                    onChange={(e) => setPickedHour(e.target.value)}
-                    className="h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                    aria-label="Heure"
-                  >
-                    {HOURS.map((h) => (
-                      <option key={h} value={h}>{h}h</option>
-                    ))}
-                  </select>
-
-                  <span className="text-xs text-muted-foreground">:</span>
-
-                  {/* Sélecteur minute (quarts d'heure) */}
-                  <select
-                    value={pickedMinute}
-                    onChange={(e) => setPickedMinute(e.target.value)}
-                    className="h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                    aria-label="Minute"
-                  >
-                    {MINUTES.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Boutons d'action */}
-                <div className="flex items-center gap-1.5 border-t px-3 py-2">
-                  {/* Confirmer : disabled si aucune date sélectionnée */}
-                  <Button
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs flex-1"
-                    disabled={!pickedDate || isRescheduling}
-                    onClick={() => void handleConfirmReschedule()}
-                  >
-                    {isRescheduling ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <Check className="size-3" />
-                    )}
-                    Confirmer
-                  </Button>
-
-                  {/* Supprimer la date — visible uniquement si une date existe déjà */}
-                  {post.scheduledFor && (
-                    <button
-                      type="button"
-                      disabled={isRescheduling}
-                      onClick={() => void handleRemoveDate()}
-                      title="Supprimer la date planifiée (retour en brouillon)"
-                      className={[
-                        'flex size-7 items-center justify-center rounded-md border border-border',
-                        'text-muted-foreground hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive',
-                        'transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                      ].join(' ')}
-                      aria-label="Supprimer la date planifiée"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        {/* Date planifiée — texte simple (non cliquable) */}
+        {post.scheduledFor && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Calendar className="size-3 shrink-0" />
+            <span>{formatScheduledDate(post.scheduledFor)}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Actions ───────────────────────────────────────────────────────── */}
       {/*
-       * Masquées en mode sélection : les actions individuelles (Modifier/Supprimer)
-       * n'ont pas de sens quand l'utilisateur est en train de faire une sélection groupée.
-       * La BulkActionBar prend en charge les actions dans ce cas.
-       *
        * stopPropagation : empêche le clic sur Modifier/Supprimer de remonter
        * jusqu'à l'onClick de la carte (modal de détail).
        */}
       <div
-        className={[
-          'flex shrink-0 items-start gap-1.5 transition-opacity',
-          isSelecting ? 'opacity-0 pointer-events-none' : 'opacity-100',
-        ].join(' ')}
+        className="flex shrink-0 items-start gap-1.5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Bouton Modifier — ouvre l'AgentModal en mode édition */}
