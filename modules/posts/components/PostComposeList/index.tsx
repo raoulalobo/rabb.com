@@ -39,6 +39,7 @@ import type { Post } from '@/modules/posts/types'
 import { AIFilterModal } from './AIFilterModal'
 import { PostComposeCard } from './PostComposeCard'
 import { PostDetailModal } from './PostDetailModal'
+import { WeekCoverageStrip } from './WeekCoverageStrip'
 
 import type { ExtractedFilters } from './AIFilterModal'
 import type { InfiniteData } from '@tanstack/react-query'
@@ -532,6 +533,21 @@ export function PostComposeList({
 
         </div>
       </div>
+
+      {/* ── Bande de couverture hebdomadaire ─────────────────────────────────── */}
+      {/*
+       * Affichée uniquement sans filtre actif : avec un filtre, allPosts ne reflète
+       * qu'un sous-ensemble, le calcul de couverture serait inexact.
+       * WeekCoverageStrip se masque automatiquement si les 7 jours sont couverts.
+       */}
+      {!hasActiveFilter && (
+        <div className="mt-3">
+          <WeekCoverageStrip
+            posts={allPosts}
+            onCreateForDay={() => handleOpenCreate()}
+          />
+        </div>
+      )}
 
       {/* ── Liste des posts ─────────────────────────────────────────────────── */}
       {/* mt-4 : 16px d'espacement entre la toolbar et le contenu (espace-y-6 du parent
