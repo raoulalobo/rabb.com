@@ -2,9 +2,9 @@
  * @file modules/posts/components/PostComposeList/index.tsx
  * @module posts
  * @description Liste interactive des posts sur la page /compose.
- *   Propose deux vues toggleables :
+ *   Gère la création, l'édition et la consultation des brouillons/planifiés.
  *
- *   **Vue Liste** (défaut) :
+ *   Fonctionnalités :
  *   - Infinite scroll via useInfiniteQuery + IntersectionObserver
  *   - Filtres serveur : plateforme + statut + intervalle de date
  *     → extraits en langage naturel via AIFilterModal (Sonnet)
@@ -12,11 +12,7 @@
  *   - Updates optimistes (create/update/delete) via queryClient.setQueryData
  *   - Bouton "Nouveau post" → AgentModal (création / édition)
  *
- *   **Vue Calendrier** (lecture seule) :
- *   - Charge le mois complet via useCalendarPosts (inside CalendarGrid)
- *   - Filtre client-side : statut + plateforme (issus du filtre IA)
- *   - Chips cliquables → Popover d'aperçu
- *   - Bouton "Nouveau post" masqué
+ *   Note : la vue calendrier est disponible à /calendar (page dédiée).
  *
  *   Architecture :
  *   Client Component ('use client') — reçoit les posts initiaux du Server Component
@@ -31,12 +27,11 @@
 'use client'
 
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, FileText, LayoutList, Loader2, Plus, Search, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FileText, Loader2, Plus, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { AgentModal } from '@/modules/posts/components/AgentModal'
-import { CalendarGrid } from '@/modules/posts/components/CalendarGrid/CalendarGrid'
 import { composeQueryKey, fetchComposePage } from '@/modules/posts/queries/posts.queries'
 import type { ComposeFilters, ComposePage } from '@/modules/posts/queries/posts.queries'
 import type { Post } from '@/modules/posts/types'
@@ -53,9 +48,6 @@ import type { DateRange } from 'react-day-picker'
 
 /** Type helper pour le cache infini TanStack Query */
 type ComposeData = InfiniteData<ComposePage>
-
-/** Vue active de la page /compose */
-type ComposeView = 'list' | 'calendar'
 
 // ─── Helpers de tri ───────────────────────────────────────────────────────────
 
@@ -120,19 +112,6 @@ export function PostComposeList({
   initialNextCursor,
 }: PostComposeListProps): React.JSX.Element {
   const queryClient = useQueryClient()
-
-  // ── Vue active : liste ou calendrier ──────────────────────────────────────
-  const [view, setView] = useState<ComposeView>('list')
-
-  /**
-   * Mois/année affiché par le CalendarGrid.
-   * Initialisé au mois courant ; synchronisé avec le filtre date actif
-   * lors du switch vers la vue calendrier.
-   */
-  const [calendarInit, setCalendarInit] = useState<{ year: number; month: number }>(() => {
-    const now = new Date()
-    return { year: now.getFullYear(), month: now.getMonth() + 1 }
-  })
 
   // ── Filtres serveur ───────────────────────────────────────────────────────
   // Alimentés par le filtre IA (AIFilterModal → Sonnet → ExtractedFilters).
@@ -223,30 +202,6 @@ export function PostComposeList({
     }
   }, [allPosts])
 
-  // ── Filtre client-side pour la vue calendrier ─────────────────────────────
-  /**
-   * Filtre appliqué aux posts de chaque cellule du CalendarGrid.
-   * Bénéficie automatiquement des filtres IA actifs (selectedStatuses / selectedPlatforms).
-   * Stable via useCallback pour éviter les re-renders du CalendarGrid.
-   */
-  const calendarFilter = useCallback(
-    (posts: Post[]): Post[] => {
-      // Statuts actifs : ceux du filtre IA s'il est actif, sinon tous les statuts par défaut
-      // (cohérent avec le SSR page.tsx et l'API /api/posts qui renvoient aussi les 4 statuts)
-      const activeStatuses: Post['status'][] =
-        selectedStatuses.length > 0
-          ? selectedStatuses
-          : ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
-
-      return posts.filter(
-        (p) =>
-          activeStatuses.includes(p.status) &&
-          (selectedPlatforms.length === 0 || selectedPlatforms.includes(p.platform)),
-      )
-    },
-    [selectedPlatforms, selectedStatuses],
-  )
-
   // ── Infinite scroll — IntersectionObserver ────────────────────────────────
   // Le sentinel (div invisible en bas de liste) déclenche fetchNextPage
   // quand il entre dans le viewport (avec une marge de 200px).
@@ -322,6 +277,33 @@ export function PostComposeList({
       // 4. Redistribuer dans les pages en conservant leur taille d'origine.
       //    Conserver la taille de chaque page est crucial pour ne pas corrompre
       //    les curseurs de pagination (nextCursor) de TanStack Query.
+      let offset = 0
+      const newPages = old.pages.map((page) => {
+        const size = page.posts.length
+        const newPosts = sorted.slice(offset, offset + size)
+        offset += size
+        return { ...page, posts: newPosts }
+      })
+
+      return { ...old, pages: newPages }
+    })
+  }
+
+  /**
+   * Met à jour un post replanifié dans toutes les pages du cache, puis re-trie.
+   * Réutilise la même logique que handlePostUpdated (même algorithme flatten/replace/sort/paginate).
+   * Appelé par PostComposeCard après une replanification inline réussie.
+   *
+   * @param updatedPost - Post mis à jour retourné par PATCH /api/posts/[id]
+   */
+  const handlePostRescheduled = (updatedPost: Post): void => {
+    queryClient.setQueryData<ComposeData>(getKey(), (old) => {
+      if (!old) return old
+
+      const allLoaded = old.pages.flatMap((page) => page.posts)
+      const replaced = allLoaded.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+      const sorted = sortComposePosts(replaced)
+
       let offset = 0
       const newPages = old.pages.map((page) => {
         const size = page.posts.length
@@ -415,31 +397,19 @@ export function PostComposeList({
         : ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'],
     )
     // Convertir les dates string ISO en Date pour react-day-picker DateRange
+    // `to` est optionnel (plage ouverte vers le futur) — ne pas créer d'Invalid Date
     setDateRange(
       filters.dateRange
-        ? { from: new Date(filters.dateRange.from), to: new Date(filters.dateRange.to) }
+        ? {
+            from: new Date(filters.dateRange.from),
+            ...(filters.dateRange.to ? { to: new Date(filters.dateRange.to) } : {}),
+          }
         : undefined,
     )
     // Stocker le texte de la requête pour affichage dans le bouton
     setActiveQueryText(filters.queryText)
     // Mot-clé de contenu extrait par Claude → transmis à l'API via ?search=
     setActiveSearchQuery(filters.search ?? '')
-  }
-
-  // ── Switch vers la vue calendrier ─────────────────────────────────────────
-  /**
-   * Bascule vers la vue calendrier.
-   * Si un filtre date est actif, initialise le calendrier au mois du début
-   * de la plage sélectionnée pour un alignement visuel cohérent.
-   */
-  const handleSwitchToCalendar = (): void => {
-    if (dateRange?.from) {
-      setCalendarInit({
-        year: dateRange.from.getFullYear(),
-        month: dateRange.from.getMonth() + 1,
-      })
-    }
-    setView('calendar')
   }
 
   // ── Réinitialisation de tous les filtres ──────────────────────────────────
@@ -502,16 +472,11 @@ export function PostComposeList({
        */}
       <div className="sticky -top-4 md:-top-6 z-10 flex items-center justify-between gap-3 bg-background py-3 border-b border-border">
 
-        {/* Bouton "Nouveau post" — masqué en vue calendrier (lecture seule) */}
-        {view === 'list' && (
-          <Button onClick={handleOpenCreate} className="gap-2">
-            <Plus className="size-4" />
-            Nouveau post
-          </Button>
-        )}
-
-        {/* Spacer pour aligner les filtres à droite quand le bouton est masqué */}
-        {view === 'calendar' && <div />}
+        {/* Bouton "Nouveau post" — ouvre l'AgentModal en mode création */}
+        <Button onClick={handleOpenCreate} className="gap-2">
+          <Plus className="size-4" />
+          Nouveau post
+        </Button>
 
         <div className="flex items-center gap-2">
 
@@ -531,13 +496,8 @@ export function PostComposeList({
             onChange={setSelectedStatuses}
           /> */}
 
-          {/* Filtre date — masqué en vue calendrier */}
-          {/* {view === 'list' && (
-            <DateRangeFilter
-              dateRange={dateRange}
-              onChange={setDateRange}
-            />
-          )} */}
+          {/* Filtre date — désactivé (réactiver si besoin) */}
+          {/* <DateRangeFilter dateRange={dateRange} onChange={setDateRange} /> */}
 
           {/* ── Bouton Rechercher (filtre IA en langage naturel) ────────────── */}
           <Button
@@ -570,75 +530,13 @@ export function PostComposeList({
             </Button>
           )}
 
-          {/* ── Toggle vue liste / calendrier ──────────────────────────────── */}
-          <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
-            <Button
-              variant={view === 'list' ? 'secondary' : 'ghost'}
-              size="icon"
-              className="size-7"
-              onClick={() => setView('list')}
-              aria-label="Vue liste"
-              aria-pressed={view === 'list'}
-            >
-              <LayoutList className="size-3.5" />
-            </Button>
-            <Button
-              variant={view === 'calendar' ? 'secondary' : 'ghost'}
-              size="icon"
-              className="size-7"
-              onClick={handleSwitchToCalendar}
-              aria-label="Vue calendrier"
-              aria-pressed={view === 'calendar'}
-            >
-              <CalendarDays className="size-3.5" />
-            </Button>
-          </div>
         </div>
       </div>
 
-      {/* ── Vue Calendrier ──────────────────────────────────────────────────── */}
+      {/* ── Liste des posts ─────────────────────────────────────────────────── */}
       {/* mt-4 : 16px d'espacement entre la toolbar et le contenu (espace-y-6 du parent
           ne s'applique plus à ces éléments depuis le passage au wrapper <div>) */}
-      {view === 'calendar' && (
-        <div className="mt-4">
-          {/* Information : vue lecture seule */}
-          <p className="text-xs text-muted-foreground">
-            Vue calendrier — cliquez sur un post pour voir ses détails.
-            Les modifications se font depuis la vue liste.
-          </p>
-
-          {/*
-           * Grille calendrier avec filtre client-side et chips interactifs.
-           * Technique "breakout" : left-1/2 + -translate-x-1/2 permet de sortir
-           * du container max-w-3xl de la page /compose.
-           *
-           * Largeur responsive (main padding + sidebar) :
-           *   Mobile (< md) : calc(100vw - 2rem)
-           *     - 0rem  = pas de sidebar (cachée sur mobile)
-           *     - 2rem  = padding du <main> p-4 (1rem de chaque côté)
-           *   Desktop (md+) : calc(100vw - 15rem - 3rem)
-           *     - 15rem = sidebar fixe (w-60)
-           *     - 3rem  = padding du <main> p-6 (1.5rem de chaque côté)
-           * → Le calendrier occupe exactement la largeur utile du <main>,
-           *   sans débordement ni scrollbar horizontale.
-           */}
-          <div className="relative left-1/2 w-[calc(100vw-2rem)] -translate-x-1/2 md:w-[calc(100vw-15rem-3rem)]">
-            <CalendarGrid
-              initialYear={calendarInit.year}
-              initialMonth={calendarInit.month}
-              interactive
-              filterPosts={calendarFilter}
-              // onMonthChange non nécessaire — pas d'invalidation cache depuis le calendrier
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ── Vue Liste ───────────────────────────────────────────────────────── */}
-      {/* mt-4 : 16px d'espacement entre la toolbar et le contenu (espace-y-6 du parent
-          ne s'applique plus à ces éléments depuis le passage au wrapper <div>) */}
-      {view === 'list' && (
-        <div className="mt-4">
+      <div className="mt-4">
           {/* Barre de statut — compteur + indicateur de filtre actif */}
           {allPosts.length > 0 && hasActiveFilter && (
             <p className="text-sm text-muted-foreground">
@@ -697,6 +595,7 @@ export function PostComposeList({
                   post={post}
                   onEdit={handleOpenEdit}
                   onDelete={handlePostDeleted}
+                  onReschedule={handlePostRescheduled}
                   onDetail={handleOpenDetail}
                 />
               ))}
@@ -720,13 +619,11 @@ export function PostComposeList({
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
             </div>
           )}
-        </div>
-      )}
+      </div>
 
       {/* ── PostDetailModal — affichage complet d'un post ───────────────────── */}
       {/*
-       * Rendu en dehors des vues liste/calendrier pour éviter les conflits de z-index
-       * avec les cards et le calendrier.
+       * Rendu en dehors de la liste pour éviter les conflits de z-index avec les cards.
        * detailPost conserve sa valeur même après la fermeture (lastPostRef dans PostDetailModal)
        * pour que l'animation de fermeture affiche encore le contenu.
        */}
