@@ -29,6 +29,7 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Loader2, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { AgentModal } from '@/modules/posts/components/AgentModal'
@@ -37,6 +38,7 @@ import type { ComposeFilters, ComposePage } from '@/modules/posts/queries/posts.
 import type { Post } from '@/modules/posts/types'
 
 import { AIFilterModal } from './AIFilterModal'
+import { BulkActionBar } from './BulkActionBar'
 import { PostComposeCard } from './PostComposeCard'
 import { PostDetailModal } from './PostDetailModal'
 import { WeekCoverageStrip } from './WeekCoverageStrip'
@@ -336,6 +338,110 @@ export function PostComposeList({
     })
   }
 
+  // ── Sélection groupée ─────────────────────────────────────────────────────
+
+  /** Ensemble des IDs de posts sélectionnés */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  /** true dès qu'au moins un post est sélectionné */
+  const isSelecting = selectedIds.size > 0
+  /** true pendant la suppression groupée */
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  // Vider la sélection quand les filtres changent (les posts affichés changent)
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [filters])
+
+  /**
+   * Bascule la sélection d'un post (ajoute ou retire son ID de la sélection).
+   *
+   * @param postId - ID du post à basculer
+   */
+  const handleToggleSelect = useCallback((postId: string): void => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(postId)) {
+        next.delete(postId)
+      } else {
+        next.add(postId)
+      }
+      return next
+    })
+  }, [])
+
+  /**
+   * Sélectionne tous les posts DRAFT/SCHEDULED chargés.
+   * PUBLISHED et FAILED sont exclus (non supprimables).
+   */
+  const handleSelectAll = useCallback((): void => {
+    const deletableIds = allPosts
+      .filter((p) => p.status === 'DRAFT' || p.status === 'SCHEDULED')
+      .map((p) => p.id)
+    setSelectedIds(new Set(deletableIds))
+  }, [allPosts])
+
+  /** Désélectionne tout et quitte le mode sélection */
+  const handleClearSelection = useCallback((): void => {
+    setSelectedIds(new Set())
+  }, [])
+
+  /**
+   * Retire en une seule passe plusieurs posts du cache TanStack Query.
+   * Plus efficace que d'appeler handlePostDeleted en boucle (évite N re-renders).
+   *
+   * @param postIds - IDs des posts supprimés avec succès
+   */
+  const handleBulkDeleted = useCallback((postIds: string[]): void => {
+    const idsSet = new Set(postIds)
+    queryClient.setQueryData<ComposeData>(getKey(), (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          posts: page.posts.filter((p) => !idsSet.has(p.id)),
+        })),
+      }
+    })
+  }, [queryClient, getKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Supprime en parallèle tous les posts sélectionnés qui sont DRAFT ou SCHEDULED.
+   * Les posts PUBLISHED/FAILED dans la sélection sont silencieusement ignorés.
+   * Met à jour le cache optimistement après les appels API.
+   */
+  const handleBulkDelete = async (): Promise<void> => {
+    if (isBulkDeleting) return
+    setIsBulkDeleting(true)
+
+    // Filtrer : seuls les DRAFT/SCHEDULED peuvent être supprimés
+    const deletableIds = [...selectedIds].filter((id) => {
+      const p = allPosts.find((post) => post.id === id)
+      return p?.status === 'DRAFT' || p?.status === 'SCHEDULED'
+    })
+
+    // DELETE en parallèle (fire-and-forget — on collecte les succès)
+    const results = await Promise.allSettled(
+      deletableIds.map((id) => fetch(`/api/posts/${id}`, { method: 'DELETE' })),
+    )
+
+    // Retirer du cache uniquement les posts effectivement supprimés (200 OK)
+    const succeededIds = deletableIds.filter((_, i) => {
+      const r = results[i]
+      return r.status === 'fulfilled' && r.value.ok
+    })
+
+    handleBulkDeleted(succeededIds)
+    setSelectedIds(new Set())
+    setIsBulkDeleting(false)
+  }
+
+  // Nombre de posts DRAFT/SCHEDULED parmi les posts chargés (pour "Tout sélectionner")
+  const totalDeletable = useMemo(
+    () => allPosts.filter((p) => p.status === 'DRAFT' || p.status === 'SCHEDULED').length,
+    [allPosts],
+  )
+
   // ── État du modal PostDetailModal ─────────────────────────────────────────
   /** Post dont on affiche le détail (null = modal fermé) */
   const [detailPost, setDetailPost] = useState<Post | null>(null)
@@ -613,6 +719,9 @@ export function PostComposeList({
                   onDelete={handlePostDeleted}
                   onReschedule={handlePostRescheduled}
                   onDetail={handleOpenDetail}
+                  isSelected={selectedIds.has(post.id)}
+                  isSelecting={isSelecting}
+                  onToggleSelect={handleToggleSelect}
                 />
               ))}
             </div>
@@ -683,6 +792,21 @@ export function PostComposeList({
         onOpenChange={setAiModalOpen}
         currentQuery={activeQueryText}
         onFiltersApplied={handleFiltersApplied}
+      />
+
+      {/* ── BulkActionBar — actions groupées (slide-in depuis le bas) ─────────── */}
+      {/*
+       * Rendu en dehors du flux principal pour bénéficier du `fixed` sans
+       * être contraint par un ancestor overflow:hidden.
+       * La barre gère elle-même sa visibilité via count et les transitions CSS.
+       */}
+      <BulkActionBar
+        count={selectedIds.size}
+        totalDeletable={totalDeletable}
+        onDelete={() => void handleBulkDelete()}
+        onSelectAll={handleSelectAll}
+        onClear={handleClearSelection}
+        isDeleting={isBulkDeleting}
       />
     </div>
   )

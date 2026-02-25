@@ -53,6 +53,13 @@ interface PostComposeCardProps {
   onReschedule: (updatedPost: Post) => void
   /** Callback appelé quand l'utilisateur clique sur le corps de la carte (ouvre le modal de détail) */
   onDetail?: (post: Post) => void
+  // ── Sélection groupée ──────────────────────────────────────────────────────
+  /** true si ce post est actuellement sélectionné (mode actions groupées) */
+  isSelected?: boolean
+  /** true si au moins un post est sélectionné dans la liste (mode sélection actif) */
+  isSelecting?: boolean
+  /** Callback pour basculer la sélection de ce post */
+  onToggleSelect?: (postId: string) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -111,6 +118,9 @@ export function PostComposeCard({
   onDelete,
   onReschedule,
   onDetail,
+  isSelected = false,
+  isSelecting = false,
+  onToggleSelect,
 }: PostComposeCardProps): React.JSX.Element {
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -244,36 +254,95 @@ export function PostComposeCard({
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className={[
-        'flex gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm',
-        onDetail ? 'cursor-pointer hover:border-border/80' : '',
+        // `group` active les variants group-hover sur les enfants (checkbox overlay)
+        'group flex gap-3 rounded-xl border bg-card p-4 transition-all hover:shadow-sm',
+        // Highlight quand sélectionné
+        isSelected
+          ? 'border-primary/50 ring-2 ring-primary/20'
+          : 'border-border hover:border-border/80',
+        // Curseur selon le mode
+        isSelecting || onDetail ? 'cursor-pointer' : '',
       ].join(' ')}
-      onClick={() => onDetail?.(post)}
-      role={onDetail ? 'button' : undefined}
-      tabIndex={onDetail ? 0 : undefined}
+      onClick={
+        isSelecting
+          // Mode sélection : clic sur la carte → toggle (le checkbox gère aussi via stopPropagation)
+          ? () => onToggleSelect?.(post.id)
+          : () => onDetail?.(post)
+      }
+      role={isSelecting || onDetail ? 'button' : undefined}
+      tabIndex={isSelecting || onDetail ? 0 : undefined}
       onKeyDown={
-        onDetail
+        isSelecting || onDetail
           ? (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
-                onDetail(post)
+                isSelecting ? onToggleSelect?.(post.id) : onDetail?.(post)
               }
             }
           : undefined
       }
-      aria-label={onDetail ? `Voir les détails du post ${post.platform}` : undefined}
+      aria-label={
+        isSelecting
+          ? `${isSelected ? 'Désélectionner' : 'Sélectionner'} le post ${post.platform}`
+          : onDetail
+            ? `Voir les détails du post ${post.platform}`
+            : undefined
+      }
     >
-      {/* ── Icône de plateforme ───────────────────────────────────────────── */}
-      <div
-        className="flex size-8 shrink-0 items-center justify-center rounded-md"
-        style={{ backgroundColor: config?.bgColor ?? '#f5f5f5' }}
-      >
-        {config ? (
-          <img src={config.iconPath} alt={config.label} className="size-5 object-contain" />
-        ) : (
-          <span className="text-xs font-bold text-muted-foreground uppercase">
-            {post.platform.slice(0, 2)}
-          </span>
-        )}
+      {/* ── Icône de plateforme + checkbox overlay (style Gmail) ─────────── */}
+      {/*
+       * Conteneur relatif : le checkbox se superpose exactement à l'icône.
+       * Logique de visibilité :
+       *   - Normal  : icône visible, checkbox invisible (opacity-0)
+       *   - Hover   : icône disparaît (group-hover:opacity-0), checkbox apparaît
+       *   - Sélectionné ou mode sélection : checkbox toujours visible
+       */}
+      <div className="relative shrink-0 size-8">
+        {/* Icône plateforme */}
+        <div
+          className={[
+            'flex size-8 items-center justify-center rounded-md transition-opacity',
+            // Masquer l'icône au hover ou si sélectionné/mode sélection
+            isSelected || isSelecting
+              ? 'opacity-0'
+              : 'opacity-100 group-hover:opacity-0',
+          ].join(' ')}
+          style={{ backgroundColor: config?.bgColor ?? '#f5f5f5' }}
+        >
+          {config ? (
+            <img src={config.iconPath} alt={config.label} className="size-5 object-contain" />
+          ) : (
+            <span className="text-xs font-bold text-muted-foreground uppercase">
+              {post.platform.slice(0, 2)}
+            </span>
+          )}
+        </div>
+
+        {/* Checkbox overlay — apparaît au hover ou en mode sélection */}
+        <div
+          className={[
+            'absolute inset-0 flex items-center justify-center rounded-md transition-opacity',
+            'bg-muted/60',
+            isSelected || isSelecting
+              ? 'opacity-100'
+              : 'opacity-0 group-hover:opacity-100',
+          ].join(' ')}
+          onClick={(e) => {
+            // stopPropagation : évite le double-toggle (checkbox + carte parente)
+            e.stopPropagation()
+            onToggleSelect?.(post.id)
+          }}
+          aria-hidden="true"
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            readOnly
+            // tabIndex=-1 : la carte parente est déjà focusable, évite double tab stop
+            tabIndex={-1}
+            className="size-4 cursor-pointer accent-primary"
+          />
+        </div>
       </div>
 
       {/* ── Contenu principal ─────────────────────────────────────────────── */}
@@ -473,11 +542,18 @@ export function PostComposeCard({
 
       {/* ── Actions ───────────────────────────────────────────────────────── */}
       {/*
+       * Masquées en mode sélection : les actions individuelles (Modifier/Supprimer)
+       * n'ont pas de sens quand l'utilisateur est en train de faire une sélection groupée.
+       * La BulkActionBar prend en charge les actions dans ce cas.
+       *
        * stopPropagation : empêche le clic sur Modifier/Supprimer de remonter
        * jusqu'à l'onClick de la carte (modal de détail).
        */}
       <div
-        className="flex shrink-0 items-start gap-1.5"
+        className={[
+          'flex shrink-0 items-start gap-1.5 transition-opacity',
+          isSelecting ? 'opacity-0 pointer-events-none' : 'opacity-100',
+        ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Bouton Modifier — ouvre l'AgentModal en mode édition */}
