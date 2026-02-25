@@ -84,6 +84,15 @@ export const postQueryKeys = {
    * @param month - Mois 1-indexé (ex: 3 pour mars)
    */
   calendar: (year: number, month: number) => ['posts', 'calendar', year, month] as const,
+
+  /**
+   * Vue Kanban — tous les posts sans pagination, groupés côté client par statut.
+   * Invalidée après chaque drag & drop ou création/édition de post.
+   *
+   * @example
+   *   queryClient.invalidateQueries({ queryKey: postQueryKeys.kanban() })
+   */
+  kanban: () => ['posts', 'kanban'] as const,
 }
 
 /**
@@ -103,6 +112,45 @@ export const composeQueryKey = (filters: ComposeFilters): readonly unknown[] =>
   ['posts', 'compose', filters.platforms, filters.dateRange, filters.statuses, filters.queryText] as const
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fetche tous les posts pour la vue Kanban (limit haute = 200, sans pagination).
+ * Récupère les 4 statuts : DRAFT, SCHEDULED, PUBLISHED, FAILED.
+ * Le groupement par statut est fait côté client dans useKanbanPosts.
+ *
+ * @returns Liste de tous les posts (max 200)
+ * @throws Error si la réponse n'est pas OK
+ *
+ * @example
+ *   const posts = await fetchKanbanPosts()
+ *   // → [{ id: 'abc', status: 'DRAFT', ... }, ...]
+ */
+export async function fetchKanbanPosts(): Promise<Post[]> {
+  const params = new URLSearchParams({
+    compose: '1',
+    statuses: 'DRAFT,SCHEDULED,PUBLISHED,FAILED',
+    limit: '200',
+  })
+
+  const res = await fetch(`/api/posts?${params.toString()}`)
+  if (!res.ok) {
+    throw new Error(`Erreur chargement Kanban : ${res.status} ${res.statusText}`)
+  }
+
+  const data = (await res.json()) as { posts: unknown[]; nextCursor: string | null }
+
+  // ── Désérialisation des dates (JSON string → Date objects) ──────────────
+  return data.posts.map((p: unknown): Post => {
+    const raw = p as unknown as Post
+    return {
+      ...raw,
+      scheduledFor: raw.scheduledFor ? new Date(raw.scheduledFor as unknown as string) : null,
+      publishedAt: raw.publishedAt ? new Date(raw.publishedAt as unknown as string) : null,
+      createdAt: new Date(raw.createdAt as unknown as string),
+      updatedAt: new Date(raw.updatedAt as unknown as string),
+    }
+  })
+}
 
 /**
  * Fetche les posts d'un mois pour le calendrier.
@@ -168,11 +216,14 @@ export async function fetchComposePage(
     params.set('platforms', filters.platforms.join(','))
   }
 
-  // Filtre date — bornes sur scheduledFor
+  // Filtre date — bornes sur scheduledFor.
+  // `to` est optionnel : absent = plage ouverte vers le futur (aucun paramètre `to` envoyé).
   if (filters.dateRange?.from) {
     params.set('from', filters.dateRange.from.toISOString())
-    // Si `to` absent (sélection d'un seul jour) → utiliser `from` comme borne de fin
-    params.set('to', (filters.dateRange.to ?? filters.dateRange.from).toISOString())
+    // N'envoyer `to` que si la borne de fin est explicitement définie
+    if (filters.dateRange.to) {
+      params.set('to', filters.dateRange.to.toISOString())
+    }
   }
 
   // Filtre statuts — appliqué côté serveur (remplace le filtre client-side)

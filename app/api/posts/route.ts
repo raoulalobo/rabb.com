@@ -252,15 +252,35 @@ async function handleComposeMode(
   //    des bornes UTC explicites (T00:00:00Z / T23:59:59Z), indépendantes
   //    du fuseau du serveur.
   //
-  // fromParam est une string ISO UTC : "2026-02-27T00:00:00.000Z"
-  // → on extrait la date UTC : "2026-02-27"
-  // → on construit les bornes du jour entier en UTC
+  // fromParam / toParam sont des strings ISO UTC produites par .toISOString() côté client.
+  // Deux formats possibles :
+  //   • Avec heure  : "2026-02-24T14:00:00.000Z" → utiliser directement (granularité heure).
+  //   • Date seule  : "2026-02-24"               → appliquer les bornes du jour entier en UTC.
+  //
+  // Règle de détection : présence du caractère "T" dans le paramètre.
+  // Les params viennent toujours de .toISOString() (UTC) → aucun risque de décalage TZ.
+  //
+  // `toParam` absent = plage ouverte vers le futur → pas de borne `lte` en DB.
+  // Ex : "depuis le 24 février" → gte: 2026-02-24T00:00:00Z, sans lte.
+  // Ex : "entre 14h et 20h le 24" → gte: 2026-02-24T14:00:00Z, lte: 2026-02-24T20:00:00Z
   const dateFilter =
     fromParam
       ? {
           scheduledFor: {
-            gte: new Date(`${fromParam.substring(0, 10)}T00:00:00.000Z`),
-            lte: new Date(`${(toParam ?? fromParam).substring(0, 10)}T23:59:59.999Z`),
+            // Si l'heure est présente dans le param → l'utiliser telle quelle.
+            // Sinon (date seule "YYYY-MM-DD") → borne début de journée UTC.
+            gte: fromParam.includes('T')
+              ? new Date(fromParam)
+              : new Date(`${fromParam}T00:00:00.000Z`),
+            ...(toParam
+              ? {
+                  // Même logique pour la borne de fin.
+                  // Date seule → borne fin de journée UTC (23:59:59.999).
+                  lte: toParam.includes('T')
+                    ? new Date(toParam)
+                    : new Date(`${toParam.substring(0, 10)}T23:59:59.999Z`),
+                }
+              : {}),
           },
         }
       : {}

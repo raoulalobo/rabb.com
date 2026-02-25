@@ -48,7 +48,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -79,17 +79,99 @@ interface PostDetailModalProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Extensions vidéo reconnues pour la détection du type de média */
-const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|avi|mkv|m4v|ogv)(\?.*)?$/i
+/**
+ * Extensions vidéo reconnues pour la détection du type de média.
+ * La regex cherche l'extension PARTOUT dans l'URL (pas uniquement en fin de chaîne)
+ * pour gérer les URLs Supabase Storage qui peuvent contenir des segments après l'extension.
+ * Exemple : "https://xxx.supabase.co/.../video.mp4" → match
+ */
+const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|avi|mkv|m4v|ogv|3gp|ts|flv)(\?|\/|$)/i
 
 /**
  * Détermine si une URL pointe vers une vidéo.
+ * Cherche l'extension vidéo PARTOUT dans le chemin de l'URL.
  *
  * @param url - URL du média à analyser
  * @returns true si c'est une vidéo, false si c'est une image
  */
 function isVideoUrl(url: string): boolean {
   return VIDEO_EXTENSIONS.test(url)
+}
+
+// ─── Composant MediaItem ──────────────────────────────────────────────────────
+
+/**
+ * Affiche un média (image ou vidéo) avec détection automatique du type
+ * et fallback : si le premier rendu échoue, bascule vers l'autre type.
+ *
+ * Exemple : URL sans extension → on essaie <video>, si erreur → <img>, et vice-versa.
+ *
+ * @param url   - URL du média
+ * @param className - Classes CSS Tailwind
+ * @param controls  - Afficher les contrôles vidéo natifs (défaut: false)
+ * @param muted     - Couper le son (défaut: false)
+ * @param playsInline - Lecture inline mobile (défaut: false)
+ * @param ariaLabel   - Label accessibilité
+ */
+function MediaItem({
+  url,
+  className,
+  controls = false,
+  muted = false,
+  playsInline = false,
+  ariaLabel,
+}: {
+  url: string
+  className?: string
+  controls?: boolean
+  muted?: boolean
+  playsInline?: boolean
+  ariaLabel?: string
+}): React.JSX.Element {
+  // Détection initiale du type (video ou image) depuis l'extension de l'URL
+  const [renderAs, setRenderAs] = useState<'video' | 'image'>(
+    isVideoUrl(url) ? 'video' : 'image',
+  )
+
+  /**
+   * En cas d'erreur de chargement, bascule vers l'autre type.
+   * Exemple : URL sans extension détectée comme image → essaie video.
+   * Ne bascule qu'une seule fois pour éviter une boucle infinie.
+   */
+  const hasFallback = useRef(false)
+  const handleError = useCallback(() => {
+    if (!hasFallback.current) {
+      hasFallback.current = true
+      setRenderAs((prev) => (prev === 'video' ? 'image' : 'video'))
+    }
+  }, [])
+
+  if (renderAs === 'video') {
+    return (
+      <video
+        key={url + '-video'}
+        src={url}
+        controls={controls}
+        muted={muted}
+        playsInline={playsInline}
+        preload="metadata"
+        className={className}
+        aria-label={ariaLabel}
+        onError={handleError}
+      />
+    )
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      key={url + '-image'}
+      src={url}
+      alt={ariaLabel ?? 'Média'}
+      className={className}
+      onError={handleError}
+    />
+  )
 }
 
 /**
@@ -369,29 +451,18 @@ export function PostDetailModal({
                 className="relative flex items-center justify-center"
                 style={{ minHeight: 160, maxHeight: 280 }}
               >
-                {isVideoUrl(displayPost.mediaUrls[activeMediaIndex]) ? (
-                  /*
-                   * Vidéo : controls natifs du navigateur.
-                   * preload="metadata" charge uniquement la première frame sans
-                   * télécharger le fichier entier.
-                   */
-                  <video
-                    key={displayPost.mediaUrls[activeMediaIndex]}
-                    src={displayPost.mediaUrls[activeMediaIndex]}
-                    controls
-                    preload="metadata"
-                    playsInline
-                    className="max-h-[280px] w-full object-contain"
-                    aria-label={`Vidéo ${activeMediaIndex + 1} sur ${displayPost.mediaUrls.length}`}
-                  />
-                ) : (
-                  <img
-                    key={displayPost.mediaUrls[activeMediaIndex]}
-                    src={displayPost.mediaUrls[activeMediaIndex]}
-                    alt={`Média ${activeMediaIndex + 1} sur ${displayPost.mediaUrls.length}`}
-                    className="max-h-[280px] w-full object-contain"
-                  />
-                )}
+                {/*
+                 * MediaItem : détecte automatiquement video/image depuis l'extension.
+                 * En cas d'erreur (URL sans extension, bucket privé, etc.), bascule
+                 * vers l'autre type (fallback une seule fois pour éviter une boucle).
+                 */}
+                <MediaItem
+                  url={displayPost.mediaUrls[activeMediaIndex]}
+                  controls
+                  playsInline
+                  className="max-h-[280px] w-full object-contain"
+                  ariaLabel={`Média ${activeMediaIndex + 1} sur ${displayPost.mediaUrls.length}`}
+                />
 
                 {/* Compteur de médias (ex: "2 / 4") — visible si plusieurs médias */}
                 {displayPost.mediaUrls.length > 1 && (
@@ -420,27 +491,24 @@ export function PostDetailModal({
                       aria-label={`Voir le média ${i + 1}`}
                       aria-pressed={i === activeMediaIndex}
                     >
-                      {isVideoUrl(url) ? (
-                        <>
-                          <video
-                            src={url}
-                            preload="metadata"
-                            muted
-                            playsInline
-                            className="size-full object-cover"
-                            aria-hidden="true"
-                          />
-                          {/* Overlay icône Play pour signaler que c'est une vidéo */}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <Play className="size-3 fill-white text-white" />
-                          </div>
-                        </>
-                      ) : (
-                        <img
-                          src={url}
-                          alt={`Miniature ${i + 1}`}
-                          className="size-full object-cover"
-                        />
+                      {/*
+                       * MediaItem gère le fallback video ↔ image.
+                       * L'overlay Play est affiché si l'URL semble être une vidéo
+                       * (détection initiale) — reste visible même après fallback
+                       * car la miniature est petite et non critique.
+                       */}
+                      <MediaItem
+                        url={url}
+                        muted
+                        playsInline
+                        className="size-full object-cover"
+                        ariaLabel={`Miniature ${i + 1}`}
+                      />
+                      {isVideoUrl(url) && (
+                        /* Overlay icône Play pour signaler que c'est une vidéo */
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <Play className="size-3 fill-white text-white" />
+                        </div>
                       )}
                     </button>
                   ))}

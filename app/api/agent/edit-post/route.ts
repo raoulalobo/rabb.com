@@ -38,6 +38,7 @@ import { z } from 'zod'
 
 import { anthropic, AGENT_MODEL } from '@/lib/ai'
 import { auth } from '@/lib/auth'
+import { inngest } from '@/lib/inngest/client'
 import { prisma } from '@/lib/prisma'
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 
@@ -191,7 +192,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     ...new Set([...post.mediaUrls, ...mediaPool.map((m) => m.url)]),
   ]
 
+  // Date actuelle transmise à Claude pour qu'il génère des dates FUTURES correctes.
+  // Sans cette information, Claude utilise son année de référence interne (souvent passée)
+  // et génère des dates invalides → isValidFutureDate = false → scheduledFor = null.
+  const now = new Date()
+  const nowIso = now.toISOString()
+
   const systemPrompt = `Tu es un expert en social media. Tu dois modifier un post existant selon les instructions de l'utilisateur.
+
+## Date et heure actuelles
+${nowIso} — Utilise cette date comme référence pour toutes les dates relatives ("demain", "la semaine prochaine", "le 1er mars", etc.).
+Toutes les dates que tu génères pour scheduledFor DOIVENT être dans le futur (après ${nowIso}).
 
 ## Post actuel
 - Plateforme : **${post.platform}**
@@ -209,8 +220,9 @@ ${allAvailableMediaUrls.length > 0 ? allAvailableMediaUrls.join('\n') : 'Aucun m
 1. Modifie uniquement ce qui est demandé dans l'instruction.
 2. Respecte STRICTEMENT les limites de caractères de la plateforme.
 3. Si l'instruction ne mentionne pas les médias, conserve les médias actuels.
-4. Si l'instruction ne mentionne pas de date, conserve la date actuelle.
-5. Retourne le texte complet (pas seulement les modifications).`
+4. Si l'instruction mentionne une date, génère une date ISO 8601 strictement future dans scheduledFor.
+5. Si l'instruction ne mentionne pas de date, recopie la date actuelle (ou null si pas de date).
+6. Retourne le texte complet (pas seulement les modifications).`
 
   // ── Appel Claude Sonnet ───────────────────────────────────────────────────
   try {
@@ -245,37 +257,77 @@ ${allAvailableMediaUrls.length > 0 ? allAvailableMediaUrls.join('\n') : 'Aucun m
 
     const { text, mediaUrls, scheduledFor: newScheduledForStr } = toolOutputParsed.data
 
-    // Calculer la date et le statut mis à jour
+    // ── Calcul de la date et du statut résultant ──────────────────────────
     const newScheduledDate = newScheduledForStr ? new Date(newScheduledForStr) : null
     const isValidFutureDate = newScheduledDate !== null
       && !isNaN(newScheduledDate.getTime())
-      && newScheduledDate > new Date()
+      && newScheduledDate > now   // `now` défini plus haut — cohérence avec le prompt
+
+    // Statut précédent du post (pour détecter une transition DRAFT → SCHEDULED)
+    const previousStatus = post.status
+    const newStatus = isValidFutureDate ? 'SCHEDULED' : 'DRAFT'
 
     // ── Mise à jour en DB ─────────────────────────────────────────────────
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: {
         text,
-        // Filtrer les URLs vides ou invalides
+        // Filtrer les URLs vides ou invalides avant persistance
         mediaUrls: mediaUrls.filter((url) => url.startsWith('http')),
         scheduledFor: isValidFutureDate ? newScheduledDate : null,
-        status: isValidFutureDate ? 'SCHEDULED' : 'DRAFT',
-        // Remettre à zéro les données de publication précédentes si on replanifie
+        status: newStatus,
+        // Réinitialiser les champs de publication si on replanifie
         latePostId: null,
         failureReason: null,
         publishedAt: null,
       },
     })
 
+    // ── Event Inngest : déclencher la publication si nouvelle date assignée ──
+    // Opération non-bloquante : un échec Inngest (ex: dev server non démarré)
+    // ne doit PAS faire échouer la sauvegarde du post déjà persistée en DB.
+    // Cas couverts :
+    // - DRAFT → SCHEDULED (nouvelle date assignée via l'agent)
+    // - SCHEDULED → SCHEDULED (replanification : annule l'ancien run puis crée le nouveau)
+    if (isValidFutureDate && newScheduledDate) {
+      if (!process.env.INNGEST_EVENT_KEY) {
+        // En local sans clé Inngest, on skip l'envoi — pas de scheduling à déclencher.
+        console.warn('[edit-post] INNGEST_EVENT_KEY non défini — envoi Inngest ignoré (mode local).')
+      } else {
+        try {
+          // Annuler l'éventuel run Inngest précédent avant d'en créer un nouveau
+          // pour éviter deux runs concurrents sur le même post lors d'une replanification.
+          if (previousStatus === 'SCHEDULED') {
+            await inngest.send({ name: 'post/cancel', data: { postId } })
+          }
+
+          await inngest.send({
+            name: 'post/schedule',
+            data: {
+              postId,
+              scheduledFor: newScheduledDate.toISOString(),
+            },
+          })
+        } catch (inngestError) {
+          // Log sans faire échouer la requête — le post est déjà sauvé en DB.
+          // L'utilisateur pourra replanifier manuellement si nécessaire.
+          console.error('[edit-post] Inngest send échoué (non-bloquant) :', inngestError)
+        }
+      }
+    }
+
     // ── Invalidation du cache ─────────────────────────────────────────────
     revalidatePath('/compose')
     revalidatePath('/calendar')
+    revalidatePath('/kanban')
 
     return NextResponse.json({ post: updatedPost })
   } catch (error) {
-    console.error('[edit-post] Erreur :', error)
+    // Logger l'erreur réelle (visible dans les logs serveur / Vercel)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[edit-post] Erreur :', message, error)
     return NextResponse.json(
-      { error: 'Erreur lors de la modification du post. Veuillez réessayer.' },
+      { error: `Erreur lors de la modification du post : ${message}` },
       { status: 500 },
     )
   }
