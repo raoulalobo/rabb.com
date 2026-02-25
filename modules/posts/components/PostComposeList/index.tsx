@@ -42,6 +42,7 @@ import { BulkActionBar } from './BulkActionBar'
 import { PostComposeCard } from './PostComposeCard'
 import { PostDetailModal } from './PostDetailModal'
 import { WeekCoverageStrip } from './WeekCoverageStrip'
+import { WeeklyProgressBar } from './WeeklyProgressBar'
 
 import type { ExtractedFilters } from './AIFilterModal'
 import type { InfiniteData } from '@tanstack/react-query'
@@ -640,14 +641,18 @@ export function PostComposeList({
         </div>
       </div>
 
-      {/* ── Bande de couverture hebdomadaire ─────────────────────────────────── */}
+      {/* ── Progression + couverture hebdomadaires ───────────────────────────── */}
       {/*
-       * Affichée uniquement sans filtre actif : avec un filtre, allPosts ne reflète
-       * qu'un sous-ensemble, le calcul de couverture serait inexact.
+       * Les deux widgets sont masqués quand des filtres sont actifs :
+       * allPosts ne reflète qu'un sous-ensemble → les comptages seraient incorrects.
+       * WeeklyProgressBar est masquée si la liste est vide (état initial sans posts).
        * WeekCoverageStrip se masque automatiquement si les 7 jours sont couverts.
        */}
-      {!hasActiveFilter && (
-        <div className="mt-3">
+      {!hasActiveFilter && allPosts.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {/* Barre de progression : N/5 posts planifiés cette semaine */}
+          <WeeklyProgressBar posts={allPosts} />
+          {/* Trous de planning : pills des 7 prochains jours */}
           <WeekCoverageStrip
             posts={allPosts}
             onCreateForDay={() => handleOpenCreate()}
