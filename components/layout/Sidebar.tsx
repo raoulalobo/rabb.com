@@ -7,11 +7,11 @@
  *   - Sur mobile, la navigation est assurée par MobileSidebar (Sheet)
  *
  * Navigation principale (MVP) :
- *   - Dashboard (/dashboard) → vue d'ensemble rapide
- *   - Compose (/compose) → créer un post
- *   - Analytics (/analytics) → statistiques
- *   - Inbox (/inbox) → messages unifiés
- *   - Settings (/settings) → compte et réseaux
+ *   - Dashboard (/dashboard)  → vue d'ensemble rapide
+ *   - Composer (/compose)     → créer / lister / éditer des posts
+ *   - Analytics (/analytics)  → statistiques
+ *   - Inbox (/inbox)          → messages unifiés
+ *   - Settings (/settings)    → compte et réseaux
  *
  * @example
  *   // app/(dashboard)/layout.tsx
@@ -51,12 +51,12 @@ interface NavItem {
  * Ordre : du plus fréquent au moins fréquent selon les cas d'usage créateur.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Composer', href: '/compose', icon: PenSquare },
-  { label: 'Analytics', href: '/analytics', icon: BarChart2 },
-  { label: 'Inbox', href: '/inbox', icon: Inbox },
-  { label: 'Profil', href: '/profile', icon: UserCircle },
-  { label: 'Paramètres', href: '/settings', icon: Settings },
+  { label: 'Dashboard',   href: '/dashboard',  icon: LayoutDashboard },
+  { label: 'Composer',    href: '/compose',    icon: PenSquare },
+  { label: 'Analytics',   href: '/analytics',  icon: BarChart2 },
+  { label: 'Inbox',       href: '/inbox',      icon: Inbox },
+  { label: 'Profil',      href: '/profile',    icon: UserCircle },
+  { label: 'Paramètres',  href: '/settings',   icon: Settings },
 ]
 
 // ─── Composant ────────────────────────────────────────────────────────────────
