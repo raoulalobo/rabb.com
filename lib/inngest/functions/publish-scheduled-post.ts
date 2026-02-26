@@ -122,26 +122,46 @@ export const publishScheduledPost = inngest.createFunction(
     //
     // Structure de LateAccount : { _id, platform, profileId: { _id, name } | string }
     // On compare profileId._id (ou profileId si string) avec lateProfileId du ConnectedPlatform.
+    //
+    // Gestion du renommage Twitter → X :
+    // Twitter a changé son nom en X. L'API Late peut retourner "x" alors que notre DB
+    // stocke "twitter" (et inversement selon la version du SDK Late).
+    // Ce mapping garantit que les deux noms sont acceptés.
+    const PLATFORM_ALIASES: Record<string, string[]> = {
+      twitter: ['twitter', 'x'],
+      x: ['x', 'twitter'],
+    }
+
     const lateAccountId = await step.run('recuperer-account-id', async () => {
       const accounts = await late.accounts.list()
+
+      // Log de diagnostic : afficher les plateformes disponibles dans Late
+      // (utile pour détecter un mismatch de nom de plateforme)
+      console.log(
+        '[publish-scheduled-post] comptes Late disponibles :',
+        accounts.map((a) => ({ platform: a.platform, id: a._id ?? a.id })),
+      )
 
       // Extraire l'_id du profileId (qui peut être objet ou string selon l'endpoint)
       const resolveProfileId = (profileId: { _id: string; name: string } | string): string =>
         typeof profileId === 'string' ? profileId : profileId._id
 
+      // Noms de plateforme acceptés (gère le renommage Twitter → X)
+      const acceptedPlatformNames = PLATFORM_ALIASES[post.platform] ?? [post.platform]
+
       const account = accounts.find(
-        (a) => a.platform === post.platform
+        (a) => acceptedPlatformNames.includes(a.platform)
           && resolveProfileId(a.profileId) === connectedPlatform.lateProfileId,
       )
 
       if (!account) {
-        // Fallback : prendre le premier compte de cette plateforme
+        // Fallback : prendre le premier compte de cette plateforme (alias inclus)
         // (cas où le mapping workspace/account a changé côté Late)
-        const fallback = accounts.find((a) => a.platform === post.platform)
+        const fallback = accounts.find((a) => acceptedPlatformNames.includes(a.platform))
         if (fallback) {
           console.warn(
             `[publish-scheduled-post] profileId ${connectedPlatform.lateProfileId} introuvable,`
-            + ` fallback sur account ${fallback._id ?? fallback.id}`,
+            + ` fallback sur account ${fallback._id ?? fallback.id} (platform: ${fallback.platform})`,
           )
           return fallback._id ?? fallback.id ?? null
         }
@@ -153,14 +173,20 @@ export const publishScheduledPost = inngest.createFunction(
     })
 
     if (!lateAccountId) {
+      // Logguer les alias tentés pour faciliter le diagnostic
+      const tried = (PLATFORM_ALIASES[post.platform] ?? [post.platform]).join(', ')
+      console.error(
+        `[publish-scheduled-post] Aucun compte Late trouvé pour ${post.platform}`
+        + ` (aliases essayés : ${tried}). Vérifier la connexion dans Late.`,
+      )
       await prisma.post.update({
         where: { id: postId },
         data: {
           status: 'FAILED',
-          failureReason: `Aucun compte Late trouvé pour ${post.platform} — vérifier la connexion`,
+          failureReason: `Aucun compte Late trouvé pour ${post.platform} — vérifier la connexion sur /settings`,
         },
       })
-      throw new Error(`Aucun account Late trouvé pour ${post.platform}`)
+      throw new Error(`Aucun account Late trouvé pour ${post.platform} (aliases : ${tried})`)
     }
 
     // ── Étape 4 : Publier via getlate.dev avec publishNow ────────────────────
