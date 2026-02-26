@@ -323,8 +323,9 @@ export function PostDetailModal({
     setTimeout(() => { onEdit(displayPost) }, 200)
   }
 
-  // Seuls les posts DRAFT et SCHEDULED sont éditables
-  const canEdit = displayPost.status !== 'PUBLISHED' && displayPost.status !== 'FAILED'
+  // Les posts PUBLISHED sont en lecture seule.
+  // Les posts FAILED peuvent être édités/replanifiés (retry) comme les DRAFT.
+  const canEdit = displayPost.status !== 'PUBLISHED'
 
   return (
     <Dialog
@@ -690,7 +691,7 @@ export function PostDetailModal({
                 className="gap-1.5 text-xs h-8"
                 onClick={handleEdit}
                 disabled={!canEdit || isDeleting}
-                title={!canEdit ? 'Les posts publiés ou en erreur ne peuvent pas être modifiés' : undefined}
+                title={!canEdit ? 'Les posts publiés ne peuvent pas être modifiés' : undefined}
               >
                 <Pencil className="size-3" />
                 Modifier

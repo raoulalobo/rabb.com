@@ -106,7 +106,9 @@ export async function schedulePost(
       return { success: false, error: 'Post introuvable' }
     }
 
-    if (existing.status === 'PUBLISHED' || existing.status === 'FAILED') {
+    // Seul un post PUBLISHED ne peut plus être modifié.
+    // Un post FAILED peut être replanifié (retry) : l'erreur sera effacée ci-dessous.
+    if (existing.status === 'PUBLISHED') {
       return { success: false, error: 'Ce post ne peut plus être modifié' }
     }
   }
@@ -116,7 +118,15 @@ export async function schedulePost(
     const post = existingPostId
       ? await prisma.post.update({
           where: { id: existingPostId },
-          data: { text, platform, mediaUrls: mediaUrls ?? [], scheduledFor, status: 'SCHEDULED' },
+          data: {
+            text,
+            platform,
+            mediaUrls: mediaUrls ?? [],
+            scheduledFor,
+            status: 'SCHEDULED',
+            // Effacer l'erreur précédente si le post était en échec (retry propre)
+            failureReason: null,
+          },
         })
       : await prisma.post.create({
           data: {

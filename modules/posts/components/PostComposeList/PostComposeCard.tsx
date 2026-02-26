@@ -240,7 +240,7 @@ export function PostComposeCard({
           size="sm"
           className="gap-1.5 text-xs h-7 px-2"
           onClick={() => onEdit(post)}
-          disabled={isDeleting || post.status === 'PUBLISHED' || post.status === 'FAILED'}
+          disabled={isDeleting || post.status === 'PUBLISHED'}
         >
           <Pencil className="size-3" />
           Modifier

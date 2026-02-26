@@ -202,8 +202,10 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
     return { success: false, error: 'Post introuvable' }
   }
 
-  // Seuls les posts DRAFT ou SCHEDULED peuvent être modifiés
-  if (existingPost.status === 'PUBLISHED' || existingPost.status === 'FAILED') {
+  // Seuls les posts PUBLISHED ne peuvent pas être modifiés.
+  // Les posts FAILED sont traités comme des DRAFT : ils peuvent être modifiés
+  // pour permettre un retry (l'erreur précédente sera effacée).
+  if (existingPost.status === 'PUBLISHED') {
     return { success: false, error: 'Ce post ne peut plus être modifié' }
   }
 
@@ -219,6 +221,8 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
         ...(mediaUrls !== undefined && { mediaUrls }),
         ...(scheduledFor !== undefined && { scheduledFor }),
         status: finalStatus,
+        // Effacer l'erreur précédente si le post était en échec (retry propre)
+        ...(existingPost.status === 'FAILED' && { failureReason: null }),
       },
     })
 
@@ -236,8 +240,8 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
 // ─── deletePost ───────────────────────────────────────────────────────────────
 
 /**
- * Supprime un post (DRAFT ou SCHEDULED uniquement).
- * Les posts PUBLISHED ou FAILED ne peuvent pas être supprimés via cette action.
+ * Supprime un post (DRAFT, SCHEDULED ou FAILED).
+ * Seuls les posts PUBLISHED ne peuvent pas être supprimés via cette action.
  *
  * @param postId - ID du post à supprimer
  * @returns { success: true } si supprimé, { success: false, error } si KO
@@ -263,7 +267,9 @@ export async function deletePost(postId: string): Promise<{ success: boolean; er
     return { success: false, error: 'Post introuvable' }
   }
 
-  if (post.status === 'PUBLISHED' || post.status === 'FAILED') {
+  // Seuls les posts PUBLISHED ne peuvent pas être supprimés.
+  // Les posts FAILED peuvent être supprimés pour permettre à l'utilisateur de repartir proprement.
+  if (post.status === 'PUBLISHED') {
     return { success: false, error: 'Ce post ne peut pas être supprimé' }
   }
 
