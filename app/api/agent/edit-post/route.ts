@@ -168,10 +168,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Post introuvable ou non autorisé' }, { status: 404 })
   }
 
-  // Empêcher l'édition de posts déjà publiés ou en échec
-  if (post.status === 'PUBLISHED' || post.status === 'FAILED') {
+  // Seuls les posts PUBLISHED sont en lecture seule.
+  // Les posts FAILED peuvent être modifiés (retry propre).
+  if (post.status === 'PUBLISHED') {
     return NextResponse.json(
-      { error: 'Ce post ne peut plus être modifié (déjà publié ou en échec)' },
+      { error: 'Ce post ne peut plus être modifié (déjà publié)' },
       { status: 409 },
     )
   }

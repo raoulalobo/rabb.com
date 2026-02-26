@@ -4,14 +4,14 @@
  *
  *   DELETE /api/posts/[id]
  *   → Supprime le post si l'utilisateur en est le propriétaire et si le statut le permet
- *     (DRAFT ou SCHEDULED uniquement — pas PUBLISHED ni FAILED).
+ *     (DRAFT, SCHEDULED ou FAILED — pas PUBLISHED).
  *
  * @example
  *   // Suppression depuis PostComposeCard
  *   const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
  *   // 200 { success: true } si supprimé
  *   // 404 si post introuvable ou non propriétaire
- *   // 409 si déjà publié ou en échec
+ *   // 409 si déjà publié
  */
 
 import { headers } from 'next/headers'
@@ -53,10 +53,11 @@ export async function DELETE(
     return NextResponse.json({ error: 'Post introuvable' }, { status: 404 })
   }
 
-  // Seuls les posts DRAFT ou SCHEDULED peuvent être supprimés
-  if (post.status === 'PUBLISHED' || post.status === 'FAILED') {
+  // Seuls les posts PUBLISHED ne peuvent pas être supprimés.
+  // Les posts FAILED peuvent être supprimés (retry propre).
+  if (post.status === 'PUBLISHED') {
     return NextResponse.json(
-      { error: 'Ce post ne peut pas être supprimé (déjà publié ou en échec)' },
+      { error: 'Ce post ne peut pas être supprimé (déjà publié)' },
       { status: 409 },
     )
   }
