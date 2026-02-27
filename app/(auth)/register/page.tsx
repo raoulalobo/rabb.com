@@ -31,7 +31,12 @@ export default function RegisterPage(): React.JSX.Element {
 
       {/* ── Carte de formulaire ─────────────────────────────────────── */}
       <div className="rounded-xl border bg-card p-8 shadow-sm">
-        <RegisterForm />
+        {/* showGoogleOAuth lu côté serveur — évite d'exposer les clés au client */}
+        <RegisterForm
+          showGoogleOAuth={
+            !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
+          }
+        />
       </div>
 
       {/* ── Lien vers la connexion ─────────────────────────────────── */}
