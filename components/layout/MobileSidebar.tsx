@@ -57,15 +57,17 @@ export function MobileSidebar(): React.JSX.Element {
            * SheetTitle : requis par Radix pour l'accessibilité (aria-labelledby).
            * Contient le logo + nom de l'app, identique à la sidebar desktop.
            */}
-          <SheetTitle className="flex items-center gap-2 font-semibold text-sidebar-foreground">
-            {/* Logo ogolong — identique à Sidebar.tsx */}
-            <div
-              className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm"
-              aria-label="Logo ogolong"
-            >
-              o
-            </div>
-            ogolong
+          <SheetTitle asChild>
+            {/* Logo ogolong — identique à Sidebar.tsx, renvoie vers la homepage */}
+            <Link href="/" className="flex items-center gap-2 font-semibold text-sidebar-foreground">
+              <div
+                className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm"
+                aria-label="Logo ogolong"
+              >
+                o
+              </div>
+              ogolong
+            </Link>
           </SheetTitle>
         </SheetHeader>
 

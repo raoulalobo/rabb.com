@@ -83,7 +83,7 @@ export function Sidebar(): React.JSX.Element {
     <aside className="hidden md:flex h-full w-60 flex-col border-r bg-sidebar">
       {/* ── Logo ─────────────────────────────────────────────────────── */}
       <div className="flex h-16 items-center border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           {/* Placeholder logo — sera remplacé en phase 03 (branding) */}
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
             o
