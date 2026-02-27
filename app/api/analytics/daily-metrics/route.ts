@@ -41,7 +41,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const rawResults = await Promise.all(
       profileIds.map((profileId) =>
         // On passe platform à Late (filtre best-effort) même si Late peut l'ignorer
-        late.analytics.getDailyMetrics({ profileId, platform: platformFilter, from, to }) as Promise<Record<string, unknown>>
+        late.analytics.getDailyMetrics({ profileId, platform: platformFilter, from, to }) as unknown as Promise<Record<string, unknown>>
       )
     )
 

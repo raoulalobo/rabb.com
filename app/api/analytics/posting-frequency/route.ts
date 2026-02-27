@@ -37,7 +37,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const rawResults = await Promise.all(
       profileIds.map((profileId) =>
-        late.analytics.getPostingFrequency({ profileId, platform: platformFilter }) as Promise<Record<string, unknown>>
+        late.analytics.getPostingFrequency({ profileId, platform: platformFilter }) as unknown as Promise<Record<string, unknown>>
       )
     )
 

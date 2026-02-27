@@ -342,11 +342,24 @@ export interface LateFollowerDataPoint {
   growth: number
 }
 
+/**
+ * Snapshot courant d'un compte pour GET /v1/accounts/follower-stats.
+ * Présent dans le champ `accounts` de la réponse.
+ */
+export interface LateAccountSnapshot {
+  platform: string
+  currentFollowers: number
+  growth: number
+}
+
 /** Réponse de GET /v1/accounts/follower-stats */
 export interface LateFollowerStatsResponse {
+  /** Snapshot par plateforme (currentFollowers, growth) */
+  accounts: LateAccountSnapshot[]
+  /** Historique quotidien — vide si l'add-on analytics n'est pas actif */
   stats: LateFollowerDataPoint[]
-  /** Total de followers toutes plateformes confondues */
-  total: number
+  /** Total optionnel retourné par certaines versions de l'API */
+  total?: number
 }
 
 /**

@@ -23,41 +23,42 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const platformFilter = searchParams.get('platform') ?? undefined
 
   try {
+    // Le type LateFollowerStatsResponse est maintenant complet : accounts + stats + total?
     const raw = await late.accounts.followerStats({
       from: searchParams.get('from') ?? undefined,
       to: searchParams.get('to') ?? undefined,
       platform: platformFilter,
-    }) as Record<string, unknown>
+    })
 
-    // Normalisation : l'API retourne { accounts: [...], stats: [...], dateRange, granularity }
+    // Normalisation : l'API retourne { accounts: [...], stats: [...] }
     // `accounts` = snapshot courant par plateforme (currentFollowers, growth)
-    // `stats` = historique quotidien (si disponible)
-    const accounts = Array.isArray(raw?.accounts) ? raw.accounts as Record<string, unknown>[] : []
-    const rawStats = Array.isArray(raw?.stats) ? raw.stats as Record<string, unknown>[] : []
+    // `stats`    = historique quotidien (si add-on analytics actif)
+    const accounts = Array.isArray(raw?.accounts) ? raw.accounts : []
+    const rawStats = Array.isArray(raw?.stats) ? raw.stats : []
 
-    // Si l'API fournit un historique dans `stats`, on l'utilise directement
-    // Sinon on construit un point synthétique par compte à partir de `accounts`
+    // Si l'API fournit un historique dans `stats`, on l'utilise directement.
+    // Sinon on construit un point synthétique par compte à partir de `accounts`.
     let normalizedStats: { date: string; platform: string; count: number; growth: number }[]
 
     if (rawStats.length > 0) {
       normalizedStats = rawStats.map((s) => ({
-        date: String(s.date ?? ''),
-        platform: String(s.platform ?? ''),
-        count: Number(s.count ?? s.followers ?? 0),
-        growth: Number(s.growth ?? 0),
+        date: s.date,
+        platform: s.platform,
+        count: s.count,
+        growth: s.growth,
       }))
     } else {
       // Fallback : un point par compte (date = aujourd'hui)
       const today = new Date().toISOString().slice(0, 10)
       normalizedStats = accounts.map((a) => ({
         date: today,
-        platform: String(a.platform ?? ''),
-        count: Number(a.currentFollowers ?? 0),
-        growth: Number(a.growth ?? 0),
+        platform: a.platform,
+        count: a.currentFollowers,
+        growth: a.growth,
       }))
     }
 
-    // Filtrage côté proxy : exclure les stats des autres plateformes si un filtre est actif.
+    // Filtrage côté proxy : exclure les autres plateformes si un filtre est actif.
     // Garantit la cohérence même si l'API Late ignore le paramètre `platform`.
     const filteredStats = platformFilter
       ? normalizedStats.filter(
@@ -68,10 +69,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // Total = somme des followers courants des comptes filtrés
     const filteredAccounts = platformFilter
       ? accounts.filter(
-          (a) => String(a.platform ?? '').toLowerCase() === platformFilter.toLowerCase()
+          (a) => a.platform.toLowerCase() === platformFilter.toLowerCase()
         )
       : accounts
-    const total = filteredAccounts.reduce((sum, a) => sum + Number(a.currentFollowers ?? 0), 0)
+    const total = filteredAccounts.reduce((sum, a) => sum + a.currentFollowers, 0)
 
     return NextResponse.json({ stats: filteredStats, total })
   } catch (error) {

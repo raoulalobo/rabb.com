@@ -194,7 +194,8 @@ export function ImageEditorDialog({
           language="fr"
           // Tabs actifs : recadrage, filtres, ajustements, annotations, redimensionnement
           // Utilisation de `tabsIds` (prop correcte) et non `tabs`
-          tabsIds={['Adjust', 'Annotate', 'Finetune', 'Filters', 'Resize', 'Rotate']}
+          // 'Rotate' n'est pas un onglet Filerobot — c'est un outil dans 'Adjust'
+          tabsIds={['Adjust', 'Annotate', 'Finetune', 'Filters', 'Resize']}
           // Outil actif par défaut au chargement
           defaultTabId="Adjust"
           defaultToolId="Crop"
