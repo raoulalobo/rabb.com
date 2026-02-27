@@ -26,6 +26,7 @@ import { useCallback } from 'react'
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 import type { Platform } from '@/modules/platforms/types'
 import { getCharLimit } from '@/modules/posts/schemas/post.schema'
+import { SignaturePicker } from '@/modules/signatures/components/SignaturePicker'
 
 import { usePostComposerContext } from './context'
 
@@ -52,7 +53,7 @@ export function Editor({
   placeholder = 'Rédigez votre post...',
   rows = 6,
 }: EditorProps): React.JSX.Element {
-  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting } =
+  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, appendSignature } =
     usePostComposerContext()
 
   // ─── Limite de caractères selon l'onglet actif ──────────────────────────────
@@ -108,6 +109,15 @@ export function Editor({
           {platformInfo}
         </p>
       )}
+
+      {/* ── Barre d'outils sous l'éditeur ───────────────────────────────────── */}
+      {/* SignaturePicker gère lui-même la visibilité (caché si platforms vide) */}
+      <div className="mt-2 flex items-center">
+        <SignaturePicker
+          platforms={platforms}
+          onInsert={appendSignature}
+        />
+      </div>
 
       {/* Compteur de caractères */}
       <div

@@ -242,6 +242,168 @@ export interface LatePostStats {
   date: string
 }
 
+// ─── Types Analytics avancés (GET /v1/analytics/*) ───────────────────────────
+
+/**
+ * Métriques d'engagement d'un post analytics.
+ * Retournées par GET /v1/analytics (par post) et GET /v1/analytics/daily-metrics (agrégées).
+ */
+export interface LatePostMetrics {
+  likes: number
+  comments: number
+  shares: number
+  views: number
+  impressions: number
+  reach: number
+  clicks: number
+  /** Taux d'engagement en pourcentage (ex: 5.43 = 5,43%) */
+  engagementRate: number
+}
+
+/**
+ * Post avec ses analytics individuels.
+ * Retourné par GET /v1/analytics dans le tableau `posts`.
+ */
+export interface LateAnalyticsPost {
+  id: string
+  text: string
+  platform: string
+  publishedAt: string
+  /** URL de la miniature/image du post (peut être absent) */
+  mediaUrl?: string
+  metrics: LatePostMetrics
+}
+
+/**
+ * Statistiques agrégées par plateforme.
+ * Retournées dans `platforms[]` de LateAnalyticsListResponse.
+ */
+export interface LatePlatformStats {
+  platform: string
+  postCount: number
+  likes: number
+  comments: number
+  shares: number
+  views: number
+  impressions: number
+  reach: number
+  clicks: number
+  engagementRate: number
+}
+
+/**
+ * Réponse de GET /v1/analytics (liste paginée).
+ * Contient les posts, l'overview global et la répartition par plateforme.
+ */
+export interface LateAnalyticsListResponse {
+  posts: LateAnalyticsPost[]
+  /** Vue d'ensemble agrégée sur tous les posts de la période */
+  overview: LatePostMetrics
+  /** Répartition par plateforme */
+  platforms: LatePlatformStats[]
+  /** Curseur pagination (null si dernière page) */
+  nextCursor: string | null
+}
+
+/**
+ * Métriques agrégées pour un jour.
+ * Retournées par GET /v1/analytics/daily-metrics dans le tableau `days`.
+ */
+export interface LateDailyMetric {
+  date: string
+  postCount: number
+  /** Distribution des posts par plateforme ex: { tiktok: 2, instagram: 1 } */
+  platforms: Record<string, number>
+  impressions: number
+  reach: number
+  likes: number
+  comments: number
+  shares: number
+  saves: number
+  clicks: number
+  views: number
+}
+
+/** Réponse de GET /v1/analytics/daily-metrics */
+export interface LateDailyMetricsResponse {
+  days: LateDailyMetric[]
+}
+
+/**
+ * Point de données followers pour un jour et une plateforme.
+ * Retourné par GET /v1/accounts/follower-stats.
+ */
+export interface LateFollowerDataPoint {
+  date: string
+  platform: string
+  /** Nombre total de followers à cette date */
+  count: number
+  /** Variation (positif = gain, négatif = perte) */
+  growth: number
+}
+
+/** Réponse de GET /v1/accounts/follower-stats */
+export interface LateFollowerStatsResponse {
+  stats: LateFollowerDataPoint[]
+  /** Total de followers toutes plateformes confondues */
+  total: number
+}
+
+/**
+ * Créneau optimal de publication.
+ * Retourné par GET /v1/analytics/best-time dans `slots`.
+ * dayOfWeek : 0=Lundi, 6=Dimanche (UTC)
+ * hour : 0-23 UTC
+ */
+export interface LateBestTimeSlot {
+  dayOfWeek: number
+  hour: number
+  avgEngagement: number
+  postCount: number
+}
+
+/** Réponse de GET /v1/analytics/best-time */
+export interface LateBestTimeResponse {
+  slots: LateBestTimeSlot[]
+  /** Labels lisibles des meilleurs créneaux ex: ["Wed 11pm", "Sun 7pm"] */
+  bestTimes: string[]
+}
+
+/**
+ * Bucket de décroissance du contenu.
+ * Retourné par GET /v1/analytics/content-decay.
+ * Indique quel % de l'engagement total est atteint dans chaque fenêtre temporelle.
+ */
+export interface LateContentDecayBucket {
+  /** Fenêtre temporelle ex: "1-2d", "2-7d", "7-30d" */
+  bucket: string
+  /** % de l'engagement total atteint dans ce délai (0-100) */
+  percentage: number
+}
+
+/** Réponse de GET /v1/analytics/content-decay */
+export interface LateContentDecayResponse {
+  buckets: LateContentDecayBucket[]
+}
+
+/**
+ * Corrélation fréquence de publication vs taux d'engagement.
+ * Retournée par GET /v1/analytics/posting-frequency.
+ */
+export interface LatePostingFrequencyData {
+  platform: string
+  /** Fréquence hebdomadaire ex: "3-5", "1-2", "6+" */
+  postsPerWeek: string
+  avgEngagementRate: number
+}
+
+/** Réponse de GET /v1/analytics/posting-frequency */
+export interface LatePostingFrequencyResponse {
+  data: LatePostingFrequencyData[]
+  /** Fréquence optimale par plateforme */
+  optimal: LatePostingFrequencyData[]
+}
+
 /** Message de l'inbox */
 export interface LateInboxMessage {
   id: string
@@ -491,6 +653,36 @@ class LateClient {
      */
     delete: (accountId: string) =>
       this.request<void>(`/v1/accounts/${accountId}`, { method: 'DELETE' }),
+
+    /**
+     * Historique du nombre de followers et métriques de croissance.
+     * Rafraîchi une fois par jour. Nécessite l'add-on Analytics.
+     *
+     * @param params.from     - Date de début ISO 8601
+     * @param params.to       - Date de fin ISO 8601
+     * @param params.platform - Filtrer par plateforme
+     * @returns Historique followers + total toutes plateformes
+     *
+     * @example
+     *   const { stats, total } = await late.accounts.followerStats({ from: '2026-02-01' })
+     *   stats.forEach(s => console.log(s.date, s.platform, s.count))
+     */
+    followerStats: (params: {
+      from?: string
+      to?: string
+      platform?: string
+    } = {}) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<LateFollowerStatsResponse>(
+        `/v1/accounts/follower-stats${query ? `?${query}` : ''}`
+      )
+    },
   }
 
   // ─── Posts ───────────────────────────────────────────────────────────────────
@@ -553,20 +745,152 @@ class LateClient {
   // ─── Analytics ───────────────────────────────────────────────────────────────
 
   /**
-   * Ressource "analytics" : statistiques agrégées par profil.
+   * Ressource "analytics" : statistiques et insights de contenu.
+   * Tous les endpoints ci-dessous font partie de GET /v1/analytics/*.
    */
   readonly analytics = {
     /**
-     * Récupère les statistiques d'un profil sur une période.
+     * [Legacy] Récupère les statistiques d'un profil sur une période.
+     * Conservé pour compatibilité avec les fonctions Inngest existantes.
      *
      * @param profileId - ID du profil getlate.dev
      * @param params.from - Date de début (ISO 8601)
      * @param params.to - Date de fin (ISO 8601)
-     * @returns Statistiques agrégées
      */
     get: (profileId: string, params: { from: string; to: string }) => {
       const query = new URLSearchParams(params).toString()
       return this.request<LatePostStats[]>(`/v1/profiles/${profileId}/analytics?${query}`)
+    },
+
+    /**
+     * Liste paginée des posts avec leurs analytics.
+     * Accepte Late Post IDs et External Post IDs (résolution automatique).
+     * Données mises en cache et rafraîchies au maximum 1x par heure.
+     *
+     * @param params.profileId - ID du workspace Late (recommandé)
+     * @param params.platform  - Filtrer par plateforme (ex: "tiktok")
+     * @param params.from      - Date de début ISO 8601
+     * @param params.to        - Date de fin ISO 8601
+     * @param params.limit     - Nombre de posts par page (défaut: 20)
+     * @param params.cursor    - Curseur de pagination
+     *
+     * @example
+     *   const data = await late.analytics.getPosts({ profileId: 'prof_abc', from: '2026-01-01', to: '2026-02-27' })
+     *   data.posts.forEach(p => console.log(p.metrics.engagementRate))
+     */
+    getPosts: (params: {
+      profileId?: string
+      platform?: string
+      from?: string
+      to?: string
+      limit?: number
+      cursor?: string
+    }) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<LateAnalyticsListResponse>(`/v1/analytics?${query}`)
+    },
+
+    /**
+     * Métriques quotidiennes agrégées avec répartition par plateforme.
+     * Inclut : postCount, impressions, reach, likes, comments, shares, saves, clicks, views.
+     * Défaut : 180 derniers jours.
+     *
+     * @param params.profileId - ID du workspace Late
+     * @param params.platform  - Filtrer par plateforme
+     * @param params.from      - Date de début ISO 8601
+     * @param params.to        - Date de fin ISO 8601
+     *
+     * @example
+     *   const { days } = await late.analytics.getDailyMetrics({ profileId: 'prof_abc', from: '2026-01-01' })
+     */
+    getDailyMetrics: (params: {
+      profileId?: string
+      platform?: string
+      from?: string
+      to?: string
+    } = {}) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<LateDailyMetricsResponse>(`/v1/analytics/daily-metrics?${query}`)
+    },
+
+    /**
+     * Meilleurs créneaux de publication basés sur l'engagement historique.
+     * Regroupe les posts publiés par jour de semaine et heure (UTC).
+     * Nécessite l'add-on Analytics.
+     *
+     * @param params.profileId - ID du workspace Late
+     * @param params.platform  - Filtrer par plateforme
+     *
+     * @example
+     *   const { slots, bestTimes } = await late.analytics.getBestTime({ profileId: 'prof_abc' })
+     */
+    getBestTime: (params: { profileId?: string; platform?: string } = {}) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<LateBestTimeResponse>(`/v1/analytics/best-time?${query}`)
+    },
+
+    /**
+     * Décroissance de la performance du contenu dans le temps.
+     * Montre quel % de l'engagement total est atteint à chaque fenêtre temporelle.
+     * Nécessite l'add-on Analytics.
+     *
+     * @param params.profileId - ID du workspace Late
+     * @param params.platform  - Filtrer par plateforme
+     *
+     * @example
+     *   const { buckets } = await late.analytics.getContentDecay({})
+     *   // buckets: [{ bucket: "1-2d", percentage: 78 }, ...]
+     */
+    getContentDecay: (params: { profileId?: string; platform?: string } = {}) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<LateContentDecayResponse>(`/v1/analytics/content-decay?${query}`)
+    },
+
+    /**
+     * Corrélation entre fréquence de publication et taux d'engagement, par plateforme.
+     * Aide à trouver la cadence optimale.
+     * Nécessite l'add-on Analytics.
+     *
+     * @param params.profileId - ID du workspace Late
+     * @param params.platform  - Filtrer par plateforme
+     *
+     * @example
+     *   const { optimal } = await late.analytics.getPostingFrequency({})
+     *   // optimal: [{ platform: "tiktok", postsPerWeek: "3-5", avgEngagementRate: 4.9 }]
+     */
+    getPostingFrequency: (params: { profileId?: string; platform?: string } = {}) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<LatePostingFrequencyResponse>(`/v1/analytics/posting-frequency?${query}`)
     },
   }
 

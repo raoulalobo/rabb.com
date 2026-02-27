@@ -27,6 +27,13 @@ export function PostComposerCard(): React.JSX.Element {
 
       {/* Corps principal */}
       <div className="space-y-5 px-5 py-4">
+        {/* Sélection des plateformes cibles — en premier pour que les onglets et
+            le bouton Signature apparaissent immédiatement après la sélection */}
+        <PostComposer.Platforms />
+
+        {/* Séparateur */}
+        <div className="border-t border-border/60" />
+
         {/* Onglets par plateforme (visibles uniquement si au moins une plateforme est sélectionnée) */}
         <PostComposer.PlatformTabs />
 
@@ -38,9 +45,6 @@ export function PostComposerCard(): React.JSX.Element {
 
         {/* Séparateur entre l'éditeur et les options */}
         <div className="border-t border-border/60" />
-
-        {/* Sélection des plateformes cibles */}
-        <PostComposer.Platforms />
 
         {/* Upload de médias (images/vidéos) */}
         <PostComposer.MediaUpload />

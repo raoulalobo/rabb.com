@@ -173,17 +173,31 @@ export const publishScheduledPost = inngest.createFunction(
     })
 
     if (!lateAccountId) {
-      // Logguer les alias tentés pour faciliter le diagnostic
+      // Alias tentés pour le log de diagnostic
       const tried = (PLATFORM_ALIASES[post.platform] ?? [post.platform]).join(', ')
       console.error(
         `[publish-scheduled-post] Aucun compte Late trouvé pour ${post.platform}`
-        + ` (aliases essayés : ${tried}). Vérifier la connexion dans Late.`,
+        + ` (aliases essayés : ${tried}). Le token OAuth a probablement expiré — Late ne connaît plus ce compte.`,
       )
+
+      // Marquer la ConnectedPlatform comme inactive.
+      // Late ne possède plus le compte (token expiré ou révoqué) : notre DB doit
+      // refléter cet état pour que l'UI affiche la plateforme comme déconnectée
+      // et invite l'utilisateur à reconnecter son compte sur /settings.
+      await prisma.connectedPlatform.updateMany({
+        where: {
+          userId: post.userId,
+          platform: post.platform,
+          isActive: true,
+        },
+        data: { isActive: false },
+      })
+
       await prisma.post.update({
         where: { id: postId },
         data: {
           status: 'FAILED',
-          failureReason: `Aucun compte Late trouvé pour ${post.platform} — vérifier la connexion sur /settings`,
+          failureReason: `Compte ${post.platform} déconnecté de Late (token expiré ou révoqué) — reconnecte-le sur /settings`,
         },
       })
       throw new Error(`Aucun account Late trouvé pour ${post.platform} (aliases : ${tried})`)

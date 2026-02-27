@@ -22,13 +22,16 @@
 
 'use client'
 
-import { ImagePlus, Loader2, Mic, MicOff, Sparkles, X } from 'lucide-react'
+import { ImagePlus, LayoutGrid, Loader2, Mic, MicOff, Pencil, Sparkles, X } from 'lucide-react'
 import { useCallback, useId, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
+import { ImageEditorDialog } from '@/modules/media/components/ImageEditorDialog'
+import { MediaPicker } from '@/modules/media/components/MediaPicker'
 import { useSpeechRecognition } from '@/modules/posts/hooks/useSpeechRecognition'
+import { isVideoUrl } from '@/modules/posts/utils/media.utils'
 import { useAppStore } from '@/store/app.store'
 import type { Post, PoolMedia, UploadingFile } from '@/modules/posts/types'
 
@@ -59,6 +62,15 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
   const [mediaPool, setMediaPool] = useState<PoolMedia[]>([])
   /** Fichiers en cours d'upload (avec progression) */
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
+
+  // ── Galerie / éditeur ──────────────────────────────────────────────────────
+  /** Contrôle l'ouverture du MediaPicker (sélection depuis la galerie) */
+  const [pickerOpen, setPickerOpen] = useState(false)
+  /**
+   * Média en cours d'édition dans Filerobot.
+   * null = aucun éditeur ouvert.
+   */
+  const [editingMedia, setEditingMedia] = useState<PoolMedia | null>(null)
 
   // ── États de chargement / erreur ───────────────────────────────────────────
   const [isGenerating, setIsGenerating] = useState(false)
@@ -356,7 +368,7 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-foreground">Médias</span>
 
-          {/* Input file caché — déclenché par le bouton */}
+          {/* Input file caché — déclenché par le bouton "Ajouter" */}
           <input
             ref={fileInputRef}
             type="file"
@@ -365,17 +377,32 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
             className="hidden"
             onChange={(e) => void handleFileInputChange(e)}
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isDisabled}
-            onClick={() => fileInputRef.current?.click()}
-            className="gap-1.5 text-xs"
-          >
-            <ImagePlus className="size-3.5" />
-            Ajouter des médias
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {/* Bouton "Galerie" — ouvre le MediaPicker pour réutiliser des médias */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => setPickerOpen(true)}
+              className="gap-1.5 text-xs"
+            >
+              <LayoutGrid className="size-3.5" />
+              Galerie
+            </Button>
+            {/* Bouton "Ajouter" — upload direct depuis l'appareil */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => fileInputRef.current?.click()}
+              className="gap-1.5 text-xs"
+            >
+              <ImagePlus className="size-3.5" />
+              Ajouter
+            </Button>
+          </div>
         </div>
 
         {/* Zone de drop */}
@@ -435,12 +462,24 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
                       <span className="text-xs text-muted-foreground">Vidéo</span>
                     </div>
                   )}
-                  {/* Bouton de suppression */}
+                  {/* ✏️ Bouton édition — coin haut-gauche, images seulement */}
+                  {media.type === 'photo' && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingMedia(media)}
+                      disabled={isDisabled}
+                      aria-label={`Éditer ${media.filename}`}
+                      className="absolute left-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/60 text-white transition-opacity hover:bg-black/80 disabled:pointer-events-none"
+                    >
+                      <Pencil className="size-2.5" />
+                    </button>
+                  )}
+                  {/* ✗ Bouton suppression — coin haut-droit */}
                   <button
                     type="button"
                     onClick={() => setMediaPool((prev) => prev.filter((m) => m.url !== media.url))}
                     disabled={isDisabled}
-                    className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/60 text-white transition-opacity hover:bg-black/80"
+                    className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/60 text-white transition-opacity hover:bg-black/80 disabled:pointer-events-none"
                     aria-label={`Retirer ${media.filename}`}
                   >
                     <X className="size-2.5" />
@@ -506,6 +545,43 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
           )}
         </Button>
       </div>
+
+      {/* ── Dialog sélection galerie ────────────────────────────────────────── */}
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        selectedUrls={mediaPool.map((m) => m.url)}
+        onConfirm={(urls) => {
+          // Fusionner les nouvelles URLs avec le pool existant (sans doublons)
+          const newItems = urls
+            .filter((url) => !mediaPool.some((m) => m.url === url))
+            .map((url) => ({
+              url,
+              type: isVideoUrl(url) ? ('video' as const) : ('photo' as const),
+              filename: decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? 'fichier'),
+            }))
+          setMediaPool((prev) => [...prev, ...newItems])
+          setPickerOpen(false)
+        }}
+      />
+
+      {/* ── Dialog éditeur d'image Filerobot (une seule instance pour tout le pool) ── */}
+      {editingMedia && (
+        <ImageEditorDialog
+          sourceUrl={editingMedia.url}
+          open={!!editingMedia}
+          onOpenChange={(open) => { if (!open) setEditingMedia(null) }}
+          onSave={async (newUrl) => {
+            // Remplacer l'ancienne URL dans le pool par la nouvelle (image éditée)
+            setMediaPool((prev) =>
+              prev.map((m) =>
+                m.url === editingMedia.url ? { ...m, url: newUrl } : m,
+              ),
+            )
+            setEditingMedia(null)
+          }}
+        />
+      )}
     </div>
   )
 }

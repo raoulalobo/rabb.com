@@ -238,6 +238,29 @@ function PostComposerRoot({ children, className }: PostComposerProps): React.JSX
     [platformOverrides],
   )
 
+  // ─── Insertion de signature dans le texte actif ─────────────────────────────
+
+  /**
+   * Appende une signature au texte de l'onglet actif.
+   * Ajoute deux sauts de ligne devant la signature si le texte n'est pas vide.
+   * Utilise `setActiveText` pour respecter la logique base vs override.
+   *
+   * @param sigText - Texte de la signature à insérer
+   *
+   * @example
+   *   appendSignature('#photo #lifestyle')
+   *   // Si activeText = "Mon post", devient "Mon post\n\n#photo #lifestyle"
+   *   // Si activeText = "", devient "#photo #lifestyle" (pas de double saut vide)
+   */
+  const appendSignature = useCallback(
+    (sigText: string): void => {
+      // Préfixer d'un double saut de ligne uniquement si le texte n'est pas vide
+      const prefix = activeText.length > 0 ? '\n\n' : ''
+      setActiveText(activeText + prefix + sigText)
+    },
+    [activeText, setActiveText],
+  )
+
   // ─── État local : fichiers en cours d'upload ────────────────────────────────
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([])
 
@@ -523,6 +546,8 @@ function PostComposerRoot({ children, className }: PostComposerProps): React.JSX
         uploadingFiles,
         uploadFile,
         removeUploadedFile,
+        // Insertion de signature
+        appendSignature,
         // Soumission
         isSubmitting,
         saveDraft,

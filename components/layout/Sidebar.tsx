@@ -22,6 +22,8 @@
 
 import {
   BarChart2,
+  FileSignature,
+  Images,
   Inbox,
   LayoutDashboard,
   PenSquare,
@@ -51,12 +53,16 @@ interface NavItem {
  * Ordre : du plus fréquent au moins fréquent selon les cas d'usage créateur.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',   href: '/dashboard',  icon: LayoutDashboard },
-  { label: 'Composer',    href: '/compose',    icon: PenSquare },
-  { label: 'Analytics',   href: '/analytics',  icon: BarChart2 },
-  { label: 'Inbox',       href: '/inbox',      icon: Inbox },
-  { label: 'Profil',      href: '/profile',    icon: UserCircle },
-  { label: 'Paramètres',  href: '/settings',   icon: Settings },
+  { label: 'Dashboard',   href: '/dashboard',   icon: LayoutDashboard },
+  { label: 'Composer',    href: '/compose',     icon: PenSquare },
+  // Galerie : bibliothèque de médias réutilisables dans les posts
+  { label: 'Galerie',     href: '/gallery',     icon: Images },
+  // Signatures : blocs de texte réutilisables (hashtags, CTA) par plateforme
+  { label: 'Signatures',  href: '/signatures',  icon: FileSignature },
+  { label: 'Analytics',   href: '/analytics',   icon: BarChart2 },
+  { label: 'Inbox',       href: '/inbox',       icon: Inbox },
+  { label: 'Profil',      href: '/profile',     icon: UserCircle },
+  { label: 'Paramètres',  href: '/settings',    icon: Settings },
 ]
 
 // ─── Composant ────────────────────────────────────────────────────────────────
