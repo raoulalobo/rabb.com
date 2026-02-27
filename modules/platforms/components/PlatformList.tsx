@@ -24,8 +24,8 @@ import { PlatformCardSkeleton } from './PlatformCardSkeleton'
 
 /**
  * Liste complète des plateformes sociales.
- * Affiche les 6 plateformes affichées par défaut (DISPLAYED_PLATFORMS : les 4 prioritaires
- * + Twitter + Snapchat) + toutes les autres déjà connectées.
+ * Affiche les 5 plateformes prioritaires (DISPLAYED_PLATFORMS : Instagram, TikTok,
+ * YouTube, Facebook, X/Twitter) + toutes les autres déjà connectées.
  * Gère les états de chargement et les actions connect/disconnect.
  */
 export function PlatformList(): React.JSX.Element {
@@ -33,10 +33,10 @@ export function PlatformList(): React.JSX.Element {
   const { connect, connectingPlatform } = useConnectPlatform()
   const { disconnect, disconnectingId } = useDisconnectPlatform()
 
-  if (isLoading) return <PlatformCardSkeleton count={6} />
+  if (isLoading) return <PlatformCardSkeleton count={5} />
 
   // Construire la liste à afficher :
-  // 1. Toujours afficher les 6 plateformes de DISPLAYED_PLATFORMS
+  // 1. Toujours afficher les 5 plateformes de DISPLAYED_PLATFORMS
   // 2. Ajouter les plateformes restantes si elles sont déjà connectées
   const connectedOther = platforms.filter(
     (p) => !DISPLAYED_PLATFORMS.includes(p.platform as LatePlatform),

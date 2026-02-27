@@ -68,11 +68,7 @@ const PLATFORMS = [
     icon: '/icons/twitter.svg',
     color: '#000000',
   },
-  {
-    name: 'Snapchat',
-    icon: '/icons/snapchat.svg',
-    color: '#FFFC00',
-  },
+  // Snapchat retiré — plateforme non active pour ce projet
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────

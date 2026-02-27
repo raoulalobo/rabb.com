@@ -178,7 +178,7 @@ export const PLATFORM_CONFIG: Record<LatePlatform, PlatformConfig> = {
 // ─── Plateformes prioritaires ─────────────────────────────────────────────────
 
 /**
- * Liste ordonnée des 4 plateformes prioritaires du MVP.
+ * Liste ordonnée des 5 plateformes prioritaires du projet.
  * Affichées en premier et en avant dans la UI.
  */
 export const PRIORITY_PLATFORMS: LatePlatform[] = [
@@ -186,19 +186,18 @@ export const PRIORITY_PLATFORMS: LatePlatform[] = [
   'tiktok',
   'youtube',
   'facebook',
+  'twitter', // X (Twitter) — 5e plateforme prioritaire
 ]
 
 /**
  * Plateformes affichées par défaut dans la page Paramètres (Settings).
- * Inclut les 4 prioritaires + Twitter et Snapchat, qui sont mis en avant
- * sans être dans les priorités du MVP (pas de media-type restriction forte).
- * Les autres plateformes (LinkedIn, Reddit, etc.) restent masquées tant
- * qu'elles ne sont pas connectées.
+ * Correspond aux 5 plateformes actives du projet (= PRIORITY_PLATFORMS).
+ * Les autres plateformes (LinkedIn, Snapchat, Reddit, etc.) restent masquées
+ * tant qu'elles ne sont pas connectées.
  */
 export const DISPLAYED_PLATFORMS: LatePlatform[] = [
   ...PRIORITY_PLATFORMS,
-  'twitter',
-  'snapchat',
+  // Snapchat retiré — plateforme non active pour ce projet
 ]
 
 /**

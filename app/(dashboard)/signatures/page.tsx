@@ -7,11 +7,11 @@
  *
  *   Structure de la page :
  *   - En-tête : titre + description
- *   - Une `SignaturePlatformSection` par plateforme qui a au moins une signature
- *     OU pour toutes les plateformes connectées de l'utilisateur
+ *   - Une `SignaturePlatformSection` pour chacune des 5 plateformes prioritaires
+ *     (DISPLAYED_PLATFORMS) + les plateformes qui ont déjà des signatures (non régressif)
  *   - Si aucune plateforme connectée : message d'invitation à connecter un compte
  *
- *   Les sections sont triées selon PLATFORM_CONFIG (plateformes prioritaires d'abord).
+ *   Les sections sont triées selon DISPLAYED_PLATFORMS (plateformes prioritaires d'abord).
  *
  * @example
  *   // Accessible via la sidebar : /signatures
@@ -19,7 +19,8 @@
  */
 
 import { Separator } from '@/components/ui/separator'
-import { ALL_PLATFORMS } from '@/modules/platforms/constants'
+import type { LatePlatform } from '@/lib/late'
+import { DISPLAYED_PLATFORMS } from '@/modules/platforms/constants'
 import { listSignatures } from '@/modules/signatures/actions/signature.action'
 import { SignaturePlatformSection } from '@/modules/signatures/components/SignaturePlatformSection'
 import type { SignaturesByPlatform } from '@/modules/signatures/types'
@@ -29,8 +30,9 @@ import type { SignaturesByPlatform } from '@/modules/signatures/types'
 /**
  * Page /signatures — gestion des signatures textuelles par plateforme.
  * Charge toutes les signatures de l'utilisateur et les groupe par plateforme.
+ * Affiche les 5 plateformes prioritaires + celles ayant déjà des signatures.
  *
- * @returns Page avec une section par plateforme (même sans signatures)
+ * @returns Page avec une section par plateforme prioritaire (même sans signatures)
  */
 export default async function SignaturesPage(): Promise<React.JSX.Element> {
   // Chargement de toutes les signatures de l'utilisateur connecté
@@ -43,10 +45,17 @@ export default async function SignaturesPage(): Promise<React.JSX.Element> {
     return acc
   }, {})
 
-  // Plateformes à afficher : toutes les plateformes connues (ALL_PLATFORMS),
-  // triées dans l'ordre canonique. On affiche même celles sans signature
-  // pour que l'utilisateur puisse en créer facilement.
-  const platformsToShow = ALL_PLATFORMS
+  // Plateformes avec des signatures existantes non incluses dans DISPLAYED_PLATFORMS
+  // (non régressif : un utilisateur qui avait des signatures Snapchat les voit toujours)
+  const platformsWithSigs = Object.keys(byPlatform).filter(
+    (p) => !DISPLAYED_PLATFORMS.includes(p as LatePlatform),
+  )
+
+  // Afficher les 5 plateformes prioritaires + celles qui ont déjà des signatures
+  const platformsToShow: LatePlatform[] = [
+    ...DISPLAYED_PLATFORMS,
+    ...platformsWithSigs as LatePlatform[],
+  ]
 
   return (
     <div className="container max-w-3xl py-8 space-y-8">
