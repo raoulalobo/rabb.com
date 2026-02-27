@@ -19,9 +19,15 @@
  *   - Compteur `dragCounterRef` pour éviter le flickering sur les éléments enfants
  *   - Visuellement : la bordure et l'icône changent lors du survol drag
  *
+ *   Galerie :
+ *   - Bouton "Galerie" (Images) → ouvre MediaPicker (dialog plein écran)
+ *   - L'utilisateur sélectionne des médias déjà uploadés dans la galerie
+ *   - Les URLs sélectionnées sont ajoutées au brouillon via addActiveMediaUrl
+ *   - Visible uniquement hors état drag (pour ne pas gêner le feedback visuel)
+ *
  *   Interaction avec le contexte :
  *   - Lit : activeMediaUrls, activePlatformTab, platforms, uploadingFiles, isSubmitting
- *   - Écrit : uploadFile, removeUploadedFile
+ *   - Écrit : uploadFile, removeUploadedFile, addActiveMediaUrl
  *
  * @example
  *   <PostComposer>
@@ -31,8 +37,10 @@
 
 'use client'
 
-import { ImagePlus, Loader2, UploadCloud, X } from 'lucide-react'
+import { ImagePlus, Images, Loader2, UploadCloud, X } from 'lucide-react'
 import { useRef, useState } from 'react'
+
+import { MediaPicker } from '@/modules/media/components/MediaPicker'
 
 import { getMaxMediaForPlatforms, PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 import type { Platform } from '@/modules/platforms/types'
@@ -104,6 +112,7 @@ export function MediaUpload(): React.JSX.Element {
     uploadingFiles,
     uploadFile,
     removeUploadedFile,
+    addActiveMediaUrl,
     isSubmitting,
   } = usePostComposerContext()
 
@@ -111,6 +120,9 @@ export function MediaUpload(): React.JSX.Element {
 
   // État visuel de survol drag & drop
   const [isDragging, setIsDragging] = useState(false)
+
+  // Contrôle l'ouverture du MediaPicker (dialog galerie)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   // Compteur d'entrées drag pour éviter le flickering sur les éléments enfants.
   // dragenter sur un enfant → dragleave sur le parent → dragenter sur l'enfant.
@@ -255,40 +267,63 @@ export function MediaUpload(): React.JSX.Element {
           </div>
         )}
 
-        {/* Bouton d'ajout de médias */}
+        {/* Barre d'actions : bouton upload + bouton galerie */}
         {canAddMore && (
-          <button
-            type="button"
-            onClick={handleTriggerClick}
-            disabled={isSubmitting}
-            className={[
-              'flex w-full items-center gap-2 px-3 py-2.5 text-xs transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-              // Quand on drag, on centre l'icône et le texte
-              isDragging ? 'justify-center text-primary' : 'text-muted-foreground hover:text-primary',
-            ].join(' ')}
-            aria-label={`Ajouter des médias (${totalFiles}/${maxFiles})`}
-          >
-            {/* Icône change selon le contexte */}
-            {isDragging ? (
-              <UploadCloud className="size-4 animate-bounce" />
-            ) : (
-              <ImagePlus className="size-4" />
+          <div className="flex items-stretch">
+            {/* Bouton principal : upload depuis l'appareil */}
+            <button
+              type="button"
+              onClick={handleTriggerClick}
+              disabled={isSubmitting}
+              className={[
+                'flex flex-1 items-center gap-2 px-3 py-2.5 text-xs transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                // Quand on drag, on centre l'icône et le texte
+                isDragging ? 'justify-center text-primary' : 'text-muted-foreground hover:text-primary',
+              ].join(' ')}
+              aria-label={`Ajouter des médias (${totalFiles}/${maxFiles})`}
+            >
+              {/* Icône change selon le contexte */}
+              {isDragging ? (
+                <UploadCloud className="size-4 animate-bounce" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+              <span>
+                {isDragging
+                  ? 'Déposez vos fichiers ici'
+                  : (
+                    <>
+                      Ajouter des médias
+                      <span className="ml-1 opacity-60">
+                        ({totalFiles}/{maxFiles})
+                      </span>
+                    </>
+                  )}
+              </span>
+            </button>
+
+            {/* Bouton Galerie — ouvre MediaPicker pour réutiliser des médias existants.
+                Masqué pendant le drag pour ne pas gêner le feedback visuel. */}
+            {!isDragging && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                disabled={isSubmitting}
+                className={[
+                  'flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground',
+                  'border-l border-border/40 transition-colors hover:text-primary',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                ].join(' ')}
+                aria-label="Choisir depuis la galerie"
+              >
+                <Images className="size-4" />
+                <span>Galerie</span>
+              </button>
             )}
-            <span>
-              {isDragging
-                ? 'Déposez vos fichiers ici'
-                : (
-                  <>
-                    Ajouter des médias
-                    <span className="ml-1 opacity-60">
-                      ({totalFiles}/{maxFiles})
-                    </span>
-                  </>
-                )}
-            </span>
-          </button>
+          </div>
         )}
 
         {/* Zone vide sans fichiers et sans bouton (isSubmitting) */}
@@ -308,6 +343,24 @@ export function MediaUpload(): React.JSX.Element {
         className="hidden"
         onChange={handleFileChange}
         aria-hidden="true"
+      />
+
+      {/* Dialog galerie — sélection de médias déjà uploadés.
+          onConfirm reçoit toutes les URLs cochées (y compris celles déjà présentes).
+          On filtre les doublons et on respecte la limite maxFiles. */}
+      <MediaPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        selectedUrls={activeMediaUrls}
+        onConfirm={(urls) => {
+          // Conserver uniquement les URLs absentes du brouillon, dans la limite restante
+          const newUrls = urls
+            .filter((url) => !activeMediaUrls.includes(url))
+            .slice(0, maxFiles - activeMediaUrls.length)
+          for (const url of newUrls) {
+            addActiveMediaUrl(url)
+          }
+        }}
       />
     </div>
   )
