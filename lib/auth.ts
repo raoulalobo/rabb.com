@@ -94,11 +94,38 @@ export const auth = betterAuth({
 
   // ─── Session ──────────────────────────────────────────────────────────────
   session: {
-    // Durée de vie d'une session : 30 jours
-    expiresIn: 60 * 60 * 24 * 30,
-    // Renouvellement du cookie de session : 1 fois par jour
-    updateAge: 60 * 60 * 24,
-    // Cache du cookie pour réduire les lectures DB (stratégie compacte)
+    /**
+     * Durée de vie de la session : 48 heures (fenêtre glissante).
+     * Si l'utilisateur est actif, la session est automatiquement prolongée de 48h
+     * à chaque fois que le seuil `updateAge` est franchi.
+     * Si l'utilisateur est inactif pendant 48h, la session expire définitivement.
+     *
+     * Ancienne valeur : 30 jours — trop longue pour un SaaS (surface d'attaque élevée
+     * si un token de session est compromis).
+     */
+    expiresIn: 60 * 60 * 48,
+
+    /**
+     * Seuil de rotation de session : 1 heure.
+     * Lorsqu'une requête arrive et que `now - session.updatedAt > updateAge`,
+     * better-auth génère un nouveau token de session (rotation), invalide l'ancien,
+     * et reporte l'expiration de 48h à partir de maintenant.
+     *
+     * Effet glissant : tant que l'utilisateur fait au moins une requête par heure,
+     * sa session ne expire jamais. S'il disparaît > 48h, elle expire.
+     *
+     * Ancienne valeur : 24h — rotation trop rare, fenêtre d'exploitation trop large
+     * en cas de vol de cookie.
+     */
+    updateAge: 60 * 60,
+
+    /**
+     * Cache du cookie de session : 5 minutes.
+     * Better-auth signe et stocke les données de session directement dans le cookie
+     * (en plus de la DB) pour éviter une lecture Supabase/Prisma à chaque requête.
+     * Toutes les 5 minutes, le cookie cache est expiré et la session est re-validée
+     * en base → équilibre entre performance et fraîcheur des données.
+     */
     cookieCache: {
       enabled: true,
       maxAge: 60 * 5,

@@ -3,9 +3,9 @@
  * @description Layout partagé pour toutes les pages du dashboard (routes protégées).
  *   Structure : Sidebar à gauche + Header en haut + contenu à droite.
  *
- *   Ce layout sera enrichi en phase 02 avec :
- *   - AuthGuard (vérification de session better-auth côté serveur)
- *   - Redirection vers /login si non connecté
+ *   Protection côté serveur via auth.api.getSession() (better-auth) :
+ *   si aucune session valide n'est trouvée dans les headers HTTP entrants,
+ *   l'utilisateur est redirigé vers /login avant tout rendu DOM.
  *
  * Arborescence des routes protégées :
  *   /dashboard   → Vue d'ensemble (stats rapides)
@@ -16,8 +16,12 @@
  *   /settings    → Compte, réseaux connectés, facturation
  */
 
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+
 import { Header } from '@/components/layout/Header'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { auth } from '@/lib/auth'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -25,14 +29,26 @@ interface DashboardLayoutProps {
 
 /**
  * Layout du dashboard — Sidebar + Header + zone de contenu.
- * Server Component : pas de 'use client', le data fetching peut se faire ici.
+ * Server Component async : vérifie la session avant tout rendu.
+ *
+ * Flux d'authentification :
+ *   1. `headers()` récupère les headers HTTP de la requête entrante (Next.js 15 : async)
+ *   2. `auth.api.getSession()` lit le cookie `better-auth.session_token` et valide
+ *      la session en base (Prisma/Supabase) — retourne null si invalide ou absente
+ *   3. Si null → `redirect('/login')` coupe le rendu et renvoie un 307
  *
  * @param props.children - Page courante injectée par Next.js App Router
- * @returns Shell du dashboard avec navigation et header
+ * @returns Shell du dashboard avec navigation et header, ou redirection vers /login
  */
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
-}: DashboardLayoutProps): React.JSX.Element {
+}: DashboardLayoutProps): Promise<React.JSX.Element> {
+  // Vérification de session côté serveur — auth.api.getSession lit le cookie de session
+  // transmis dans les headers HTTP entrants.
+  // Si aucune session valide → redirection vers /login avant tout rendu DOM.
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+
   return (
     // Conteneur full-screen en flex row
     <div className="flex h-screen overflow-hidden">
