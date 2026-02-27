@@ -3,11 +3,11 @@
  * @description Configuration better-auth pour ogolong.com.
  *   Providers : email/password (avec vérification email) + Google OAuth.
  *   Persistance : adaptateur Prisma → Supabase PostgreSQL.
- *   Emails transactionnels : Loops (vérification email + reset mot de passe).
+ *   Emails transactionnels : Plunk + React Email (vérification email + reset mot de passe).
  *
  *   Comportements conditionnels selon l'environnement :
  *   - Google OAuth : activé uniquement si GOOGLE_CLIENT_ID/SECRET sont définis
- *   - Emails Loops : fallback console.warn si les template IDs ne sont pas configurés
+ *   - Emails Plunk : envoi via plunk.emails.send() avec HTML rendu par React Email
  *
  *   Hooks de base de données :
  *   - Après inscription → création automatique des NotificationPrefs par défaut
@@ -17,14 +17,14 @@
  *   → Évite de consommer des ressources Late pour les utilisateurs inactifs.
  *
  * @see https://better-auth.com/docs
- * @see https://loops.so/docs/sdks/javascript
+ * @see https://docs.useplunk.com/api-reference/transactional
  */
 
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 
 import { prisma } from '@/lib/prisma'
-import { sendPasswordResetEmail, sendVerificationEmail } from '@/lib/loops'
+import { sendPasswordResetEmail, sendVerificationEmail } from '@/lib/plunk'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

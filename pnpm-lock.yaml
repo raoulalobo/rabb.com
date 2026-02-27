@@ -26,6 +26,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
+      '@plunk/node':
+        specifier: ^3.0.3
+        version: 3.0.3
       '@prisma/adapter-pg':
         specifier: ^7.4.1
         version: 7.4.1
@@ -38,6 +41,9 @@ importers:
       '@react-email/components':
         specifier: ^1.0.8
         version: 1.0.8(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@react-email/render':
+        specifier: ^2.0.4
+        version: 2.0.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@supabase/ssr':
         specifier: ^0.8.0
         version: 0.8.0(@supabase/supabase-js@2.97.0)
@@ -74,9 +80,6 @@ importers:
       inngest:
         specifier: ^3.52.2
         version: 3.52.2(@opentelemetry/core@2.5.1(@opentelemetry/api@1.9.0))(express@5.2.1)(hono@4.11.4)(next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(typescript@5.9.3)(zod@4.3.6)
-      loops:
-        specifier: ^6.2.1
-        version: 6.2.1
       lucide-react:
         specifier: ^0.575.0
         version: 0.575.0(react@19.2.3)
@@ -1775,6 +1778,9 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@plunk/node@3.0.3':
+    resolution: {integrity: sha512-f3NT418/EdLjebQ4arAwR64cnz7d5H7i1CeKh8+B0cVBrwzHvF+Q+QkhutF+FAp49yuI/BYc71qQH+RFc2fxxQ==}
 
   '@popperjs/core@2.11.8':
     resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
@@ -5460,10 +5466,6 @@ packages:
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
-  loops@6.2.1:
-    resolution: {integrity: sha512-UF321fEmlX7KeGlbjxXnL49hk8gVyMqHB2sbeEiEbHyacHYJN20NRh0f2FQSvW2r9X9/xpKBwO5gFYqy5ztauQ==}
-    engines: {node: '>=18'}
-
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
@@ -8867,6 +8869,10 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@plunk/node@3.0.3':
+    dependencies:
+      tslib: 2.8.1
 
   '@popperjs/core@2.11.8': {}
 
@@ -12737,8 +12743,6 @@ snapshots:
       underscore: 1.13.8
 
   long@5.3.2: {}
-
-  loops@6.2.1: {}
 
   loose-envify@1.4.0:
     dependencies:
