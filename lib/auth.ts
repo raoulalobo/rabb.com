@@ -3,10 +3,11 @@
  * @description Configuration better-auth pour ogolong.com.
  *   Providers : email/password (avec vérification email) + Google OAuth.
  *   Persistance : adaptateur Prisma → Supabase PostgreSQL.
+ *   Emails transactionnels : Loops (vérification email + reset mot de passe).
  *
  *   Comportements conditionnels selon l'environnement :
  *   - Google OAuth : activé uniquement si GOOGLE_CLIENT_ID/SECRET sont définis
- *   - Vérification email : désactivée (requireEmailVerification: false)
+ *   - Emails Loops : fallback console.warn si les template IDs ne sont pas configurés
  *
  *   Hooks de base de données :
  *   - Après inscription → création automatique des NotificationPrefs par défaut
@@ -16,12 +17,14 @@
  *   → Évite de consommer des ressources Late pour les utilisateurs inactifs.
  *
  * @see https://better-auth.com/docs
+ * @see https://loops.so/docs/sdks/javascript
  */
 
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 
 import { prisma } from '@/lib/prisma'
+import { sendPasswordResetEmail, sendVerificationEmail } from '@/lib/loops'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,9 +43,41 @@ export const auth = betterAuth({
   // ─── Email & Mot de passe ─────────────────────────────────────────────────
   emailAndPassword: {
     enabled: true,
-    // Vérification email désactivée — l'inscription est directement effective.
-    // À activer en production avec sendVerificationEmail + Resend.
-    requireEmailVerification: false,
+    /**
+     * sendResetPassword : appelé par better-auth quand l'utilisateur soumet
+     * "Mot de passe oublié" (POST /api/auth/request-password-reset).
+     * Le paramètre `url` contient le lien complet avec token, valide 1h.
+     *
+     * @param user - Objet utilisateur better-auth
+     * @param url  - Lien de reset complet (ex: http://localhost:3000/reset-password?token=...)
+     */
+    sendResetPassword: async ({ user, url }: { user: { email: string; name: string }; url: string }) => {
+      await sendPasswordResetEmail({ email: user.email, url, name: user.name })
+    },
+  },
+
+  // ─── Vérification email ───────────────────────────────────────────────────
+  emailVerification: {
+    /**
+     * sendOnSignUp : déclenche l'envoi de l'email de vérification automatiquement
+     * après chaque inscription email/password.
+     */
+    sendOnSignUp: true,
+    /**
+     * autoSignInAfterVerification : connecte automatiquement l'utilisateur après
+     * qu'il ait cliqué sur le lien de vérification, sans repasser par le login.
+     */
+    autoSignInAfterVerification: true,
+    /**
+     * sendVerificationEmail : appelé par better-auth pour envoyer le lien de
+     * confirmation d'email. Le paramètre `url` contient le lien complet avec token.
+     *
+     * @param user - Objet utilisateur better-auth
+     * @param url  - Lien de vérification (ex: http://localhost:3000/api/auth/verify-email?token=...)
+     */
+    sendVerificationEmail: async ({ user, url }: { user: { email: string; name: string }; url: string }) => {
+      await sendVerificationEmail({ email: user.email, url, name: user.name })
+    },
   },
 
   // ─── OAuth Google (conditionnel) ──────────────────────────────────────────
