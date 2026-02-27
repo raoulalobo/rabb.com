@@ -9,7 +9,7 @@
 
 Permettre à l'utilisateur de connecter ses comptes sociaux (Instagram, TikTok,
 YouTube, Facebook) via getlate.dev. L'OAuth est délégué entièrement à getlate.dev —
-rabb ne gère pas les tokens OAuth directement.
+ogolong ne gère pas les tokens OAuth directement.
 
 ---
 
@@ -17,12 +17,12 @@ rabb ne gère pas les tokens OAuth directement.
 
 ```
 User clique "Connecter Instagram"
-  → API rabb : GET /api/platforms/connect?platform=instagram
+  → API ogolong : GET /api/platforms/connect?platform=instagram
     → getlate.dev : POST /api/v1/profiles (crée un profil)
       → getlate.dev retourne une URL OAuth
         → Redirect vers l'URL OAuth getlate.dev
           → User autorise sur Instagram
-            → Callback getlate.dev → rabb /api/platforms/callback
+            → Callback getlate.dev → ogolong /api/platforms/callback
               → Sauvegarde ConnectedPlatform en DB
                 → Redirect vers /settings/platforms
 ```
@@ -72,7 +72,7 @@ export const PlatformEnum = z.enum([
 ])
 export type Platform = z.infer<typeof PlatformEnum>
 
-// Plateformes prioritaires dans l'UI rabb
+// Plateformes prioritaires dans l'UI ogolong
 export const PRIORITY_PLATFORMS: Platform[] = ['instagram', 'tiktok', 'youtube', 'facebook']
 
 export const ConnectPlatformSchema = z.object({

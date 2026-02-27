@@ -40,13 +40,13 @@ export const resend = new Resend(process.env.RESEND_API_KEY!)
 /**
  * @file PublicationFailed.tsx
  * @description Template React Email envoyé quand un post planifié échoue.
- *   Design sobre avec les couleurs de rabb, informations claires sur l'échec.
+ *   Design sobre avec les couleurs de ogolong, informations claires sur l'échec.
  *
  * @param userName     - Prénom de l'utilisateur
  * @param postText     - Début du texte du post (max 100 chars)
  * @param platforms    - Plateformes ciblées par le post
  * @param failureReason - Raison de l'échec
- * @param postUrl      - Lien pour rouvrir le post dans rabb
+ * @param postUrl      - Lien pour rouvrir le post dans ogolong
  */
 import {
   Body, Button, Container, Head, Heading, Html,
@@ -104,14 +104,14 @@ export function PublicationFailedEmail({
 
           {/* CTA */}
           <Text style={textStyle}>
-            Tu peux réessayer en ouvrant ton post dans rabb :
+            Tu peux réessayer en ouvrant ton post dans ogolong :
           </Text>
           <Button style={buttonStyle} href={postUrl}>
             Rouvrir le post →
           </Button>
 
           <Text style={footerStyle}>
-            rabb · Planification de contenu multiplateforme
+            ogolong · Planification de contenu multiplateforme
           </Text>
 
         </Container>
@@ -151,7 +151,7 @@ const footerStyle    = { fontSize: '12px', color: '#9ca3af', marginTop: '32px' }
  * @param totalImpressions  - Total des impressions
  * @param avgEngagement     - Taux d'engagement moyen (%)
  * @param topPost           - Post avec le plus d'impressions
- * @param dashboardUrl      - Lien vers le dashboard analytics rabb
+ * @param dashboardUrl      - Lien vers le dashboard analytics ogolong
  */
 import {
   Body, Button, Container, Head, Heading, Html,
@@ -186,7 +186,7 @@ export function WeeklyRecapEmail({
   return (
     <Html lang="fr">
       <Head />
-      <Preview>📊 Ta semaine sur rabb — {totalPublished} posts publiés</Preview>
+      <Preview>📊 Ta semaine sur ogolong — {totalPublished} posts publiés</Preview>
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
 
@@ -236,7 +236,7 @@ export function WeeklyRecapEmail({
           </Button>
 
           <Text style={footerStyle}>
-            rabb · Tu reçois cet email car tu as activé le récap hebdo.{' '}
+            ogolong · Tu reçois cet email car tu as activé le récap hebdo.{' '}
             <a href={`${dashboardUrl}/settings`} style={{ color: '#6b7280' }}>
               Gérer mes notifications
             </a>
@@ -317,7 +317,7 @@ export const weeklyRecap = inngest.createFunction(
           await resend.emails.send({
             from: process.env.RESEND_FROM_EMAIL!,
             to:   pref.user.email,
-            subject: `📊 Ton récap rabb — ${weekLabel}`,
+            subject: `📊 Ton récap ogolong — ${weekLabel}`,
             react: WeeklyRecapEmail({
               userName:         pref.user.name ?? 'Créateur',
               weekLabel,

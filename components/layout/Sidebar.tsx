@@ -2,7 +2,7 @@
  * @file Sidebar.tsx
  * @module layout
  * @description Barre de navigation latérale du dashboard.
- *   - Affiche le logo rabb et les liens de navigation principaux
+ *   - Affiche le logo ogolong et les liens de navigation principaux
  *   - Responsive : visible en desktop (md+), cachée sur mobile
  *   - Sur mobile, la navigation est assurée par MobileSidebar (Sheet)
  *
@@ -86,9 +86,9 @@ export function Sidebar(): React.JSX.Element {
         <Link href="/dashboard" className="flex items-center gap-2">
           {/* Placeholder logo — sera remplacé en phase 03 (branding) */}
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-            r
+            o
           </div>
-          <span className="font-semibold text-sidebar-foreground">rabb</span>
+          <span className="font-semibold text-sidebar-foreground">ogolong</span>
         </Link>
       </div>
 

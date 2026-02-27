@@ -27,11 +27,18 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 
 // Chargement dynamique SANS SSR — Filerobot utilise Canvas API (non disponible côté serveur)
 const FilerobotImageEditor = dynamic(
-  () => import('react-filerobot-image-editor'),
+  async () => {
+    // react-filerobot-image-editor beta.153 est compilé avec l'ancien JSX transform
+    // et attend React comme variable globale (window.React / globalThis.React).
+    // Dans un contexte modulaire moderne, React n'est pas global par défaut.
+    // On l'expose avant d'importer Filerobot pour qu'il trouve bien React au chargement.
+    ;(globalThis as Record<string, unknown>).React = React
+    return import('react-filerobot-image-editor')
+  },
   {
     ssr: false,
     // Skeleton pendant le chargement du bundle Filerobot
@@ -73,6 +80,37 @@ export function ImageEditorDialog({
 }: ImageEditorDialogProps): React.JSX.Element | null {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Supprime l'avertissement React "non-boolean attribute `active`" généré par
+  // @scaleflex/ui (dépendance interne de Filerobot). Ce composant utilise
+  // styled-components v5 qui passait `active={boolean}` à des éléments DOM button.
+  // En styled-components v6 (installé dans ce projet), ces props custom ne sont
+  // plus filtrées automatiquement. Le filtre est actif uniquement lorsque le
+  // dialog est ouvert et est nettoyé à la fermeture.
+  // FilerobotImageEditor est chargé dynamiquement (ssr: false) → il rend toujours
+  // après ce useEffect, donc le patch est déjà en place lors de son premier rendu.
+  useEffect(() => {
+    if (!open) return
+
+    const original = console.error.bind(console)
+    console.error = (...args: unknown[]) => {
+      // @scaleflex/ui (dépendance de Filerobot) passe de nombreuses props custom
+      // (active, buttonType, …) à des éléments DOM natifs — incompatibilité
+      // styled-components v5 (attendu) vs v6 (installé dans ce projet).
+      // React 19 split le message en args : args[0] = format string, args[1..n] = valeurs.
+      // On joint tout pour matcher quelle que soit la forme du message.
+      const fullMsg = args.map(String).join(' ')
+      if (
+        fullMsg.includes('non-boolean attribute') ||
+        fullMsg.includes('prop on a DOM element')
+      ) return
+      original(...args)
+    }
+
+    return () => {
+      console.error = original
+    }
+  }, [open])
 
   /**
    * Callback déclenché par Filerobot lorsque l'utilisateur clique "Sauvegarder".

@@ -24,7 +24,7 @@ import type { ForgotPasswordFormData } from '@/modules/auth/schemas/auth.schema'
 
 // Note : metadata ne peut pas être exporté depuis un Client Component en Next.js.
 // La metadata de cette page est définie via generateMetadata ou dans un Server Component parent.
-// Pour le MVP, le titre est géré par le layout racine (template '%s · rabb').
+// Pour le MVP, le titre est géré par le layout racine (template '%s · ogolong').
 
 /**
  * Page de demande de réinitialisation de mot de passe.

@@ -23,7 +23,7 @@ export default function RegisterPage(): React.JSX.Element {
     <div className="w-full max-w-md">
       {/* ── En-tête ─────────────────────────────────────────────────── */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Créer ton compte rabb</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Créer ton compte ogolong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Commence à planifier ton contenu gratuitement
         </p>

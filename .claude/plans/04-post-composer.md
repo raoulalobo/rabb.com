@@ -7,7 +7,7 @@
 
 ## Objectif
 
-Construire l'éditeur de post central de rabb :
+Construire l'éditeur de post central de ogolong :
 - Rédaction de texte multi-plateformes (avec compteur de caractères par réseau)
 - Upload de médias (images/vidéos) vers Supabase Storage
 - Sélection des plateformes de publication
@@ -151,7 +151,7 @@ export const useDraftStore = create<DraftStore>()(
       reset: () => set(() => initialState),
     })),
     {
-      name: 'rabb-draft',
+      name: 'ogolong-draft',
       storage: createJSONStorage(() => sessionStorage),
     }
   )

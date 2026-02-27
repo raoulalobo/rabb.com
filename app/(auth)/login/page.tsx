@@ -23,7 +23,7 @@ export default function LoginPage(): React.JSX.Element {
     <div className="w-full max-w-md">
       {/* ── En-tête ─────────────────────────────────────────────────── */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Connexion à rabb</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Connexion à ogolong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Planifie et publie ton contenu sur tous tes réseaux
         </p>

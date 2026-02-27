@@ -1,6 +1,6 @@
 /**
  * @file lib/auth.ts
- * @description Configuration better-auth pour rabb.com.
+ * @description Configuration better-auth pour ogolong.com.
  *   Providers : email/password (avec vérification email) + Google OAuth.
  *   Persistance : adaptateur Prisma → Supabase PostgreSQL.
  *

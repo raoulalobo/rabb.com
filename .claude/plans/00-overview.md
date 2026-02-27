@@ -1,4 +1,4 @@
-# Plan général — rabb.com
+# Plan général — ogolong.com
 
 > Plan maître incrémental et itératif.
 > Chaque phase est autonome, testable, et déployable indépendamment.
@@ -7,7 +7,7 @@
 
 ## Vision
 
-rabb.com est un SaaS de planification de contenu multiplateforme pour créateurs
+ogolong.com est un SaaS de planification de contenu multiplateforme pour créateurs
 francophones solo. Il s'appuie sur l'API getlate.dev pour la publication réelle
 sur Instagram, TikTok, YouTube et Facebook (+ 9 autres).
 
@@ -72,7 +72,7 @@ sur Instagram, TikTok, YouTube et Facebook (+ 9 autres).
 ## Arborescence cible finale
 
 ```
-rabb/
+ogolong/
 ├── .claude/plans/          ← ce dossier
 ├── app/
 │   ├── (auth)/

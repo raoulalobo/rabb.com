@@ -75,12 +75,12 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
       // → Créer un nouveau workspace Late DÉDIÉ à cet utilisateur.
       //
       // ⚠️ Ne pas utiliser late.profiles.list() : il retourne TOUS les workspaces du compte
-      //    Late de rabb.com (tous utilisateurs confondus). Réutiliser le premier / le défaut
+      //    Late de ogolong.com (tous utilisateurs confondus). Réutiliser le premier / le défaut
       //    reviendrait à assigner le workspace d'un autre utilisateur → violation d'isolation.
       console.log('[connectPlatform] lateWorkspaceId absent → création workspace Late pour:', session.user.id)
 
       const workspace = await late.profiles.create({
-        name: user?.name ?? session.user.email ?? 'rabb user',
+        name: user?.name ?? session.user.email ?? 'ogolong user',
       })
       // Late utilise _id (ObjectId MongoDB) et non id
       lateWorkspaceId = workspace._id

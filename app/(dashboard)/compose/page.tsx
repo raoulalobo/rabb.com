@@ -33,7 +33,7 @@ import type { Metadata } from 'next'
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'Brouillons — rabb',
+  title: 'Brouillons — ogolong',
   description: 'Gérez vos brouillons et créez de nouveaux posts avec l\'agent IA.',
 }
 

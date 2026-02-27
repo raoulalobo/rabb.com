@@ -81,7 +81,10 @@ export async function fetchAnalyticsPosts(params: {
   platform?: string
 }): Promise<AnalyticsListResponse> {
   const query = buildQuery(params)
-  const res = await fetch(`/api/analytics${query ? `?${query}` : ''}`)
+  const res = await fetch(`/api/analytics${query ? `?${query}` : ''}`, {
+    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!res.ok) throw new Error('Impossible de charger les analytics posts')
   return res.json() as Promise<AnalyticsListResponse>
 }
@@ -96,7 +99,10 @@ export async function fetchDailyMetrics(params: {
   platform?: string
 } = {}): Promise<DailyMetricsResponse> {
   const query = buildQuery(params)
-  const res = await fetch(`/api/analytics/daily-metrics${query ? `?${query}` : ''}`)
+  const res = await fetch(`/api/analytics/daily-metrics${query ? `?${query}` : ''}`, {
+    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!res.ok) throw new Error('Impossible de charger les métriques quotidiennes')
   return res.json() as Promise<DailyMetricsResponse>
 }
@@ -111,7 +117,10 @@ export async function fetchFollowerStats(params: {
   platform?: string
 } = {}): Promise<FollowerStatsResponse> {
   const query = buildQuery(params)
-  const res = await fetch(`/api/accounts/follower-stats${query ? `?${query}` : ''}`)
+  const res = await fetch(`/api/accounts/follower-stats${query ? `?${query}` : ''}`, {
+    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!res.ok) throw new Error('Impossible de charger les stats followers')
   return res.json() as Promise<FollowerStatsResponse>
 }
@@ -124,7 +133,10 @@ export async function fetchBestTime(params: {
   platform?: string
 } = {}): Promise<BestTimeResponse> {
   const query = buildQuery(params)
-  const res = await fetch(`/api/analytics/best-time${query ? `?${query}` : ''}`)
+  const res = await fetch(`/api/analytics/best-time${query ? `?${query}` : ''}`, {
+    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!res.ok) throw new Error('Impossible de charger les meilleurs créneaux')
   return res.json() as Promise<BestTimeResponse>
 }
@@ -137,7 +149,10 @@ export async function fetchContentDecay(params: {
   platform?: string
 } = {}): Promise<ContentDecayResponse> {
   const query = buildQuery(params)
-  const res = await fetch(`/api/analytics/content-decay${query ? `?${query}` : ''}`)
+  const res = await fetch(`/api/analytics/content-decay${query ? `?${query}` : ''}`, {
+    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!res.ok) throw new Error('Impossible de charger le content decay')
   return res.json() as Promise<ContentDecayResponse>
 }
@@ -150,7 +165,10 @@ export async function fetchPostingFrequency(params: {
   platform?: string
 } = {}): Promise<PostingFrequencyResponse> {
   const query = buildQuery(params)
-  const res = await fetch(`/api/analytics/posting-frequency${query ? `?${query}` : ''}`)
+  const res = await fetch(`/api/analytics/posting-frequency${query ? `?${query}` : ''}`, {
+    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    signal: AbortSignal.timeout(10_000),
+  })
   if (!res.ok) throw new Error('Impossible de charger la fréquence de publication')
   return res.json() as Promise<PostingFrequencyResponse>
 }

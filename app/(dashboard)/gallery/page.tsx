@@ -19,7 +19,7 @@ import { MediaGrid } from '@/modules/media/components/MediaGrid'
 // ─── Métadonnées ───────────────────────────────────────────────────────────────
 
 export const metadata = {
-  title: 'Galerie — rabb',
+  title: 'Galerie — ogolong',
   description: 'Gérez vos images et vidéos réutilisables dans vos posts.',
 }
 

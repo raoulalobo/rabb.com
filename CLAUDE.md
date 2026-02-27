@@ -1,4 +1,4 @@
-# CLAUDE.md — rabb.com
+# CLAUDE.md — ogolong.com
 
 > Guide de référence pour l'IA et les développeurs.
 > Toujours lire ce fichier avant de modifier du code.
@@ -7,7 +7,7 @@
 
 ## 1. Présentation du projet
 
-**rabb.com** est un SaaS de planification de contenu sur les réseaux sociaux,
+**ogolong.com** est un SaaS de planification de contenu sur les réseaux sociaux,
 ciblant les créateurs de contenu francophones solo.
 Il s'appuie sur l'API **getlate.dev** pour la publication multi-plateformes.
 
@@ -43,7 +43,7 @@ Français uniquement (MVP). i18n (next-intl) ajouté ultérieurement.
 ## 3. Architecture modulaire
 
 ```
-rabb/
+ogolong/
 ├── app/                        # Next.js App Router
 │   ├── (auth)/                 # Routes publiques (login, register, reset)
 │   ├── (dashboard)/            # Routes protégées (layout avec sidebar)
@@ -331,7 +331,7 @@ INNGEST_SIGNING_KEY=
 
 # Resend
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@rabb.com
+RESEND_FROM_EMAIL=noreply@ogolong.com
 ```
 
 ---

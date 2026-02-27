@@ -34,7 +34,7 @@ import type { Metadata } from 'next'
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'Analytics — rabb',
+  title: 'Analytics — ogolong',
   description: 'Analysez les performances de vos publications sur tous vos réseaux sociaux.',
 }
 

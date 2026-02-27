@@ -1,6 +1,6 @@
 /**
  * @file next.config.ts
- * @description Configuration Next.js pour rabb.com.
+ * @description Configuration Next.js pour ogolong.com.
  *   - Turbopack : définit la racine du workspace pour éviter le warning de détection
  *   - Peut être enrichi au fil des phases (images, headers, redirections, etc.)
  */

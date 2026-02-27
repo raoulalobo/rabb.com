@@ -87,7 +87,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // ── Récupération du workspace Late de l'utilisateur ────────────────────────
   // Source de vérité : User.lateWorkspaceId (Prisma).
   // IMPORTANT : late.profiles.list() retourne TOUS les workspaces liés à LATE_API_KEY,
-  // y compris ceux d'autres utilisateurs rabb → exposition inter-utilisateurs interdite.
+  // y compris ceux d'autres utilisateurs ogolong → exposition inter-utilisateurs interdite.
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { lateWorkspaceId: true },

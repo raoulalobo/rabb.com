@@ -48,8 +48,8 @@ User clique "Planifier"
 import { Inngest } from 'inngest'
 
 export const inngest = new Inngest({
-  id: 'rabb',
-  name: 'rabb.com',
+  id: 'ogolong',
+  name: 'ogolong.com',
 })
 ```
 
@@ -177,7 +177,7 @@ export const handlePostFailure = inngest.createFunction(
       return resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL!,
         to: post.user.email,
-        subject: '⚠️ Échec de publication — rabb',
+        subject: '⚠️ Échec de publication — ogolong',
         react: PublicationFailedEmail({
           userName:     post.user.name ?? 'Utilisateur',
           postText:     post.text.substring(0, 100),

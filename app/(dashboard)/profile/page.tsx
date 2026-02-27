@@ -23,7 +23,7 @@ import { ProfileForm } from '@/modules/auth/components/ProfileForm'
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'Mon profil — rabb',
+  title: 'Mon profil — ogolong',
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

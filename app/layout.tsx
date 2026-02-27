@@ -1,6 +1,6 @@
 /**
  * @file app/layout.tsx
- * @description Layout racine de l'application rabb.com.
+ * @description Layout racine de l'application ogolong.com.
  *   - Fournit les fonts Geist (sans + mono) via le package npm 'geist' (local, sans réseau)
  *   - Configure les métadonnées globales (SEO)
  *   - Monte les providers globaux : TanStack Query + Sonner (notifications toast)
@@ -28,9 +28,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: {
     // Titre par défaut (pages sans titre propre)
-    default: 'rabb — Planification de contenu',
-    // Modèle pour les pages internes : "Compose · rabb"
-    template: '%s · rabb',
+    default: 'ogolong — Planification de contenu',
+    // Modèle pour les pages internes : "Compose · ogolong"
+    template: '%s · ogolong',
   },
   description:
     'Planifiez et publiez votre contenu sur Instagram, TikTok, YouTube et Facebook depuis un seul outil.',

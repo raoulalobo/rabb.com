@@ -113,6 +113,8 @@ export function useAnalytics(): UseAnalyticsReturn {
         queryFn: () => fetchFollowerStats({ from, platform: platformParam }),
         staleTime: 60 * 60 * 1000,
         placeholderData: keepPreviousData,
+        // retry: 0 — pas de relance si Late API ne répond pas (timeout 10s côté fetcher)
+        retry: 0,
       },
       // 3 — Best time (pas de filtre date — basé sur tout l'historique)
       {
@@ -120,6 +122,8 @@ export function useAnalytics(): UseAnalyticsReturn {
         queryFn: () => fetchBestTime({ platform: platformParam }),
         staleTime: 24 * 60 * 60 * 1000,
         placeholderData: keepPreviousData,
+        // retry: 0 — échec immédiat si Late API ne répond pas → BestTimeHeatmap affiche état vide
+        retry: 0,
       },
       // 4 — Content decay
       {
@@ -127,6 +131,8 @@ export function useAnalytics(): UseAnalyticsReturn {
         queryFn: () => fetchContentDecay({ platform: platformParam }),
         staleTime: 24 * 60 * 60 * 1000,
         placeholderData: keepPreviousData,
+        // retry: 0 — idem, ContentDecay gère `data: undefined` nativement
+        retry: 0,
       },
       // 5 — Posting frequency
       {
@@ -134,6 +140,8 @@ export function useAnalytics(): UseAnalyticsReturn {
         queryFn: () => fetchPostingFrequency({ platform: platformParam }),
         staleTime: 24 * 60 * 60 * 1000,
         placeholderData: keepPreviousData,
+        // retry: 0 — PostingFrequency gère `data: undefined` nativement
+        retry: 0,
       },
     ],
   })
@@ -147,8 +155,10 @@ export function useAnalytics(): UseAnalyticsReturn {
     bestTime: bestTimeQ.data,
     contentDecay: decayQ.data,
     postingFrequency: freqQ.data,
-    // isPending = true uniquement au premier chargement (aucune donnée en cache ni placeholder)
-    isLoading: results.some((r) => r.isPending),
+    // Bloque le rendu uniquement sur les 2 queries primaires (posts + daily metrics).
+    // Les sections secondaires (FollowersChart, BestTimeHeatmap, etc.) gèrent `undefined` nativement.
+    // Cela évite que le skeleton reste bloqué si best-time ou follower-stats ne répondent jamais.
+    isLoading: postsQ.isPending || dailyQ.isPending,
     // isFetching = true dès qu'une query est en vol (initial ET re-fetch après changement de filtre)
     isFetching: results.some((r) => r.isFetching),
     isSuccess: results.every((r) => r.isSuccess),

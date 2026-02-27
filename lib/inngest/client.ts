@@ -1,6 +1,6 @@
 /**
  * @file lib/inngest/client.ts
- * @description Client Inngest singleton pour rabb.com.
+ * @description Client Inngest singleton pour ogolong.com.
  *   Toutes les fonctions Inngest et les appels inngest.send() passent par ce fichier.
  *
  *   Configurer les variables d'environnement :
@@ -21,11 +21,11 @@ import { Inngest } from 'inngest'
 
 /**
  * Instance singleton du client Inngest.
- * L'identifiant 'rabb' est utilisé dans le dashboard Inngest pour identifier l'application.
+ * L'identifiant 'ogolong' est utilisé dans le dashboard Inngest pour identifier l'application.
  */
 export const inngest = new Inngest({
-  id: 'rabb',
-  name: 'rabb.com',
+  id: 'ogolong',
+  name: 'ogolong.com',
 })
 
 // ─── Types des événements Inngest ─────────────────────────────────────────────

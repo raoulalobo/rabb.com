@@ -1,17 +1,17 @@
 /**
  * @file app/not-found.tsx
  * @module app
- * @description Page 404 de rabb.com.
+ * @description Page 404 de ogolong.com.
  *
  *   Concept : "publication échouée" — la page simule visuellement une PostCard
- *   avec le statut FAILED, exactement comme dans l'UI réelle de rabb.
+ *   avec le statut FAILED, exactement comme dans l'UI réelle de ogolong.
  *   C'est fun, cohérent avec le domaine, et immédiatement compréhensible
  *   pour un utilisateur qui connaît l'outil.
  *
  *   Structure :
  *   1. Grand "404" typographique en font-mono
  *   2. Fausse PostCard avec statut FAILED (badge destructive)
- *      - En-tête : logo rabb + nom + badge "ÉCHOUÉ"
+ *      - En-tête : logo ogolong + nom + badge "ÉCHOUÉ"
  *      - Corps : texte barré simulant un post social qui n'a pas pu être publié
  *      - Footer : métriques à zéro + message "Publication échouée"
  *   3. Bouton de retour au dashboard
@@ -23,7 +23,7 @@
  * @example
  *   // Next.js App Router détecte automatiquement ce fichier
  *   // et l'affiche pour toute route inexistante (404)
- *   // → https://rabb.com/une-page-qui-nexiste-pas  →  not-found.tsx
+ *   // → https://ogolong.com/une-page-qui-nexiste-pas  →  not-found.tsx
  */
 
 import Link from 'next/link'
@@ -41,7 +41,7 @@ import type { Metadata } from 'next'
  * noindex implicite via le statut HTTP 404 que Next.js envoie automatiquement.
  */
 export const metadata: Metadata = {
-  title: 'Page introuvable — rabb',
+  title: 'Page introuvable — ogolong',
   description: 'Cette page n\'existe pas. Retournez au dashboard pour gérer vos posts.',
 }
 
@@ -53,12 +53,12 @@ export const metadata: Metadata = {
  * Chaque ligne est un paragraphe distinct pour le rendu.
  */
 const FAKE_POST_LINES = [
-  '✨ Nouveau post disponible sur rabb...',
+  '✨ Nouveau post disponible sur ogolong...',
   '',
   'Malheureusement, cette page n\'existe pas encore.',
   'On travaille dessus. Restez connectés !',
   '',
-  '#rabb #bientôt #PageIntrouvable',
+  '#ogolong #bientôt #PageIntrouvable',
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ const FAKE_POST_LINES = [
 /**
  * Page 404 — affichée automatiquement par Next.js App Router pour toute
  * route inexistante. Simule une PostCard avec statut FAILED pour rester
- * cohérent avec l'univers visuel de rabb.
+ * cohérent avec l'univers visuel de ogolong.
  *
  * @returns JSX de la page 404, centré plein écran, Server Component
  */
@@ -113,13 +113,13 @@ export default function NotFound(): React.JSX.Element {
         {/* ── En-tête de la card ─────────────────────────────────────────── */}
         {/*
          * Structure identique à une vraie PostCard :
-         * - Logo rabb (carré arrondi bg-primary + "r" blanc)
-         * - Nom de l'app "rabb.com"
+         * - Logo ogolong (carré arrondi bg-primary + "o" blanc)
+         * - Nom de l'app "ogolong.com"
          * - Badge statut FAILED (variant destructive = rouge)
          */}
         <header className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Logo rabb — carré arrondi bg-primary avec lettre "r" blanche */}
+            {/* Logo ogolong — carré arrondi bg-primary avec lettre "o" blanche */}
             {/*
              * size-8 = 32px : taille standard pour un avatar/logo dans une card.
              * rounded-lg (pas rounded-full) : forme de l'icône app, pas d'avatar.
@@ -127,14 +127,14 @@ export default function NotFound(): React.JSX.Element {
              */}
             <div
               className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
-              aria-label="Logo rabb"
+              aria-label="Logo ogolong"
             >
-              r
+              o
             </div>
 
             {/* Nom de l'application */}
             <div className="flex flex-col">
-              <span className="text-sm font-semibold leading-tight">rabb.com</span>
+              <span className="text-sm font-semibold leading-tight">ogolong.com</span>
               {/* Sous-titre discret — identique au nom de plateforme dans les vraies cards */}
               <span className="text-xs text-muted-foreground">Agent IA</span>
             </div>
@@ -143,7 +143,7 @@ export default function NotFound(): React.JSX.Element {
           {/* Badge statut "ÉCHOUÉ" — variant destructive = fond rouge */}
           {/*
            * Reproduit exactement le badge affiché sur les posts FAILED dans l'UI.
-           * uppercase + tracking-wide : convention des badges de statut dans rabb.
+           * uppercase + tracking-wide : convention des badges de statut dans ogolong.
            */}
           <Badge variant="destructive" className="shrink-0 font-mono text-xs uppercase tracking-wide">
             ÉCHOUÉ

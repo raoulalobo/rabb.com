@@ -13,7 +13,7 @@
  *   await getResend().emails.send({
  *     from: process.env.RESEND_FROM_EMAIL!,
  *     to: 'user@example.com',
- *     subject: 'Bienvenue sur rabb',
+ *     subject: 'Bienvenue sur ogolong',
  *     react: <WelcomeEmail name="Marie" />,
  *   })
  */

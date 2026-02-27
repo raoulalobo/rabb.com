@@ -80,12 +80,12 @@ export const handlePostFailure = inngest.createFunction(
 
     // ── Étape 3 : Envoyer l'email d'alerte via Resend ─────────────────────────
     await step.run('envoyer-email-echec', async () => {
-      const baseUrl = process.env.BETTER_AUTH_URL ?? 'https://rabb.com'
+      const baseUrl = process.env.BETTER_AUTH_URL ?? 'https://ogolong.com'
 
       return getResend().emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? 'noreply@rabb.com',
+        from: process.env.RESEND_FROM_EMAIL ?? 'noreply@ogolong.com',
         to: post.user.email,
-        subject: '⚠️ Échec de publication — rabb',
+        subject: '⚠️ Échec de publication — ogolong',
         react: PublicationFailedEmail({
           userName: post.user.name ?? 'Utilisateur',
           // Extrait du texte (max 100 chars pour ne pas surcharger l'email)

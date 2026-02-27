@@ -19,14 +19,14 @@ dossiers modulaire en place.
 ### 1.1 — Création du projet Next.js
 
 ```bash
-pnpm create next-app@latest rabb \
+pnpm create next-app@latest ogolong \
   --typescript \
   --tailwind \
   --app \
   --turbopack \
   --import-alias "@/*"
 
-cd rabb
+cd ogolong
 ```
 
 ### 1.2 — Installation des dépendances
@@ -197,7 +197,7 @@ INNGEST_EVENT_KEY=
 INNGEST_SIGNING_KEY=
 
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@rabb.com
+RESEND_FROM_EMAIL=noreply@ogolong.com
 ```
 
 ### 1.7 — Configuration Vitest

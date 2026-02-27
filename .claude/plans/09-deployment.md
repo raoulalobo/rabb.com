@@ -7,9 +7,9 @@
 
 ## Objectif
 
-Déployer rabb.com en production sur Vercel avec :
+Déployer ogolong.com en production sur Vercel avec :
 - Variables d'environnement correctement configurées
-- Domaine personnalisé rabb.com
+- Domaine personnalisé ogolong.com
 - Inngest connecté en production
 - Monitoring et alertes de base
 
@@ -58,7 +58,7 @@ DIRECT_URL                        = postgresql://...          # Pour les migrati
 
 # ─── better-auth ─────────────────────────────────────────────
 BETTER_AUTH_SECRET                = [générer avec : openssl rand -base64 32]
-BETTER_AUTH_URL                   = https://rabb.com
+BETTER_AUTH_URL                   = https://ogolong.com
 
 # ─── OAuth Google ────────────────────────────────────────────
 GOOGLE_CLIENT_ID                  = [depuis console.cloud.google.com]
@@ -73,10 +73,10 @@ INNGEST_SIGNING_KEY               = signkey-prod-...
 
 # ─── Resend ──────────────────────────────────────────────────
 RESEND_API_KEY                    = re_live_...
-RESEND_FROM_EMAIL                 = noreply@rabb.com
+RESEND_FROM_EMAIL                 = noreply@ogolong.com
 
 # ─── App ─────────────────────────────────────────────────────
-NEXT_PUBLIC_APP_URL               = https://rabb.com
+NEXT_PUBLIC_APP_URL               = https://ogolong.com
 ```
 
 > **Règle de sécurité** : seules les variables préfixées `NEXT_PUBLIC_` sont
@@ -150,8 +150,8 @@ pnpm prisma migrate status
 ### 9.6 — Configuration Inngest en production
 
 1. Aller sur [dashboard.inngest.com](https://app.inngest.com)
-2. Créer une app "rabb-production"
-3. Dans **Apps** → pointer vers `https://rabb.com/api/inngest`
+2. Créer une app "ogolong-production"
+3. Dans **Apps** → pointer vers `https://ogolong.com/api/inngest`
 4. Cliquer "Sync" → vérifier que les 3 fonctions sont détectées :
    - `publish-scheduled-post`
    - `handle-post-failure`
@@ -162,7 +162,7 @@ pnpm prisma migrate status
 
 ### 9.7 — Domaine personnalisé Vercel
 
-1. Vercel Dashboard → Settings → Domains → Add `rabb.com`
+1. Vercel Dashboard → Settings → Domains → Add `ogolong.com`
 2. Configurer les DNS chez le registrar :
    ```
    A     @    76.76.21.21
@@ -188,7 +188,7 @@ import { test, expect } from '@playwright/test'
 test('parcours complet : inscription → post planifié', async ({ page }) => {
   // 1. Inscription
   await page.goto('/register')
-  await page.fill('[name="email"]', 'test-e2e@rabb.com')
+  await page.fill('[name="email"]', 'test-e2e@ogolong.com')
   await page.fill('[name="password"]', 'TestPassword123!')
   await page.click('button[type="submit"]')
   await expect(page).toHaveURL('/dashboard')
@@ -198,7 +198,7 @@ test('parcours complet : inscription → post planifié', async ({ page }) => {
   await expect(page.locator('[data-testid="post-composer"]')).toBeVisible()
 
   // 3. Rédiger un post
-  await page.fill('[data-testid="composer-editor"]', 'Test post automatisé rabb E2E')
+  await page.fill('[data-testid="composer-editor"]', 'Test post automatisé ogolong E2E')
 
   // 4. Sauvegarder en brouillon
   await page.click('[data-testid="save-draft-btn"]')
@@ -206,7 +206,7 @@ test('parcours complet : inscription → post planifié', async ({ page }) => {
 
   // 5. Vérifier dans le calendrier
   await page.goto('/calendar')
-  await expect(page.locator('text=Test post automatisé rabb E2E')).toBeVisible()
+  await expect(page.locator('text=Test post automatisé ogolong E2E')).toBeVisible()
 })
 ```
 
@@ -243,8 +243,8 @@ pnpm add @sentry/nextjs
 - [ ] `pnpm build` passe sans erreur en local avec les vars prod
 - [ ] Toutes les vars d'env configurées sur Vercel
 - [ ] Migration DB déployée (`prisma migrate deploy`)
-- [ ] Inngest synced avec `https://rabb.com/api/inngest`
-- [ ] Domaine rabb.com → SSL actif
+- [ ] Inngest synced avec `https://ogolong.com/api/inngest`
+- [ ] Domaine ogolong.com → SSL actif
 - [ ] Test manuel : inscription, connexion, connexion réseau, création post
 - [ ] Email de test reçu (déclencher manuellement depuis Inngest dashboard)
 - [ ] Web Vitals Vercel : LCP < 2.5s, CLS < 0.1

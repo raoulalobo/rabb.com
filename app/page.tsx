@@ -1,7 +1,7 @@
 /**
  * @file app/page.tsx
  * @module app
- * @description Page d'accueil publique (landing page) de rabb.com.
+ * @description Page d'accueil publique (landing page) de ogolong.com.
  *
  *   Structure :
  *   - Navbar : logo + liens de navigation + CTA
@@ -24,11 +24,11 @@ import type { Metadata } from 'next'
 // ─── Métadonnées SEO ─────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'rabb — Planifiez votre contenu sur tous vos réseaux',
+  title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
   description:
     'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube et Facebook en quelques secondes grâce à l\'IA.',
   openGraph: {
-    title: 'rabb — Planifiez votre contenu sur tous vos réseaux',
+    title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
     description:
       'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube et Facebook en quelques secondes grâce à l\'IA.',
     type: 'website',
@@ -74,7 +74,7 @@ const PLATFORMS = [
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
- * Page d'accueil publique de rabb.com.
+ * Page d'accueil publique de ogolong.com.
  *
  * Sections :
  * 1. Navbar fixe — logo + CTA adapté selon l'état de session
@@ -113,9 +113,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           <Link
             href="/"
             className="text-xl font-semibold tracking-tight text-gray-900 transition-opacity hover:opacity-80"
-            aria-label="rabb — retour à l'accueil"
+            aria-label="ogolong — retour à l'accueil"
           >
-            rabb
+            ogolong
           </Link>
 
           {/* Actions de navigation — adaptées selon l'état de session */}
@@ -186,7 +186,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
           {/* ── Sous-titre ─────────────────────────────────────────────────── */}
           <p className="mx-auto mt-6 max-w-xl text-balance text-xl leading-relaxed text-gray-500">
-            Rabb utilise l&apos;IA pour générer du contenu adapté à chaque plateforme
+            Ogolong utilise l&apos;IA pour générer du contenu adapté à chaque plateforme
             et le publie automatiquement au bon moment.
           </p>
 

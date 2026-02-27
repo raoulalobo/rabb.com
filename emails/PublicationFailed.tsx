@@ -12,7 +12,7 @@
  *       postText: 'Mon super post...',
  *       platform: 'instagram',
  *       failureReason: 'Token expiré',
- *       postUrl: 'https://rabb.com/compose?postId=abc123',
+ *       postUrl: 'https://ogolong.com/compose?postId=abc123',
  *     }),
  *   })
  */
@@ -64,7 +64,7 @@ export function PublicationFailedEmail({
   return (
     <Html lang="fr">
       <Head />
-      <Preview>⚠️ Échec de publication sur {platformLabel} — rabb</Preview>
+      <Preview>⚠️ Échec de publication sur {platformLabel} — ogolong</Preview>
       <Body style={styles.body}>
         <Container style={styles.container}>
           {/* En-tête */}
@@ -102,7 +102,7 @@ export function PublicationFailedEmail({
 
           {/* Pied de page */}
           <Text style={styles.footer}>
-            Vous recevez cet email car vous avez activé les notifications d&apos;échec sur rabb.
+            Vous recevez cet email car vous avez activé les notifications d&apos;échec sur ogolong.
             <br />
             Pour les désactiver, rendez-vous dans vos{' '}
             <a href={`${postUrl.split('/compose')[0]}/settings`} style={styles.link}>
