@@ -508,7 +508,7 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
                 'flex size-7 items-center justify-center rounded-full transition-all',
                 isListening
                   ? 'animate-pulse bg-red-100 text-red-500 hover:bg-red-200'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  : 'bg-violet-100 text-violet-600 hover:bg-violet-200',
                 isUpdating ? 'cursor-not-allowed opacity-50' : '',
               ].join(' ')}
             >
