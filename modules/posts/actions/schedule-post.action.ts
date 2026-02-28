@@ -139,15 +139,28 @@ export async function schedulePost(
           },
         })
 
-    // ─── Envoi de l'event Inngest ────────────────────────────────────────────
-    // Inngest orchestre la publication à scheduledFor via step.sleepUntil()
-    await inngest.send({
-      name: 'post/schedule',
-      data: {
-        postId: post.id,
-        scheduledFor: scheduledFor.toISOString(),
+    // ─── Envoi des events Inngest ────────────────────────────────────────────
+    // Envoi en batch (un seul appel réseau) de deux events complémentaires :
+    // 1. "post/schedule" : publie le post à scheduledFor via step.sleepUntil()
+    // 2. "post/watchdog" : vérifie 5 min après scheduledFor que la publication
+    //    a bien eu lieu. Si le post est encore SCHEDULED → marque FAILED
+    //    (détection de désync DB ↔ Inngest, ex: INNGEST_SIGNING_KEY manquante).
+    await inngest.send([
+      {
+        name: 'post/schedule',
+        data: {
+          postId: post.id,
+          scheduledFor: scheduledFor.toISOString(),
+        },
       },
-    })
+      {
+        name: 'post/watchdog',
+        data: {
+          postId: post.id,
+          scheduledFor: scheduledFor.toISOString(),
+        },
+      },
+    ])
 
     // Invalide le cache des pages affectées
     revalidatePath('/compose')
