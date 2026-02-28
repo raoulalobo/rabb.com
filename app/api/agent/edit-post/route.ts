@@ -38,6 +38,7 @@ import { z } from 'zod'
 
 import { anthropic, AGENT_MODEL } from '@/lib/ai'
 import { auth } from '@/lib/auth'
+import { rateLimiters, rateLimitResponse } from '@/lib/rate-limit'
 import { inngest } from '@/lib/inngest/client'
 import { prisma } from '@/lib/prisma'
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
@@ -131,6 +132,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!session) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
+
+  // ── Rate limiting ─────────────────────────────────────────────────────────
+  // Limite à 10 req/min par userId — protège le quota Claude API
+  const rl = await rateLimiters.ai(session.user.id)
+  if (!rl.success) return rateLimitResponse(rl.reset)
 
   // ── Validation du body ────────────────────────────────────────────────────
   let body: unknown

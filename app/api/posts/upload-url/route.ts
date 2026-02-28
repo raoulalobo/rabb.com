@@ -27,6 +27,7 @@ import { headers } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/lib/auth'
+import { rateLimiters, rateLimitResponse } from '@/lib/rate-limit'
 // createServiceClient bypasse la RLS Supabase — l'auth est gérée par better-auth
 // et déjà vérifiée dans ce handler (session obligatoire).
 import { createServiceClient } from '@/lib/supabase/server'
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!session) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
+
+  // ─── Rate limiting ────────────────────────────────────────────────────────────
+  // Limite à 20 req/min par userId — anti-abus Supabase Storage
+  const rl = await rateLimiters.upload(session.user.id)
+  if (!rl.success) return rateLimitResponse(rl.reset)
 
   // ─── Validation du corps de la requête ────────────────────────────────────────
   let body: unknown

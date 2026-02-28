@@ -92,6 +92,18 @@ export const auth = betterAuth({
     },
   }),
 
+  // ─── Rate limiting better-auth ────────────────────────────────────────────
+  // Protection des endpoints /api/auth/* contre le brute-force (login, register, reset).
+  // Stockage in-memory (par défaut) : suffisant pour l'auth car les tentatives proviennent
+  // en général d'une même instance. Pour un multi-instance strict, utiliser 'database'.
+  rateLimit: {
+    enabled: true,
+    // Fenêtre de 15 minutes : aligne sur les recommandations OWASP pour l'anti brute-force
+    window: 60 * 15,
+    // 10 requêtes max par fenêtre de 15 min — bloque les attaques par dictionnaire
+    max: 10,
+  },
+
   // ─── Session ──────────────────────────────────────────────────────────────
   session: {
     /**

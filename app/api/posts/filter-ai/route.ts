@@ -28,6 +28,7 @@ import { z } from 'zod'
 
 import { FILTER_MODEL, anthropic } from '@/lib/ai'
 import { auth } from '@/lib/auth'
+import { rateLimiters, rateLimitResponse } from '@/lib/rate-limit'
 
 // ─── Schéma du body entrant ────────────────────────────────────────────────────
 
@@ -150,6 +151,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!session) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
+
+  // ── Rate limiting ──────────────────────────────────────────────────────────
+  // Limite à 30 req/min par userId — moins coûteux que les agents complets
+  const rl = await rateLimiters.filter(session.user.id)
+  if (!rl.success) return rateLimitResponse(rl.reset)
 
   // ── Validation du body ─────────────────────────────────────────────────────
   let body: unknown
