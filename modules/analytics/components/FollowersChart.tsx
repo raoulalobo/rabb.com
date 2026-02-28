@@ -32,6 +32,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   youtube: '#ff0000',
   facebook: '#1877f2',
   twitter: '#1da1f2',
+  x: '#1da1f2',        // Alias de Twitter (rebrandé X par Elon Musk en 2023)
   linkedin: '#0077b5',
 }
 

@@ -48,14 +48,45 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         growth: s.growth,
       }))
     } else {
-      // Fallback : un point par compte (date = aujourd'hui)
-      const today = new Date().toISOString().slice(0, 10)
-      normalizedStats = accounts.map((a) => ({
-        date: today,
-        platform: a.platform,
-        count: a.currentFollowers,
-        growth: a.growth,
-      }))
+      // Fallback : reconstruction quotidienne sur toute la période
+      // `stats` étant vide, on interpole linéairement depuis `accounts`
+      // qui contient currentFollowers (valeur finale) et growth (delta sur la période).
+
+      const todayDate = new Date()
+
+      // Date de début : paramètre `from` ou 6 jours en arrière (fenêtre 7 jours)
+      const fromDate = searchParams.get('from')
+        ? new Date(searchParams.get('from')!)
+        : (() => {
+            const d = new Date(todayDate)
+            d.setDate(d.getDate() - 6)
+            return d
+          })()
+
+      // Nombre de jours dans la période (min 1 pour éviter division par zéro)
+      const totalDays = Math.max(
+        1,
+        Math.round((todayDate.getTime() - fromDate.getTime()) / 86_400_000)
+      )
+
+      normalizedStats = accounts.flatMap((a) => {
+        // Point de départ = followers AVANT la période (currentFollowers - growth)
+        const startCount = a.currentFollowers - a.growth
+
+        // Un point par jour : interpolation linéaire de startCount → currentFollowers
+        // Exemple TikTok : growth=7, currentFollowers=268 sur 7 jours
+        //   Feb 21 → 261, Feb 22 → 262, ..., Feb 28 → 268
+        return Array.from({ length: totalDays + 1 }, (_, i) => {
+          const d = new Date(fromDate)
+          d.setDate(fromDate.getDate() + i)
+          return {
+            date: d.toISOString().slice(0, 10),
+            platform: a.platform,
+            count: Math.round(startCount + (a.growth * i) / totalDays),
+            growth: a.growth,
+          }
+        })
+      })
     }
 
     // Filtrage côté proxy : exclure les autres plateformes si un filtre est actif.
