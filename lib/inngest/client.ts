@@ -21,14 +21,18 @@ import { Inngest } from 'inngest'
 
 /**
  * Instance singleton du client Inngest.
- * L'identifiant 'ogolong' est utilisé dans le dashboard Inngest pour identifier l'application.
+ * L'identifiant 'rabb' correspond à l'app enregistrée dans Inngest Cloud.
+ * ⚠️  Ne pas changer cet ID sans re-syncer Inngest (dashboard → Apps → Sync) :
+ *     les fnId stockés par Inngest sont préfixés par cet identifiant
+ *     (ex: 'rabb-publish-scheduled-post'). Un changement d'ID crée une nouvelle
+ *     app dans Inngest et rend tous les runs en cours introuvables.
  *
  * eventKey est passé explicitement pour éviter que l'auto-détection de INNGEST_EVENT_KEY
  * échoue silencieusement sur Vercel (notamment dans les Server Actions où l'env peut être
  * lu différemment selon le contexte d'exécution Edge vs Lambda).
  */
 export const inngest = new Inngest({
-  id: 'ogolong',
+  id: 'rabb',
   name: 'ogolong.com',
   // Lecture explicite au runtime — garantit que la clé est disponible
   // que le code s'exécute en Lambda Vercel, en local ou via Inngest Dev Server.
