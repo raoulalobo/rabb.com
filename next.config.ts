@@ -1,20 +1,14 @@
 /**
  * @file next.config.ts
  * @description Configuration Next.js pour ogolong.com.
- *   - Turbopack : définit la racine du workspace pour éviter le warning de détection
- *   - Peut être enrichi au fil des phases (images, headers, redirections, etc.)
+ *   - Pas de config Turbopack : on utilise Webpack pour `next build` (production).
+ *     Turbopack ne génère pas le fichier .next/trace attendu par Vercel,
+ *     ce qui cause un fallback de tracing mémoire-intensif qui OOM sur Vercel.
+ *   - Turbopack reste utilisé pour `next dev` automatiquement dans Next.js 16.
  */
-
-import path from 'path'
 
 import type { NextConfig } from 'next'
 
-const nextConfig: NextConfig = {
-  turbopack: {
-    // Racine du workspace — évite l'ambiguïté avec d'autres lockfiles parents
-    // (cf. https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory)
-    root: path.resolve(__dirname),
-  },
-}
+const nextConfig: NextConfig = {}
 
 export default nextConfig
