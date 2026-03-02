@@ -1,6 +1,7 @@
 {
   "framework": "nextjs",
-  "buildCommand": "pnpm prisma generate && pnpm build",
-  "installCommand": "pnpm install",
-  "devCommand": "pnpm dev"
+  "buildCommand": "bun prisma generate && bun run build",
+  "installCommand": "bun install",
+  "devCommand": "bun dev"
 }
+
