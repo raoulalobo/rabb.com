@@ -16,6 +16,7 @@
  *      - Footer : métriques à zéro + message "Publication échouée"
  *   3. Bouton de retour au dashboard
  *   4. Mention discrète "Erreur 404 · Page introuvable"
+ *   5. Footer légal : liens /privacy, /terms, /legal
  *
  *   Server Component pur — pas de 'use client', pas d'animations JS.
  *   Accessible : contrastes respectés, rôles ARIA, texte alternatif.
@@ -243,6 +244,28 @@ export default function NotFound(): React.JSX.Element {
         >
           Erreur 404 &middot; Page introuvable
         </p>
+
+        {/* ── Footer légal — liens RGPD ─────────────────────────────────── */}
+        {/*
+         * Liens légaux obligatoires accessibles même depuis la page 404.
+         * Séparés par des points typographiques (aria-hidden pour les lecteurs d'écran).
+         */}
+        <nav
+          className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
+          aria-label="Liens légaux"
+        >
+          <Link href="/privacy" className="hover:text-foreground transition-colors">
+            Politique de confidentialité
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/terms" className="hover:text-foreground transition-colors">
+            CGU
+          </Link>
+          <span aria-hidden>·</span>
+          <Link href="/legal" className="hover:text-foreground transition-colors">
+            Mentions légales
+          </Link>
+        </nav>
       </div>
 
     </main>

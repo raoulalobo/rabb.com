@@ -6,9 +6,11 @@
  *   Structure :
  *   - Navbar : logo + liens de navigation + CTA
  *   - Hero : accroche, sous-titre, CTAs primaires, logos plateformes
+ *   - FeaturesSection : tabs interactifs Framer Motion (5 rubriques du dashboard)
+ *   - Footer : liens légaux RGPD (privacy, terms, legal) + copyright
  *   - Fond : dot grid SVG subtil (CSS background-image)
  *
- *   Server Component pur — aucun JS client requis.
+ *   Server Component pur — FeaturesSection est le seul Client Component (isolé).
  *   Responsive : mobile-first avec breakpoints md/lg.
  */
 
@@ -18,6 +20,8 @@ import { headers } from 'next/headers'
 
 import { Button } from '@/components/ui/button'
 import { auth } from '@/lib/auth'
+import { FeaturesSection } from '@/components/landing/FeaturesSection'
+import { SiteFooter } from '@/components/shared/SiteFooter'
 
 import type { Metadata } from 'next'
 
@@ -259,7 +263,18 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             Aucune carte bancaire requise &middot; Gratuit pendant le lancement
           </p>
         </section>
+
+        {/* ── Section Fonctionnalités ─────────────────────────────────────── */}
+        {/*
+         * Client Component isolé : FeaturesSection gère son propre state
+         * (tab actif) et les animations Framer Motion.
+         * La page reste un Server Component — seul ce composant est hydraté.
+         */}
+        <FeaturesSection />
       </main>
+
+      {/* ── Footer partagé ─────────────────────────────────────────────────── */}
+      <SiteFooter />
     </div>
   )
 }

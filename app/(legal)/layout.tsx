@@ -1,0 +1,53 @@
+/**
+ * @file app/(legal)/layout.tsx
+ * @module legal
+ * @description Layout minimal pour les pages légales (politique de confidentialité, CGU, mentions légales).
+ *   - Accessible sans authentification (aucune vérification de session)
+ *   - Design épuré : logo + contenu centré + footer avec liens légaux
+ *   - Max-width 3xl pour une lisibilité optimale des textes longs
+ *
+ *   Pages enfants :
+ *   - /privacy → Politique de confidentialité RGPD
+ *   - /terms   → Conditions Générales d'Utilisation
+ *   - /legal   → Mentions légales
+ */
+
+import Link from 'next/link'
+import { SiteFooter } from '@/components/shared/SiteFooter'
+
+interface LegalLayoutProps {
+  children: React.ReactNode
+}
+
+/**
+ * Layout public minimal pour les pages légales.
+ * Server Component pur — pas de logique dynamique.
+ *
+ * @param props.children - Page légale (privacy, terms ou legal)
+ * @returns Conteneur centré avec logo et footer de navigation
+ */
+export default function LegalLayout({ children }: LegalLayoutProps): React.JSX.Element {
+  return (
+    <div className="min-h-screen bg-background">
+      {/* ── En-tête minimal : logo uniquement ── */}
+      <header className="border-b">
+        <div className="mx-auto max-w-3xl px-4 py-4">
+          <Link
+            href="/"
+            className="text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity"
+          >
+            ogolong
+          </Link>
+        </div>
+      </header>
+
+      {/* ── Contenu de la page légale ── */}
+      <main className="mx-auto max-w-3xl px-4 py-12">
+        {children}
+      </main>
+
+      {/* ── Footer partagé ── */}
+      <SiteFooter />
+    </div>
+  )
+}

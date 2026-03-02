@@ -33,6 +33,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.34.3",
     "geist": "^1.7.0",
     "immer": "^11.1.4",
     "inngest": "^3.52.2",

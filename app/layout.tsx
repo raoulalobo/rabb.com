@@ -4,12 +4,14 @@
  *   - Fournit les fonts Geist (sans + mono) via le package npm 'geist' (local, sans réseau)
  *   - Configure les métadonnées globales (SEO)
  *   - Monte les providers globaux : TanStack Query + Sonner (notifications toast)
+ *   - Affiche la bannière de consentement cookies RGPD (CookieBanner)
  *   - Langue : français (lang="fr")
  */
 
 import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
 
+import { CookieBanner } from '@/components/shared/CookieBanner'
 import { QueryProvider } from '@/components/layout/QueryProvider'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -60,6 +62,9 @@ export default function RootLayout({ children }: RootLayoutProps): React.JSX.Ele
 
           {/* Sonner — notifications toast globales (succès, erreurs, infos) */}
           <Toaster richColors position="top-right" />
+
+          {/* Bannière RGPD — affichée uniquement au premier chargement (Client Component) */}
+          <CookieBanner />
         </QueryProvider>
       </body>
     </html>

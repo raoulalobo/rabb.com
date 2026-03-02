@@ -4,6 +4,7 @@
  *   Sections :
  *   - Réseaux sociaux connectés (PlatformList)
  *   - Dictée vocale (SpeechSettings)
+ *   - Données & compte (AccountDangerZone) — export RGPD + suppression de compte
  *
  *   Gère les query params success/error du callback OAuth pour afficher des toasts.
  *
@@ -15,6 +16,7 @@
 
 import { Suspense } from 'react'
 
+import { AccountDangerZone } from '@/modules/auth/components/AccountDangerZone'
 import { PlatformCardSkeleton } from '@/modules/platforms/components/PlatformCardSkeleton'
 import { PlatformList } from '@/modules/platforms/components/PlatformList'
 
@@ -23,7 +25,7 @@ import { SpeechSettings } from './SpeechSettings'
 
 /**
  * Page des paramètres.
- * Server Component pour le layout — PlatformList est un Client Component (TanStack Query).
+ * Server Component pour le layout — PlatformList et AccountDangerZone sont des Client Components.
  */
 export default function SettingsPage(): React.JSX.Element {
   return (
@@ -67,6 +69,14 @@ export default function SettingsPage(): React.JSX.Element {
         {/* Client Component : lit/écrit speechSilenceTimeoutMs dans le store Zustand persisté */}
         <SpeechSettings />
       </section>
+
+      {/* ── Section : Données & compte (RGPD) ── */}
+      {/*
+        AccountDangerZone expose :
+        - Export des données (droit à la portabilité — art. 20 RGPD)
+        - Suppression du compte (droit à l'effacement — art. 17 RGPD)
+      */}
+      <AccountDangerZone />
     </div>
   )
 }
