@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Bun lockfile — régénéré à chaque install (incompatible entre versions bun)
+bun.lock
