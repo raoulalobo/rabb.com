@@ -87,7 +87,7 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
     const result = await signIn.social({
       provider: 'google',
       callbackURL: '/dashboard',
-      redirect: false,
+      disableRedirect: true,
     })
 
     if (result.error || !result.data?.url) {

@@ -115,7 +115,7 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
     const result = await signIn.social({
       provider: 'google',
       callbackURL: callbackUrl,
-      redirect: false,
+      disableRedirect: true,
     })
 
     if (result.error || !result.data?.url) {
