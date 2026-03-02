@@ -15,12 +15,16 @@
  * @see https://pris.ly/d/prisma7-client-config
  */
 
-import { defineConfig, env } from 'prisma/config'
+import { defineConfig } from 'prisma/config'
 
 export default defineConfig({
   // URL utilisée uniquement par le CLI Prisma (migrate, generate, introspect).
   // Doit pointer vers la connexion directe (port 5432) pour éviter les limites PgBouncer.
+  //
+  // process.env avec fallback (au lieu de env() strict) : prisma generate n'a pas
+  // besoin d'une vraie connexion DB — il lit seulement le schéma. Le fallback évite
+  // le crash PrismaConfigEnvError dans les environnements sans DIRECT_URL (ex: Vercel build).
   datasource: {
-    url: env('DIRECT_URL'),
+    url: process.env.DIRECT_URL ?? 'postgresql://localhost:5432/placeholder',
   },
 })
