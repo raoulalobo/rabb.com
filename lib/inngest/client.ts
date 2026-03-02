@@ -22,10 +22,17 @@ import { Inngest } from 'inngest'
 /**
  * Instance singleton du client Inngest.
  * L'identifiant 'ogolong' est utilisé dans le dashboard Inngest pour identifier l'application.
+ *
+ * eventKey est passé explicitement pour éviter que l'auto-détection de INNGEST_EVENT_KEY
+ * échoue silencieusement sur Vercel (notamment dans les Server Actions où l'env peut être
+ * lu différemment selon le contexte d'exécution Edge vs Lambda).
  */
 export const inngest = new Inngest({
   id: 'ogolong',
   name: 'ogolong.com',
+  // Lecture explicite au runtime — garantit que la clé est disponible
+  // que le code s'exécute en Lambda Vercel, en local ou via Inngest Dev Server.
+  eventKey: process.env.INNGEST_EVENT_KEY,
 })
 
 // ─── Types des événements Inngest ─────────────────────────────────────────────

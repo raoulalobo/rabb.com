@@ -21,6 +21,13 @@ import { publishScheduledPost } from '@/lib/inngest/functions/publish-scheduled-
 import { watchdogScheduledPost } from '@/lib/inngest/functions/watchdog-scheduled-post'
 
 /**
+ * Force le traitement dynamique à chaque requête — jamais mis en cache par le CDN Vercel.
+ * Inngest rappelle cette route pour exécuter chaque step (ex: reprise après sleepUntil) :
+ * une réponse cachée renverrait du HTML statique au lieu du handler SDK → step perdu.
+ */
+export const dynamic = 'force-dynamic'
+
+/**
  * Durée maximale d'exécution Lambda Vercel en secondes.
  * - Hobby plan : 60s max
  * - Pro plan   : 300s max
@@ -39,6 +46,10 @@ export const maxDuration = 300
  */
 export const { GET, POST, PUT } = serve({
   client: inngest,
+  // Lecture explicite de la signing key au runtime, sans dépendre de l'auto-détection
+  // du SDK. Sur Vercel, les variables d'env sont injectées par le runtime Lambda ;
+  // passer la valeur directement élimine tout risque de lecture manquée au boot.
+  signingKey: process.env.INNGEST_SIGNING_KEY,
   functions: [
     // Publie un post à la date planifiée via getlate.dev
     publishScheduledPost,
