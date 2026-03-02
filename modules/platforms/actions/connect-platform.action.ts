@@ -101,8 +101,9 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
         //    On cherche uniquement le profil portant le nom de CET utilisateur.
         //    Risque marginal (post-MVP) si deux utilisateurs ont le même nom : utiliser
         //    user.id comme suffixe dans le nom du profil pour garantir l'unicité.
-        const profiles = await late.profiles.list()
-        const existing = profiles.find((p: { name: string }) => p.name === profileName)
+        // LateProfilesListResponse = { profiles: LateWorkspaceProfile[] } — pas un tableau direct
+        const { profiles: profileList } = await late.profiles.list()
+        const existing = profileList.find((p: { name: string }) => p.name === profileName)
 
         if (!existing) {
           // Cas improbable : Late signale "already exists" mais ne liste pas le profil.
@@ -143,7 +144,8 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     }
 
     // 4. Obtenir l'URL OAuth avec la plateforme + le profileId du workspace
-    const { authUrl } = await late.connect.getUrl(validPlatform, lateWorkspaceId, callbackUrl)
+    // lateWorkspaceId est garanti non-null ici (assigné dans le bloc if précédent ou en DB)
+    const { authUrl } = await late.connect.getUrl(validPlatform, lateWorkspaceId!, callbackUrl)
     console.log('[connectPlatform] authUrl reçu:', authUrl)
 
     return { success: true, redirectUrl: authUrl }
