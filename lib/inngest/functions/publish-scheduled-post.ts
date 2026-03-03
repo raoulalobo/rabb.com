@@ -13,7 +13,7 @@
  *   2. Récupérer le post en DB et vérifier son statut (SCHEDULED)
  *   3. Récupérer le profil getlate.dev de la plateforme du post
  *   4. Publier via getlate.dev avec publishNow: true (Inngest a déjà attendu)
- *   5. Vérifier le statut par plateforme dans la réponse Late
+ *   5. Vérifier le statut par plateforme (Late retourne "success" ou "published" selon la plateforme)
  *   6. Mettre à jour le Post avec PUBLISHED + platformPostUrl (ou FAILED)
  *
  *   Pourquoi `publishNow: true` au lieu de `scheduledAt` ?
@@ -29,6 +29,10 @@
  *   // Déclenché automatiquement par inngest.send({ name: 'post/schedule', data: { ... } })
  *   // Ne pas appeler directement.
  */
+
+// NonRetriableError : erreur Inngest qui interrompt immédiatement le run sans retry.
+// Utilisée pour les erreurs structurelles (ex: contenu dupliqué) où un retry est inutile.
+import { NonRetriableError } from 'inngest'
 
 import { inngest } from '@/lib/inngest/client'
 import { late } from '@/lib/late'
@@ -113,7 +117,8 @@ export const publishScheduledPost = inngest.createFunction(
           failureReason: `Aucun profil ${post.platform} connecté pour la publication`,
         },
       })
-      throw new Error(`Profil ${post.platform} introuvable pour l'utilisateur`)
+      // NonRetriableError : un profil absent ne réapparaîtra pas entre deux retries.
+      throw new NonRetriableError(`Profil ${post.platform} introuvable pour l'utilisateur`)
     }
 
     // ── Étape 3b : Résoudre l'accountId Late depuis la liste des comptes ─────
@@ -200,7 +205,9 @@ export const publishScheduledPost = inngest.createFunction(
           failureReason: `Compte ${post.platform} déconnecté de Late (token expiré ou révoqué) — reconnecte-le sur /settings`,
         },
       })
-      throw new Error(`Aucun account Late trouvé pour ${post.platform} (aliases : ${tried})`)
+      // NonRetriableError : le token OAuth ne se régénère pas entre deux retries.
+      // L'utilisateur doit reconnecter son compte manuellement via /settings.
+      throw new NonRetriableError(`Aucun account Late trouvé pour ${post.platform} (aliases : ${tried})`)
     }
 
     // ── Étape 4 : Publier via getlate.dev avec publishNow ────────────────────
@@ -244,23 +251,138 @@ export const publishScheduledPost = inngest.createFunction(
     })
 
     // ── Étape 5 : Vérifier le statut de publication par plateforme ───────────
-    // Late retourne `platforms[0]` avec status 'success' | 'failed' | 'pending'.
-    // En cas d'échec, on throw pour déclencher les retries Inngest automatiques.
+    // Late retourne `platforms[0]` avec status 'success' | 'published' | 'failed' | 'pending'.
+    // En cas d'échec réel (pas d'URL + statut non-succès), on throw pour déclencher
+    // les retries Inngest automatiques (max 3×).
     const platformResult = latePost.platforms?.[0]
 
-    if (!platformResult || platformResult.status === 'failed') {
-      // Marquer comme FAILED immédiatement (avant le throw)
-      // pour que l'UI reflète l'erreur même si les retries échouent.
+    // Logger la réponse Late complète — visible dans Vercel Logs et Inngest Event Trace
+    console.log(
+      '[publish-scheduled-post] réponse Late platforms :',
+      JSON.stringify(latePost.platforms ?? null),
+    )
+
+    // Extraire l'URL du post publié dès maintenant (avant la vérification de succès).
+    // Cette valeur est réutilisée dans le chemin succès (step 6) et le chemin échec (log).
+    // Priorité : platformPostUrl (URL finale) > platformPostId (utilisé par TikTok).
+    const platformPostUrl = platformResult?.platformPostUrl ?? platformResult?.platformPostId ?? null
+
+    // Statuts Late considérés comme publication effective :
+    //   - "success"   : valeur nominale documentée dans les specs Late
+    //   - "published" : valeur retournée en pratique par Instagram et Facebook
+    //   - URL présente : preuve irréfutable de publication, quel que soit le statut textuel
+    //     (ex: Late retourne status "failed" mais inclut quand même l'URL → post visible en ligne)
+    const isActuallyPublished =
+      platformResult?.status === 'success' ||
+      platformResult?.status === 'published' ||
+      !!platformPostUrl
+
+    // Condition : pas de résultat, ou publication non effective (pas de succès ni d'URL).
+    // Cela inclut 'failed' explicite (sans URL) ET 'pending' (Late n'a pas encore traité).
+    if (!platformResult || !isActuallyPublished) {
+      // Extraire le motif détaillé depuis Late (plusieurs noms de champ possibles selon version API)
+      const lateReason = platformResult?.errorMessage
+        ?? platformResult?.reason
+        ?? platformResult?.errorCode
+        ?? null
+
+      // Construire le libellé de plateforme (fallback sur connectedPlatform si absent)
+      const platformLabel = platformResult?.platform ?? connectedPlatform.platform
+      // Ajouter le motif Late s'il est disponible (ex: " — Token expired")
+      const failureDetail = lateReason ? ` — ${lateReason}` : ''
+      // Décrire le statut reçu (ex: "status: failed", "status: pending", "pas de résultat")
+      const statusLabel = platformResult ? `status: ${platformResult.status}` : 'pas de résultat'
+      // Message final stocké en DB et dans l'email d'échec
+      const failureReason = `Late : publication échouée sur ${platformLabel}${failureDetail} (${statusLabel})`
+
+      // Log d'erreur structuré pour faciliter le diagnostic dans Vercel/Inngest
+      console.error(
+        `[publish-scheduled-post] Échec publication ${platformLabel} :`,
+        { status: platformResult?.status, lateReason, platformResult },
+      )
+
+      // ── Détecter le type d'erreur Late ────────────────────────────────────────
+      // Ce test est fait APRÈS le log pour ne pas alourdir le chemin nominal.
+
+      // isUserContentError : toute erreur imputable au contenu de l'utilisateur.
+      // La catégorie 'user_content' de Late englobe plusieurs cas distincts :
+      //   - frame_rate_check_failed (TikTok : framerate hors 23-60 FPS)
+      //   - format vidéo non supporté, contenu interdit (copyright)
+      //   - contenu dupliqué (duplicate)
+      // Pour tous ces cas, un retry Inngest est inutile — Late rejettera à nouveau.
+      const isUserContentError = platformResult?.errorCategory === 'user_content'
+
+      // isDuplicateContent : sous-cas "doublon" uniquement.
+      // Late dit explicitement "duplicate" dans errorMessage dans ce cas précis.
+      // Séparer de isUserContentError pour éviter d'enrichir les autres user_content
+      // (ex: frame_rate_check_failed) avec un message de doublon qui serait faux.
+      const isDuplicateContent =
+        (platformResult?.errorMessage ?? '').toLowerCase().includes('duplicate')
+
+      // Partir du failureReason déjà construit (contient le message Late détaillé)
+      let enrichedFailureReason = failureReason
+
+      // L'enrichissement "doublon" ne s'applique QUE pour les vrais duplicates.
+      // Pour les autres user_content (ex: frame_rate_check_failed), le failureReason
+      // construit depuis errorMessage Late brut est déjà correct — ne pas l'écraser.
+      if (isDuplicateContent) {
+        // Chercher le post PUBLISHED le plus récent avec le même texte sur la même plateforme.
+        // Requête ciblée : userId + platform + status + text — pas de full-scan.
+        // Ex: si "Bonjour le monde" a déjà été publié sur facebook le 3 mars 2026,
+        //     on retrouve ce post et on enrichit le message d'erreur avec la date.
+        const originalPost = await prisma.post.findFirst({
+          where: {
+            userId:   post.userId,
+            platform: post.platform,
+            status:   'PUBLISHED',
+            text:     post.text,   // même contenu exact → c'est le doublon
+          },
+          orderBy: { publishedAt: 'desc' },
+          select:  { id: true, publishedAt: true },
+        })
+
+        if (originalPost?.publishedAt) {
+          // ── Cas A : doublon texte trouvé en DB ──────────────────────────────────
+          // Le même texte a déjà été publié sur cette plateforme via l'app.
+          // On enrichit le message avec la date de publication originale.
+          // Ex: "· Ce contenu a déjà été publié sur facebook le 3 mars 2026."
+          const dateStr = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' })
+            .format(originalPost.publishedAt)
+          enrichedFailureReason =
+            `${failureReason} · Ce contenu a déjà été publié sur ${platformLabel} le ${dateStr}.`
+
+        } else if (post.mediaUrls.length > 0) {
+          // ── Cas B : doublon vidéo/image (hash fichier) ───────────────────────────
+          // Aucun post avec le même texte trouvé en DB, mais le post contient des médias.
+          // Les plateformes (Facebook, Instagram, TikTok, YouTube) détectent les doublons
+          // via le hash binaire du fichier vidéo/image, indépendamment du texte.
+          // On ne peut pas retrouver le post original en DB car seule la plateforme
+          // connaît ce hash — on informe l'utilisateur de la cause réelle.
+          enrichedFailureReason =
+            `${failureReason} · Le fichier média (vidéo ou image) a déjà été publié sur `
+            + `${platformLabel}. Les plateformes détectent les doublons via le hash du fichier, `
+            + `même si le texte est différent. Essaie avec un fichier légèrement différent `
+            + `(recadrage, recompression).`
+
+          // Cas C (implicite) : aucun média, doublon non trouvé en DB (publié hors app)
+          // → enrichedFailureReason reste égal au failureReason Late original (pas d'enrichissement)
+        }
+      }
+
+      // Sauvegarder le failureReason enrichi (sera lu par handle-post-failure → email d'échec)
       await prisma.post.update({
         where: { id: postId },
-        data: {
-          status: 'FAILED',
-          failureReason: `Late : publication échouée sur ${platformResult?.platform ?? connectedPlatform.platform}`,
-        },
+        data: { status: 'FAILED', failureReason: enrichedFailureReason },
       })
-      throw new Error(
-        `Late : publication échouée sur ${platformResult?.platform ?? connectedPlatform.platform}`
-      )
+
+      // NonRetriableError pour TOUS les user_content (duplicate inclus).
+      // Inngest émet quand même inngest/function.failed → handle-post-failure envoie l'email.
+      // Le failureReason contient déjà le errorMessage Late brut — ne pas l'écraser.
+      if (isUserContentError) {
+        throw new NonRetriableError(enrichedFailureReason)
+      }
+      // Autres erreurs (réseau, API down, timeout) → Error classique → retry Inngest (3×)
+      throw new Error(enrichedFailureReason)
     }
 
     // ── Étape 6 : Mettre à jour le statut du Post ─────────────────────────────
@@ -274,9 +396,9 @@ export const publishScheduledPost = inngest.createFunction(
           status: 'PUBLISHED',
           publishedAt: new Date(),
           latePostId,
-          // platformPostUrl peut être absent (ex: TikTok retourne platformPostId).
-          // On prend platformPostUrl si disponible, sinon platformPostId.
-          platformPostUrl: platformResult.platformPostUrl ?? platformResult.platformPostId ?? null,
+          // platformPostUrl est déjà extrait à l'étape 5 (platformPostUrl ?? platformPostId ?? null).
+          // Réutiliser la variable pour éviter la duplication de logique.
+          platformPostUrl,
           failureReason: null,
         },
       })
@@ -286,7 +408,8 @@ export const publishScheduledPost = inngest.createFunction(
       published: true,
       platform: post.platform,
       latePostId,
-      platformPostUrl: platformResult.platformPostUrl ?? platformResult.platformPostId ?? null,
+      // Réutiliser la variable déjà calculée à l'étape 5
+      platformPostUrl,
     }
   },
 )

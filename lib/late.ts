@@ -98,6 +98,37 @@ export interface LatePostPlatformResult {
    * Peut être utilisé pour construire l'URL ou tracker le post.
    */
   platformPostId?: string
+  /**
+   * Message d'erreur détaillé retourné par Late quand `status === 'failed'`.
+   * Ex: "Duplicate content detected. This identical content was already published…"
+   * Ex: "Insufficient permissions", "Token expired", "Invalid media format"
+   */
+  errorMessage?: string
+  /**
+   * Code fonctionnel d'erreur Late (ex: 'INVALID_MEDIA', 'TOKEN_EXPIRED').
+   * Utile pour du traitement conditionnel (refresh token, retry media, etc.).
+   */
+  errorCode?: string
+  /**
+   * Alias de `errorMessage` — certaines versions de l'API Late utilisent `reason`
+   * à la place d'`errorMessage`. Toujours tester les deux champs.
+   */
+  reason?: string
+  /**
+   * Catégorie de l'erreur Late.
+   * - `"user_content"` : problème lié au contenu (duplicate, format, longueur)
+   * - `"account"` : problème de compte (token expiré, permissions)
+   * - `"platform"` : erreur côté réseau social (API down, rate limit)
+   * Observé dans la réponse Late réelle (ex: "user_content" pour contenu dupliqué).
+   */
+  errorCategory?: string
+  /**
+   * Source de l'erreur Late.
+   * - `"user"` : l'utilisateur est responsable (duplicate, contenu invalide)
+   * - `"platform"` : la plateforme sociale est responsable (erreur API, outage)
+   * Utile pour décider si un retry automatique a du sens.
+   */
+  errorSource?: string
 }
 
 /** Post publié ou planifié via getlate.dev */

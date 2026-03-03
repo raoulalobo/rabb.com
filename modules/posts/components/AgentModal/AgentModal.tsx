@@ -83,7 +83,12 @@ export function AgentModal(props: AgentModalProps): React.JSX.Element {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      {/*
+       * max-h-[90dvh] : limite la hauteur à 90% du viewport dynamique.
+       * flex flex-col  : permet au header de garder sa taille naturelle et
+       *                  au contenu de remplir le reste via flex-1.
+       */}
+      <DialogContent className="max-w-xl flex flex-col max-h-[90dvh]">
         <DialogHeader>
           {/* Titre et description selon le mode */}
           {mode === 'create' ? (
@@ -103,24 +108,34 @@ export function AgentModal(props: AgentModalProps): React.JSX.Element {
           )}
         </DialogHeader>
 
-        {/* Contenu selon le mode */}
-        {mode === 'create' ? (
-          <AgentModalCreate
-            onPostsCreated={(posts) => {
-              props.onPostsCreated(posts)
-            }}
-            onClose={handleClose}
-          />
-        ) : (
-          <AgentModalEdit
-            post={props.post}
-            onPostUpdated={(updatedPost) => {
-              props.onPostUpdated(updatedPost)
-              // La modale reste ouverte pour afficher le succès — AgentModalEdit gère son propre état
-            }}
-            onClose={handleClose}
-          />
-        )}
+        {/*
+         * flex-1       : prend tout l'espace vertical restant après le header.
+         * min-h-0      : indispensable en flex-col — sans lui, un flex item
+         *               ne peut pas descendre sous sa taille de contenu minimale
+         *               (min-height: auto par défaut).
+         * overflow-hidden : transmet la contrainte de hauteur aux enfants
+         *                   qui gèrent eux-mêmes leur scroll interne.
+         */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {/* Contenu selon le mode */}
+          {mode === 'create' ? (
+            <AgentModalCreate
+              onPostsCreated={(posts) => {
+                props.onPostsCreated(posts)
+              }}
+              onClose={handleClose}
+            />
+          ) : (
+            <AgentModalEdit
+              post={props.post}
+              onPostUpdated={(updatedPost) => {
+                props.onPostUpdated(updatedPost)
+                // La modale reste ouverte pour afficher le succès — AgentModalEdit gère son propre état
+              }}
+              onClose={handleClose}
+            />
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

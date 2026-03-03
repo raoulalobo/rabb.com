@@ -323,7 +323,20 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
   const isDisabled = isGenerating || isListening
 
   return (
-    <div className="space-y-4">
+    /*
+     * h-full      : occupe toute la hauteur transmise par le wrapper flex-1 du DialogContent.
+     * flex flex-col + gap-4 : empile header scrollable + footer en colonne.
+     */
+    <div className="flex h-full flex-col gap-4">
+
+      {/*
+       * Zone scrollable : instruction + médias + erreur.
+       * flex-1 min-h-0 : prend l'espace restant et peut rétrécir en dessous
+       *                  de sa taille de contenu (règle flex-col critique).
+       * overflow-y-auto : scroll interne si le contenu dépasse.
+       * pr-1            : petit padding pour que la scrollbar ne couvre pas le contenu.
+       */}
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
 
       {/* ── Zone d'instruction ─────────────────────────────────────────────── */}
       <div className="space-y-1.5">
@@ -350,7 +363,7 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
           onChange={(e) => setInstruction(e.target.value)}
           disabled={isDisabled}
           rows={4}
-          className="resize-none text-sm"
+          className="resize-none text-sm field-sizing-fixed"
         />
 
         <p className="text-xs text-muted-foreground">
@@ -516,8 +529,14 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
         </div>
       )}
 
-      {/* ── Actions ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+      </div>{/* fin zone scrollable (instruction + médias + erreur) */}
+
+      {/*
+       * Footer : toujours visible en bas de la modale.
+       * shrink-0 : ne rétrécit jamais — c'est la zone scrollable qui absorbe
+       *            l'espace disponible via flex-1.
+       */}
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-4 shrink-0">
         <button
           type="button"
           onClick={onClose}
@@ -547,6 +566,7 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
       </div>
 
       {/* ── Dialog sélection galerie ────────────────────────────────────────── */}
+      {/* Portail Radix — rendu dans document.body, non affecté par le scroll wrapper ci-dessus */}
       <MediaPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}

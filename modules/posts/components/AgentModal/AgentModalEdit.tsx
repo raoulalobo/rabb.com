@@ -295,7 +295,19 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
   // ── Rendu principal ───────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
+    /*
+     * h-full      : occupe toute la hauteur transmise par le wrapper flex-1 du DialogContent.
+     * flex flex-col + gap-4 : empile zone scrollable + footer en colonne.
+     */
+    <div className="flex h-full flex-col gap-4">
+
+      {/*
+       * Zone scrollable : en-tête plateforme + médias + instruction + erreur.
+       * flex-1 min-h-0  : prend l'espace restant, peut rétrécir sous sa taille minimale.
+       * overflow-y-auto : scroll interne activé si le contenu dépasse.
+       * pr-1            : espace pour la scrollbar.
+       */}
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
 
       {/* En-tête plateforme */}
       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
@@ -530,7 +542,7 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
           onChange={(e) => setInstruction(e.target.value)}
           disabled={isDisabled}
           rows={3}
-          className="resize-none text-sm"
+          className="resize-none text-sm field-sizing-fixed"
         />
 
         <p className="text-xs text-muted-foreground">
@@ -550,8 +562,14 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
         </div>
       )}
 
+      </div>{/* fin zone scrollable (plateforme + médias + instruction + erreur) */}
+
+      {/*
+       * Footer : toujours visible en bas de la modale.
+       * shrink-0 : ne rétrécit jamais — c'est la zone scrollable qui absorbe l'espace.
+       */}
       {/* Actions */}
-      <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-4 shrink-0">
         <button
           type="button"
           onClick={onClose}
@@ -581,6 +599,7 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
       </div>
 
       {/* ── Dialog sélection galerie ────────────────────────────────────────── */}
+      {/* Portail Radix — rendu dans document.body, non affecté par le scroll wrapper ci-dessus */}
       <MediaPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
