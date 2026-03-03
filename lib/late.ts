@@ -82,10 +82,11 @@ export interface LatePostPlatformResult {
   /**
    * Statut de publication sur cette plateforme.
    * - `pending`  : en attente de traitement par Late
-   * - `success`  : publié avec succès
-   * - `failed`   : échec de publication
+   * - `success`   : publié avec succès (valeur nominale documentée par Late)
+   * - `published` : publié avec succès (valeur réelle retournée par Instagram et Facebook)
+   * - `failed`    : échec de publication
    */
-  status: 'pending' | 'success' | 'failed'
+  status: 'pending' | 'success' | 'published' | 'failed'
   /**
    * URL directe du post publié sur la plateforme sociale.
    * Ex: "https://www.tiktok.com/@handle/video/123456789"

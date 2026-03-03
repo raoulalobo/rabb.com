@@ -51,12 +51,14 @@
     "react-filerobot-image-editor": "5.0.0-beta.153",
     "react-hook-form": "^7.71.1",
     "recharts": "^3.7.0",
-    "resend": "^6.9.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "zenstack": "^2.22.1",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
+  },
+  "overrides": {
+    "entities": "^4.5.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
