@@ -75,6 +75,11 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
   // ── États de chargement / erreur ───────────────────────────────────────────
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * true quand l'erreur est récupérable (503 Anthropic surchargé).
+   * Permet d'afficher le bouton "Réessayer" sans re-saisir l'instruction.
+   */
+  const [canRetry, setCanRetry] = useState(false)
 
   // ── Posts créés (étape de résumé) ─────────────────────────────────────────
   const [createdPosts, setCreatedPosts] = useState<Post[] | null>(null)
@@ -240,7 +245,11 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
     if (!instruction.trim() || isGenerating || uploadingFiles.length > 0) return
 
     setError(null)
+    setCanRetry(false)
     setIsGenerating(true)
+
+    // Variable locale synchrone : accessible dans le catch avant que setCanRetry soit appliqué
+    let isRetryableError = false
 
     try {
       const res = await fetch('/api/agent/create-posts', {
@@ -252,13 +261,23 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
       const data = (await res.json()) as { posts?: Post[]; error?: string }
 
       if (!res.ok || !data.posts) {
+        // 503 = serveurs Claude surchargés (après maxRetries côté serveur) → afficher "Réessayer"
+        if (res.status === 503) {
+          isRetryableError = true
+          setCanRetry(true)
+        }
         throw new Error(data.error ?? `Erreur ${res.status}`)
       }
 
       setCreatedPosts(data.posts)
       onPostsCreated(data.posts)
     } catch (err) {
-      console.error('[AgentModalCreate] Erreur génération :', err)
+      // 503 : niveau warn (erreur attendue, non-bloquante) — les autres : erreur réelle
+      if (isRetryableError) {
+        console.warn('[AgentModalCreate] Anthropic surchargé (503) — invite à réessayer')
+      } else {
+        console.error('[AgentModalCreate] Erreur génération :', err)
+      }
       setError(err instanceof Error ? err.message : 'Erreur lors de la génération. Veuillez réessayer.')
     } finally {
       setIsGenerating(false)
@@ -525,7 +544,20 @@ export function AgentModalCreate({ onPostsCreated, onClose }: AgentModalCreatePr
       {/* ── Erreur ─────────────────────────────────────────────────────────── */}
       {error && (
         <div className="rounded-lg bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
-          {error}
+          <p>{error}</p>
+          {/*
+           * Bouton "Réessayer" : visible uniquement pour les erreurs récupérables (503).
+           * Relance handleGenerate sans re-saisir l'instruction.
+           */}
+          {canRetry && (
+            <button
+              type="button"
+              onClick={() => void handleGenerate()}
+              className="mt-2 text-xs font-medium underline underline-offset-2 hover:no-underline"
+            >
+              Réessayer
+            </button>
+          )}
         </div>
       )}
 

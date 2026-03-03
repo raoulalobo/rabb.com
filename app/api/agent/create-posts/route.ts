@@ -39,7 +39,9 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-import { anthropic, AGENT_MODEL } from '@/lib/ai'
+import Anthropic from '@anthropic-ai/sdk'
+
+import { callAnthropicWithFallback, AGENT_MODEL, ANTHROPIC_OVERLOADED_STATUS, ANTHROPIC_SERVER_ERROR_STATUS } from '@/lib/ai'
 import { auth } from '@/lib/auth'
 import { rateLimiters, rateLimitResponse } from '@/lib/rate-limit'
 import { inngest } from '@/lib/inngest/client'
@@ -84,7 +86,7 @@ const CreatePostsToolOutputSchema = z.object({
  * Définition du tool Anthropic que Claude doit utiliser.
  * Claude remplit ce tool avec un post par plateforme ciblée par l'instruction.
  */
-const CREATE_POSTS_TOOL: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
+const CREATE_POSTS_TOOL: Parameters<typeof callAnthropicWithFallback>[0]['tools'] = [
   {
     name: 'create_posts_per_platform',
     description: [
@@ -286,7 +288,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const systemPrompt = buildSystemPrompt(connectedPlatforms, mediaPool)
 
-    const response = await anthropic.messages.create({
+    // Appel via le wrapper : tente Sonnet, bascule sur Opus si 529 persistant
+    const response = await callAnthropicWithFallback({
       model: AGENT_MODEL,
       max_tokens: 4096,
       system: systemPrompt,
@@ -397,6 +400,29 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ posts: createdPosts })
   } catch (error) {
+    // ── Erreur 529 : serveurs Anthropic surchargés ────────────────────────────
+    // Le SDK a déjà effectué maxRetries (4) tentatives avant de propager l'erreur.
+    // On retourne un 503 explicite pour que l'UI affiche un message clair à l'utilisateur.
+    if (error instanceof Anthropic.APIError && error.status === ANTHROPIC_OVERLOADED_STATUS) {
+      console.warn('[create-posts] Anthropic overloaded (529) après 5 tentatives')
+      return NextResponse.json(
+        { error: 'Les serveurs Claude sont momentanément surchargés. Veuillez réessayer dans quelques instants.' },
+        { status: 503 },
+      )
+    }
+
+    // ── Erreur 500 : erreur interne côté Anthropic (x-should-retry: false) ─────
+    // Distincte du 529 : le SDK ne réessaie pas (header x-should-retry: false).
+    // C'est une défaillance temporaire de l'infrastructure Anthropic, pas la nôtre.
+    // On retourne 503 pour signaler à l'UI que c'est temporaire et récupérable.
+    if (error instanceof Anthropic.APIError && error.status === ANTHROPIC_SERVER_ERROR_STATUS) {
+      console.warn('[create-posts] Anthropic internal server error (500) :', error.message)
+      return NextResponse.json(
+        { error: 'Une erreur interne est survenue du côté de Claude. Veuillez réessayer dans quelques instants.' },
+        { status: 503 },
+      )
+    }
+
     console.error('[create-posts] Erreur :', error)
     return NextResponse.json(
       { error: 'Erreur lors de la génération des posts. Veuillez réessayer.' },

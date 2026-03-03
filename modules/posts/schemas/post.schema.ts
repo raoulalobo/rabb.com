@@ -133,3 +133,99 @@ export const MediaUploadRequestSchema = z.object({
 })
 
 export type MediaUploadRequest = z.infer<typeof MediaUploadRequestSchema>
+
+// ─── Schémas bulk ─────────────────────────────────────────────────────────────
+
+/**
+ * Suppression en masse : 1 à 100 posts.
+ * Seuls les posts DRAFT / SCHEDULED / FAILED sont éligibles — PUBLISHED sont ignorés.
+ *
+ * @example
+ *   BulkDeleteSchema.parse({ postIds: ['abc', 'def'] })
+ */
+export const BulkDeleteSchema = z.object({
+  postIds: z
+    .array(z.string().min(1))
+    .min(1, 'Sélectionne au moins un post')
+    .max(100, 'Maximum 100 posts par opération'),
+})
+export type BulkDelete = z.infer<typeof BulkDeleteSchema>
+
+/**
+ * Un média du pool partagé transmis à Claude lors du bulk edit.
+ * Identique à la structure utilisée dans create-posts/route.ts.
+ *
+ * @example
+ *   PoolMediaSchema.parse({ url: 'https://...', type: 'photo', filename: 'img.jpg' })
+ */
+export const PoolMediaSchema = z.object({
+  /** URL publique du fichier uploadé sur Supabase Storage */
+  url: z.string().url(),
+  /** Type du média : photo ou vidéo */
+  type: z.enum(['photo', 'video']),
+  /** Nom du fichier original (ex: "banner.jpg") */
+  filename: z.string(),
+})
+export type PoolMediaItem = z.infer<typeof PoolMediaSchema>
+
+/**
+ * Validation du corps de l'endpoint /api/agent/edit-posts-batch.
+ * Contient les IDs des posts à modifier, l'instruction en langage naturel,
+ * et un pool optionnel de médias partagés à distribuer entre les posts.
+ *
+ * @example
+ *   BulkEditBatchSchema.parse({
+ *     postIds: ['abc', 'def'],
+ *     instruction: "Ajoute #promo2026 et ajoute la photo du pool à chaque post",
+ *     mediaPool: [{ url: 'https://...', type: 'photo', filename: 'promo.jpg' }],
+ *   })
+ */
+export const BulkEditBatchSchema = z.object({
+  /** IDs des posts à modifier (1–50) */
+  postIds: z.array(z.string().min(1)).min(1).max(50),
+  /** Instruction libre de modification (ex: "Ajoute #promo2026 à chaque post") */
+  instruction: z.string().min(1, 'Instruction requise').max(2000),
+  /**
+   * Pool de médias partagés (optionnel, max 50).
+   * Ces médias sont transmis à Claude pour qu'il puisse les distribuer entre les posts
+   * si l'instruction le demande (ex: "ajoute la photo du pool à chaque post Instagram").
+   */
+  mediaPool: z.array(PoolMediaSchema).max(50).default([]),
+})
+
+/**
+ * Une modification proposée par l'IA pour un post.
+ * Retournée par /api/agent/edit-posts-batch, confirmée par bulk-apply-edits.
+ * Aucune écriture DB à ce stade — uniquement des propositions pour review.
+ *
+ * @example
+ *   ProposedEditSchema.parse({
+ *     postId: 'abc123',
+ *     text: 'Mon texte modifié #promo2026',
+ *     mediaUrls: ['https://...'],
+ *     scheduledFor: '2026-03-15T09:00:00.000Z',
+ *   })
+ */
+export const ProposedEditSchema = z.object({
+  /** ID du post concerné */
+  postId: z.string().min(1),
+  /** Texte proposé par l'IA (respecte les contraintes de la plateforme) */
+  text: z.string().min(1).max(63206),
+  /** URLs des médias à conserver */
+  mediaUrls: z.array(z.string().url()),
+  /** Date de planification ISO 8601, null si pas de date */
+  scheduledFor: z.string().datetime().nullable(),
+})
+export type ProposedEdit = z.infer<typeof ProposedEditSchema>
+
+/**
+ * Tableau de modifications confirmées envoyées à la Server Action bulk-apply-edits.
+ * Déclenche la persistance en DB + events Inngest.
+ *
+ * @example
+ *   BulkApplyEditsSchema.parse({ edits: [{ postId: 'abc', text: '...', mediaUrls: [], scheduledFor: null }] })
+ */
+export const BulkApplyEditsSchema = z.object({
+  edits: z.array(ProposedEditSchema).min(1).max(50),
+})
+export type BulkApplyEdits = z.infer<typeof BulkApplyEditsSchema>

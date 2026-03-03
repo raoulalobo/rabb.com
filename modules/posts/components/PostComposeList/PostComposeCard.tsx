@@ -4,6 +4,7 @@
  * @description Carte d'un post dans la liste /compose.
  *
  *   Affiche :
+ *   - Checkbox de sélection (overlay top-left, visible au hover ou si sélectionné)
  *   - Icône de la plateforme (depuis PLATFORM_CONFIG)
  *   - Texte tronqué à 2 lignes
  *   - Vignettes des médias (max 3 affichées + compteur)
@@ -11,12 +12,17 @@
  *   - Date planifiée (texte simple, non cliquable)
  *   - Actions : Modifier (ouvre AgentModal en mode edit) · Supprimer
  *
+ *   La sélection est optionnelle : si onToggleSelect n'est pas fourni, le checkbox
+ *   est masqué et la carte se comporte comme avant.
+ *
  * @example
  *   <PostComposeCard
  *     post={post}
  *     onEdit={(post) => { setSelectedPost(post); setModalOpen(true) }}
  *     onDelete={(postId) => { removePostFromList(postId) }}
  *     onDetail={(post) => { setDetailPost(post); setDetailOpen(true) }}
+ *     isSelected={selectedIds.has(post.id)}
+ *     onToggleSelect={(id) => toggleSelect(id)}
  *   />
  */
 
@@ -27,6 +33,8 @@ import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from '@/modules/posts/utils/status-styles'
 import type { Post } from '@/modules/posts/types'
@@ -42,6 +50,18 @@ interface PostComposeCardProps {
   onDelete: (postId: string) => void
   /** Callback appelé quand l'utilisateur clique sur le corps de la carte (ouvre le modal de détail) */
   onDetail?: (post: Post) => void
+  /** true si ce post est dans la sélection courante (affiche ring + checkbox coché) */
+  isSelected?: boolean
+  /**
+   * Callback pour basculer la sélection du post.
+   * Reçoit l'objet Post complet (pas seulement l'ID) pour que le parent puisse
+   * le stocker dans son Map de sélection (persistance cross-filtres).
+   * Si fourni, le checkbox est affiché en overlay top-left.
+   * Si non fourni, aucun checkbox n'est affiché.
+   *
+   * @param post - Objet Post complet à basculer
+   */
+  onToggleSelect?: (post: Post) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -83,13 +103,16 @@ function isVideoUrl(url: string): boolean {
 
 /**
  * Carte d'un post dans la liste de composition.
- * Affiche les informations essentielles du post et les actions disponibles.
+ * Affiche les informations essentielles du post, un checkbox de sélection (optionnel),
+ * et les actions disponibles.
  */
 export function PostComposeCard({
   post,
   onEdit,
   onDelete,
   onDetail,
+  isSelected = false,
+  onToggleSelect,
 }: PostComposeCardProps): React.JSX.Element {
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -120,14 +143,25 @@ export function PostComposeCard({
   return (
     /*
      * onClick sur l'ensemble de la carte → ouvre le modal de détail (si onDetail est fourni).
-     * Les boutons d'action (Modifier / Supprimer) appellent e.stopPropagation()
-     * via leur div wrapper pour ne pas déclencher ce handler.
+     * Les boutons d'action (Modifier / Supprimer / Checkbox) appellent e.stopPropagation()
+     * pour ne pas déclencher le handler du détail.
+     *
+     * group : permet au CSS du checkbox de réagir au hover de la carte (group-hover:opacity-100).
+     * ring-2 ring-primary : indicateur visuel de sélection.
+     * pl-8 : espace à gauche pour le checkbox overlay (uniquement si onToggleSelect fourni).
      *
      * Accessibilité : role="button" + tabIndex + onKeyDown permettent la navigation clavier.
      */
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
-      className="flex gap-3 rounded-xl border border-border bg-card p-4 transition-all hover:shadow-sm hover:border-border/80 cursor-pointer"
+      className={cn(
+        'group relative flex gap-3 rounded-xl border bg-card transition-all hover:shadow-sm cursor-pointer',
+        isSelected
+          ? 'border-primary ring-2 ring-primary ring-offset-1'
+          : 'border-border hover:border-border/80',
+        // Padding gauche élargi uniquement si le checkbox est activé (espace pour l'overlay)
+        onToggleSelect ? 'pl-8 pr-4 py-4' : 'p-4',
+      )}
       onClick={() => onDetail?.(post)}
       role={onDetail ? 'button' : undefined}
       tabIndex={onDetail ? 0 : undefined}
@@ -143,6 +177,33 @@ export function PostComposeCard({
       }
       aria-label={onDetail ? `Voir les détails du post ${post.platform}` : undefined}
     >
+      {/* ── Checkbox de sélection (overlay top-left) ──────────────────────────
+       *  - Visible en permanence si le post est sélectionné
+       *  - Visible au hover de la carte si le post n'est pas sélectionné
+       *  - Absent si onToggleSelect n'est pas fourni
+       */}
+      {onToggleSelect && (
+        <div
+          className={cn(
+            'absolute left-2.5 top-1/2 -translate-y-1/2 transition-opacity z-10',
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
+          onClick={(e) => {
+            // Empêche le clic de remonter au handler de détail
+            e.stopPropagation()
+            // Passer l'objet Post complet — le parent le stocke dans son Map
+            onToggleSelect(post)
+          }}
+        >
+          <Checkbox
+            checked={isSelected}
+            aria-label={`Sélectionner le post ${post.platform}`}
+            // tabIndex=-1 : la carte elle-même est focusable — pas le checkbox séparément
+            tabIndex={-1}
+          />
+        </div>
+      )}
+
       {/* ── Icône de plateforme ───────────────────────────────────────────── */}
       <div
         className="flex size-8 shrink-0 items-center justify-center rounded-md"

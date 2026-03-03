@@ -63,6 +63,8 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
+  /** true quand l'erreur est un 503 Anthropic surchargé (récupérable → bouton Réessayer) */
+  const [canRetry, setCanRetry] = useState(false)
 
   // ── Pool de médias — initialisé depuis les URLs actuelles du post ───────────
   const [mediaPool, setMediaPool] = useState<PoolMedia[]>(() =>
@@ -244,7 +246,10 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
     if (!instruction.trim() || isUpdating) return
 
     setError(null)
+    setCanRetry(false)
     setIsUpdating(true)
+
+    let isRetryableError = false
 
     try {
       const res = await fetch('/api/agent/edit-post', {
@@ -261,13 +266,21 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
       const data = (await res.json()) as { post?: Post; error?: string }
 
       if (!res.ok || !data.post) {
+        if (res.status === 503) {
+          isRetryableError = true
+          setCanRetry(true)
+        }
         throw new Error(data.error ?? `Erreur ${res.status}`)
       }
 
       onPostUpdated(data.post)
       setIsSuccess(true)
     } catch (err) {
-      console.error('[AgentModalEdit] Erreur mise à jour :', err)
+      if (isRetryableError) {
+        console.warn('[AgentModalEdit] Anthropic surchargé (503) — invite à réessayer')
+      } else {
+        console.error('[AgentModalEdit] Erreur mise à jour :', err)
+      }
       setError(
         err instanceof Error ? err.message : 'Erreur lors de la mise à jour. Veuillez réessayer.',
       )
@@ -558,7 +571,16 @@ export function AgentModalEdit({ post, onPostUpdated, onClose }: AgentModalEditP
       {/* Erreur */}
       {error && (
         <div className="rounded-lg bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
-          {error}
+          <p>{error}</p>
+          {canRetry && (
+            <button
+              type="button"
+              onClick={() => void handleUpdate()}
+              className="mt-2 text-xs font-medium underline underline-offset-2 hover:no-underline"
+            >
+              Réessayer
+            </button>
+          )}
         </div>
       )}
 

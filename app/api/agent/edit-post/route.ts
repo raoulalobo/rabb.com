@@ -36,7 +36,9 @@ import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-import { anthropic, AGENT_MODEL } from '@/lib/ai'
+import Anthropic from '@anthropic-ai/sdk'
+
+import { callAnthropicWithFallback, AGENT_MODEL, ANTHROPIC_OVERLOADED_STATUS, ANTHROPIC_SERVER_ERROR_STATUS } from '@/lib/ai'
 import { auth } from '@/lib/auth'
 import { rateLimiters, rateLimitResponse } from '@/lib/rate-limit'
 import { inngest } from '@/lib/inngest/client'
@@ -77,7 +79,7 @@ const EditPostToolOutputSchema = z.object({
  * Définition du tool Anthropic pour l'édition d'un post.
  * Claude remplit ce tool avec le contenu mis à jour du post.
  */
-const EDIT_POST_TOOL: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
+const EDIT_POST_TOOL: Parameters<typeof callAnthropicWithFallback>[0]['tools'] = [
   {
     name: 'edit_post',
     description: [
@@ -233,7 +235,8 @@ ${allAvailableMediaUrls.length > 0 ? allAvailableMediaUrls.join('\n') : 'Aucun m
 
   // ── Appel Claude Sonnet ───────────────────────────────────────────────────
   try {
-    const response = await anthropic.messages.create({
+    // Appel via le wrapper : tente Sonnet, bascule sur Opus si 529 persistant
+    const response = await callAnthropicWithFallback({
       model: AGENT_MODEL,
       max_tokens: 2048,
       system: systemPrompt,
@@ -330,6 +333,24 @@ ${allAvailableMediaUrls.length > 0 ? allAvailableMediaUrls.join('\n') : 'Aucun m
 
     return NextResponse.json({ post: updatedPost })
   } catch (error) {
+    // ── Erreur 529 : serveurs Anthropic surchargés ────────────────────────────
+    if (error instanceof Anthropic.APIError && error.status === ANTHROPIC_OVERLOADED_STATUS) {
+      console.warn('[edit-post] Anthropic overloaded (529) après 5 tentatives')
+      return NextResponse.json(
+        { error: 'Les serveurs Claude sont momentanément surchargés. Veuillez réessayer dans quelques instants.' },
+        { status: 503 },
+      )
+    }
+
+    // ── Erreur 500 : erreur interne côté Anthropic (x-should-retry: false) ─────
+    if (error instanceof Anthropic.APIError && error.status === ANTHROPIC_SERVER_ERROR_STATUS) {
+      console.warn('[edit-post] Anthropic internal server error (500) :', error.message)
+      return NextResponse.json(
+        { error: 'Une erreur interne est survenue du côté de Claude. Veuillez réessayer dans quelques instants.' },
+        { status: 503 },
+      )
+    }
+
     // Logger l'erreur réelle (visible dans les logs serveur / Vercel)
     const message = error instanceof Error ? error.message : String(error)
     console.error('[edit-post] Erreur :', message, error)

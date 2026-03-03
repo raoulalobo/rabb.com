@@ -8,8 +8,10 @@
  *   2. Vérification de la session better-auth
  *   3. Récupérer ou créer le workspace Late de l'utilisateur (POST /api/v1/profiles)
  *      → l'ID est stocké dans User.lateWorkspaceId pour les prochains connects
- *   4. Appel GET /api/v1/connect/get-connect-url?profileId=...&redirect_url=...
- *   5. Retour de authUrl au client pour redirection
+ *   4. Guard doublon : vérifier qu'aucun compte de cette plateforme n'est déjà connecté
+ *      sur ce profileId (contrainte métier : 1 seul compte par plateforme par profileId)
+ *   5. Appel GET /api/v1/connect/get-connect-url?profileId=...&redirect_url=...
+ *   6. Retour de authUrl au client pour redirection
  *
  *   Note : Late exige un "profileId" (workspace conteneur) avant tout connect OAuth.
  *   Ce workspace est créé une fois par utilisateur et réutilisé pour toutes les plateformes.
@@ -143,7 +145,34 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
       console.log('[connectPlatform] Workspace Late existant (DB):', lateWorkspaceId)
     }
 
-    // 4. Obtenir l'URL OAuth avec la plateforme + le profileId du workspace
+    // 4. Guard doublon : vérifier qu'aucun compte de cette plateforme n'est déjà actif
+    //    sur ce profileId. Règle métier : un seul Instagram (ou autre) par profileId.
+    //    → Évite de lancer le flux OAuth pour un compte déjà connecté sur le même workspace.
+    //    Exemple interdit : profileId A → Instagram 1 ET Instagram 2 (→ erreur retournée)
+    //    Exemple valide   : profileId A → Instagram 1, profileId B → Instagram 2 (→ OK)
+    const existingAccount = await prisma.connectedPlatform.findUnique({
+      where: {
+        userId_platform_lateProfileId: {
+          userId: session.user.id,
+          platform: validPlatform,
+          lateProfileId: lateWorkspaceId!,
+        },
+      },
+      // On ne récupère que accountName pour construire le message d'erreur
+      select: { accountName: true },
+    })
+
+    if (existingAccount) {
+      // Capitalise la première lettre du nom de la plateforme pour le message utilisateur
+      // ex: 'instagram' → 'Instagram'
+      const platformLabel = validPlatform.charAt(0).toUpperCase() + validPlatform.slice(1)
+      return {
+        success: false,
+        error: `${platformLabel} est déjà connecté sur ce profil (${existingAccount.accountName}). Déconnecte-le d'abord.`,
+      }
+    }
+
+    // 5. Obtenir l'URL OAuth avec la plateforme + le profileId du workspace
     // lateWorkspaceId est garanti non-null ici (assigné dans le bloc if précédent ou en DB)
     const { authUrl } = await late.connect.getUrl(validPlatform, lateWorkspaceId!, callbackUrl)
     console.log('[connectPlatform] authUrl reçu:', authUrl)

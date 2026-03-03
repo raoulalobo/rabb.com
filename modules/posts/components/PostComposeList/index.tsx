@@ -2,7 +2,7 @@
  * @file modules/posts/components/PostComposeList/index.tsx
  * @module posts
  * @description Liste interactive des posts sur la page /compose.
- *   Gère la création, l'édition et la consultation des brouillons/planifiés.
+ *   Gère la création, l'édition, la consultation et la sélection multiple des brouillons/planifiés.
  *
  *   Fonctionnalités :
  *   - Infinite scroll via useInfiniteQuery + IntersectionObserver
@@ -11,6 +11,7 @@
  *     → reset à la page 1 à chaque changement de filtre
  *   - Updates optimistes (create/update/delete) via queryClient.setQueryData
  *   - Bouton "Nouveau post" → AgentModal (création / édition)
+ *   - Sélection multiple par checkbox → BulkActionBar → AgentModal bulk-edit / suppression en masse
  *
  *   Note : la vue calendrier est disponible à /calendar (page dédiée).
  *
@@ -28,15 +29,18 @@
 
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Loader2, Plus, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { AgentModal } from '@/modules/posts/components/AgentModal'
+import { bulkDeletePosts } from '@/modules/posts/actions/bulk-delete-posts.action'
 import { composeQueryKey, fetchComposePage } from '@/modules/posts/queries/posts.queries'
 import type { ComposeFilters, ComposePage } from '@/modules/posts/queries/posts.queries'
 import type { Post } from '@/modules/posts/types'
 
 import { AIFilterModal } from './AIFilterModal'
+import { BulkActionBar } from './BulkActionBar'
 import { PostComposeCard } from './PostComposeCard'
 import { PostDetailModal } from './PostDetailModal'
 
@@ -307,6 +311,173 @@ export function PostComposeList({
     })
   }
 
+  // ── État de la sélection multiple ─────────────────────────────────────────
+  //
+  // On stocke Map<postId, Post> plutôt que Set<postId>.
+  // Raison : l'utilisateur peut sélectionner des posts sur plusieurs filtres
+  // successifs (ex: semaine 1 → semaine 2 → plateforme Instagram uniquement).
+  // Quand le filtre change, les posts précédemment sélectionnés disparaissent
+  // de `data` (la requête fetche une nouvelle tranche). Si on ne stockait que
+  // les IDs, `selectedPosts` deviendrait [] → AgentModal bulk-edit crash.
+  // En stockant l'objet Post complet, la sélection persiste indépendamment
+  // des données actuellement visibles.
+  //
+  // Exemple de workflow supporté :
+  //   1. Filtre "semaine prochaine" → sélectionner 2 posts Instagram
+  //   2. Filtre "mois prochain" → sélectionner 3 posts TikTok
+  //   3. BulkActionBar affiche "5 sélectionnés" → "Modifier avec l'IA" → batch de 5 posts
+  /**
+   * Map postId → Post complet pour TOUS les posts sélectionnés.
+   * Persiste à travers les changements de filtre.
+   */
+  const [selectedPostsMap, setSelectedPostsMap] = useState<Map<string, Post>>(new Map())
+  /** Contrôle l'ouverture de l'AgentModal en mode bulk-edit */
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false)
+  /** true pendant l'opération de suppression en masse */
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  /**
+   * Set des IDs sélectionnés — dérivé de selectedPostsMap.
+   * Utilisé par PostComposeCard pour le rendu du checkbox (isSelected).
+   */
+  const selectedIds = useMemo(() => new Set(selectedPostsMap.keys()), [selectedPostsMap])
+
+  /**
+   * Tableau des posts sélectionnés — dérivé de selectedPostsMap.
+   * Passé comme prop `posts` à AgentModal bulk-edit.
+   * Contient les posts de TOUS les filtres précédents, pas seulement la vue courante.
+   */
+  const selectedPosts = useMemo(() => Array.from(selectedPostsMap.values()), [selectedPostsMap])
+
+  /**
+   * Bascule la sélection d'un post.
+   * Reçoit l'objet Post complet pour pouvoir le stocker dans selectedPostsMap.
+   * Ajoute au Map s'il n'est pas sélectionné, le retire sinon.
+   *
+   * @param post - Post à basculer (objet complet — persisté dans la Map)
+   */
+  const toggleSelect = useCallback((post: Post): void => {
+    setSelectedPostsMap((prev) => {
+      const next = new Map(prev)
+      next.has(post.id) ? next.delete(post.id) : next.set(post.id, post)
+      return next
+    })
+  }, [])
+
+  /**
+   * Ajoute tous les posts actuellement visibles à la sélection.
+   * Les posts déjà sélectionnés (d'un filtre précédent) sont conservés.
+   * Utilisé par le bouton "Tout sélectionner (N)" de la BulkActionBar.
+   */
+  const selectAll = useCallback((): void => {
+    const currentPosts = data?.pages.flatMap((p) => p.posts) ?? []
+    setSelectedPostsMap((prev) => {
+      const next = new Map(prev)
+      // Ajouter tous les posts visibles (sans écraser ceux déjà sélectionnés d'autres filtres)
+      for (const post of currentPosts) {
+        next.set(post.id, post)
+      }
+      return next
+    })
+  }, [data])
+
+  /**
+   * Retire un post individuel de la sélection par son ID.
+   * Utilisé par SelectionRecap (via BulkActionBar) pour le bouton × de chaque ligne.
+   *
+   * @param postId - ID du post à retirer de selectedPostsMap
+   *
+   * @example
+   *   deselect('abc123') // Retire le post "abc123" de la Map, la sélection passe de 5 à 4
+   */
+  const deselect = useCallback((postId: string): void => {
+    setSelectedPostsMap((prev) => {
+      const next = new Map(prev)
+      next.delete(postId)
+      return next
+    })
+  }, [])
+
+  /** Désélectionne tous les posts (vide la Map). */
+  const clearSelection = useCallback((): void => setSelectedPostsMap(new Map()), [])
+
+  /**
+   * Supprime en masse les posts sélectionnés (tous les filtres confondus).
+   * Applique un update optimiste sur le cache visible puis appelle la Server Action.
+   * Affiche un toast récapitulatif (N supprimés / N ignorés).
+   */
+  const handleBulkDelete = useCallback(async (): Promise<void> => {
+    if (isBulkDeleting || selectedPostsMap.size === 0) return
+
+    setIsBulkDeleting(true)
+
+    // Snapshot des IDs à supprimer avant de vider la sélection
+    const idsToDelete = new Set(selectedPostsMap.keys())
+
+    // Update optimiste : retirer les posts visibles de la liste courante
+    queryClient.setQueryData<ComposeData>(getKey(), (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          posts: page.posts.filter((p) => !idsToDelete.has(p.id)),
+        })),
+      }
+    })
+
+    clearSelection()
+
+    try {
+      const result = await bulkDeletePosts(Array.from(idsToDelete))
+
+      if (result.deleted > 0 || result.skipped > 0) {
+        const parts: string[] = []
+        if (result.deleted > 0) parts.push(`${result.deleted} post${result.deleted !== 1 ? 's' : ''} supprimé${result.deleted !== 1 ? 's' : ''}`)
+        if (result.skipped > 0) parts.push(`${result.skipped} ignoré${result.skipped !== 1 ? 's' : ''} (publié${result.skipped !== 1 ? 's' : ''})`)
+        toast.success(parts.join(', '))
+      }
+
+      if (result.errors.length > 0) {
+        toast.error(result.errors[0])
+      }
+    } catch (err) {
+      // En cas d'erreur, invalider la query pour recharger la liste depuis le serveur
+      void queryClient.invalidateQueries({ queryKey: getKey() })
+      toast.error('Erreur lors de la suppression')
+      console.error('[PostComposeList] Erreur bulk delete :', err)
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }, [isBulkDeleting, selectedPostsMap, queryClient, clearSelection]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * Callback appelé après l'application réussie des modifications IA en masse.
+   * Met à jour les posts modifiés dans le cache TanStack Query (update optimiste).
+   * Vide la sélection car les posts ont été traités.
+   *
+   * @param updatedPosts - Posts mis à jour par bulkApplyEdits
+   */
+  const handleBulkPostsUpdated = useCallback((updatedPosts: Post[]): void => {
+    // Index des posts mis à jour pour remplacement O(1)
+    const updatedMap = new Map(updatedPosts.map((p) => [p.id, p]))
+
+    // Mettre à jour les posts visibles dans le cache de la vue courante
+    queryClient.setQueryData<ComposeData>(getKey(), (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          posts: page.posts.map((post) => updatedMap.get(post.id) ?? post),
+        })),
+      }
+    })
+
+    clearSelection()
+    setIsBulkEditOpen(false)
+  }, [queryClient, clearSelection]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── État du modal PostDetailModal ─────────────────────────────────────────
   /** Post dont on affiche le détail (null = modal fermé) */
   const [detailPost, setDetailPost] = useState<Post | null>(null)
@@ -559,7 +730,11 @@ export function PostComposeList({
             </div>
           ) : (
             /* Liste des posts (filtrés côté serveur) */
-            <div className="space-y-3">
+            /*
+             * pb-20 : espace en bas de liste pour éviter que la BulkActionBar
+             * (fixed en bas du viewport) ne masque le dernier post quand elle est visible.
+             */
+            <div className="space-y-3 pb-20">
               {allPosts.map((post) => (
                 <PostComposeCard
                   key={post.id}
@@ -567,6 +742,9 @@ export function PostComposeList({
                   onEdit={handleOpenEdit}
                   onDelete={handlePostDeleted}
                   onDetail={handleOpenDetail}
+                  isSelected={selectedIds.has(post.id)}
+                  // toggleSelect reçoit le Post complet pour persistance cross-filtres
+                  onToggleSelect={toggleSelect}
                 />
               ))}
             </div>
@@ -630,6 +808,42 @@ export function PostComposeList({
           onPostUpdated={handlePostUpdated}
         />
       )}
+
+      {/* ── AgentModal — mode bulk-edit (N posts sélectionnés) ──────────────── */}
+      {/*
+       * Rendu uniquement si des posts sont sélectionnés — évite un rendu inutile
+       * et garantit que `selectedPosts` est peuplé quand la modale s'ouvre.
+       */}
+      {selectedPosts.length > 0 && (
+        <AgentModal
+          mode="bulk-edit"
+          posts={selectedPosts}
+          open={isBulkEditOpen}
+          onOpenChange={setIsBulkEditOpen}
+          onPostsUpdated={handleBulkPostsUpdated}
+        />
+      )}
+
+      {/* ── BulkActionBar — barre flottante sélection multiple ───────────────── */}
+      {/*
+       * Toujours montée (même si selectedIds.size === 0) pour que l'animation
+       * slide-down s'affiche correctement lors de la désélection.
+       * La barre gère elle-même sa visibilité via `selectedCount`.
+       */}
+      <BulkActionBar
+        // Liste complète des posts sélectionnés (cross-filtres) — passée à SelectionRecap
+        selectedPosts={selectedPosts}
+        // Posts visibles dans la vue courante qui ne sont pas encore sélectionnés
+        // → affiche "+ Ajouter les N visibles" si > 0
+        unselectedVisibleCount={allPosts.filter((p) => !selectedIds.has(p.id)).length}
+        // Désélection individuelle via SelectionRecap (bouton × de chaque ligne)
+        onDeselect={deselect}
+        onSelectAll={selectAll}
+        onClearSelection={clearSelection}
+        onBulkEdit={() => setIsBulkEditOpen(true)}
+        onBulkDelete={() => void handleBulkDelete()}
+        isDeleting={isBulkDeleting}
+      />
 
       {/* ── AIFilterModal — recherche en langage naturel ─────────────────────── */}
       <AIFilterModal
