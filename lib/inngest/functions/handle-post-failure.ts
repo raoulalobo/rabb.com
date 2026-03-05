@@ -6,7 +6,19 @@
  *
  *   Workflow :
  *   1. Vérifier que c'est bien publish-scheduled-post qui a échoué
- *   2. Mettre le post en statut FAILED en base de données
+ *   2. Lire l'état actuel du post en DB
+ *   3a. Si platformPostUrl présent → post publié en réalité → réparer en PUBLISHED
+ *   3b. Sinon → marquer FAILED avec le motif d'erreur Inngest
+ *
+ *   Garde critique contre la race condition "double run" :
+ *   Lorsque l'event post/schedule est émis deux fois (double-submit, retry réseau),
+ *   deux runs Inngest coexistent sur le même postId. Si Run A échoue et Run B réussit :
+ *   - Run B → "mettre-a-jour-statut" → DB: PUBLISHED + platformPostUrl
+ *   - Run A → inngest/function.failed → ici
+ *   Sans garde, on écraserait PUBLISHED → FAILED alors que le post EST publié.
+ *
+ *   Règle métier : platformPostUrl = preuve irréfutable de publication.
+ *   Un post avec platformPostUrl ne peut jamais être FAILED.
  *
  *   Note : les notifications par email (Resend) ont été retirées — seul Plunk
  *   est actif pour les emails transactionnels, géré dans lib/auth.ts.
@@ -33,13 +45,10 @@ export const handlePostFailure = inngest.createFunction(
   {
     id: 'handle-post-failure',
     name: 'Gérer un échec de publication',
-    // Rejouer cette fonction si elle échoue (ex: DB temporairement indisponible)
     retries: 3,
   },
-  // Événement système Inngest émis quand une fonction épuise ses retries
   { event: 'inngest/function.failed' },
   async ({ event, step }) => {
-    // Log complet pour diagnostiquer les futurs changements de structure SDK Inngest
     console.log('[handle-post-failure] event.data:', JSON.stringify(event.data, null, 2))
 
     // Vérifier que c'est bien la fonction de publication qui a échoué
@@ -57,14 +66,50 @@ export const handlePostFailure = inngest.createFunction(
     const failureReason =
       (event.data.error as { message?: string } | undefined)?.message ?? 'Erreur inconnue'
 
-    // ── Étape 1 : Marquer le post comme FAILED en DB ─────────────────────────
-    // Sans `include: { user }` pour éviter qu'une relation brisée empêche l'update
-    await step.run('marquer-echec', async () => {
-      return prisma.post.update({
+    // ── Étape 1 : Lire l'état actuel puis marquer FAILED ou réparer ───────────
+    //
+    // Avant de marquer FAILED, on vérifie la présence de platformPostUrl.
+    // platformPostUrl = preuve que Late a bien publié le contenu sur la plateforme.
+    //
+    // Cas de race condition :
+    //   Run B (doublon) réussit → DB: PUBLISHED + platformPostUrl à T1
+    //   Run A échoue  → inngest/function.failed → on lit la DB à T2
+    //   Si T2 > T1 : platformPostUrl présent → on répare en PUBLISHED (pas d'écrasement)
+    //   Si T2 < T1 : platformPostUrl absent → on marque FAILED, Run B écrasera en PUBLISHED
+    // Dans les deux ordres, l'état final est PUBLISHED. ✅
+    await step.run('verifier-puis-marquer', async () => {
+      const current = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { platformPostUrl: true },
+      })
+
+      // Post supprimé entre la planification et l'échec Inngest
+      if (!current) {
+        console.warn(`[handle-post-failure] Post ${postId} introuvable — rien à faire.`)
+        return { updated: false, reason: 'post-not-found' }
+      }
+
+      // platformPostUrl présent = publication confirmée malgré l'échec Inngest.
+      // Incohérence DB détectée → réparer en PUBLISHED.
+      if (current.platformPostUrl) {
+        console.warn(
+          `[handle-post-failure] Incohérence détectée sur le post ${postId} :`,
+          `platformPostUrl présent (${current.platformPostUrl}) mais Inngest a échoué.`,
+          'Race condition "double run" — réparation : PUBLISHED + failureReason: null.',
+        )
+        await prisma.post.update({
+          where: { id: postId },
+          data: { status: 'PUBLISHED', failureReason: null },
+        })
+        return { updated: true, reason: 'repaired-to-published' }
+      }
+
+      // Cas nominal : pas de platformPostUrl → le post n'a pas été publié → FAILED
+      await prisma.post.update({
         where: { id: postId },
         data: { status: 'FAILED', failureReason },
-        select: { userId: true },
       })
+      return { updated: true, reason: 'marked-failed' }
     })
 
     return { postMarkedFailed: true }
