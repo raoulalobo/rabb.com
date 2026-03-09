@@ -163,7 +163,7 @@ export function MediaCard({
           <img
             src={item.url}
             alt={item.filename}
-            className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+            className="size-full object-cover transition-transform duration-200 group-hover:scale-105 [@media(hover:none)]:scale-100"
             loading="lazy"
           />
         )}
@@ -183,8 +183,9 @@ export function MediaCard({
         )}
 
         {/* ── Overlay au survol (masqué en mode sélection) ──────────────── */}
+        {/* Sur desktop : visible au hover. Sur mobile (hover:none) : toujours visible */}
         {!isSelectMode && (
-          <div className="absolute inset-0 flex flex-col justify-between bg-black/0 p-1.5 opacity-0 transition-all duration-150 group-hover:bg-black/40 group-hover:opacity-100">
+          <div className="absolute inset-0 flex flex-col justify-between bg-black/0 p-1.5 opacity-0 transition-all duration-150 group-hover:bg-black/40 group-hover:opacity-100 [@media(hover:none)]:bg-black/40 [@media(hover:none)]:opacity-100">
 
             {/* Boutons d'action (haut de la carte) */}
             <div className="flex items-start justify-between gap-1">

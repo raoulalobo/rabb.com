@@ -24,6 +24,12 @@ import path from 'path'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Autorise les requêtes cross-origin vers /_next/* en développement.
+  // Nécessaire quand l'app est accédée depuis une autre machine du réseau local
+  // (ex: 10.187.189.160 → localhost). Sans cette config, Next.js affiche un warning
+  // et bloquera ces requêtes dans une future version majeure.
+  allowedDevOrigins: ['10.187.189.160'],
+
   // Config Turbopack — déclare explicitement l'usage de Turbopack pour `next dev`.
   // `root: __dirname` pointe sur /home/alobo/Bureau/NextJS/rsx/rsxv1 pour que
   // Turbopack ne remonte pas jusqu'au package.json de /home/alobo/Bureau/.

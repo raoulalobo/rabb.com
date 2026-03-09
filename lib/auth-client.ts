@@ -19,12 +19,20 @@ import { createAuthClient } from 'better-auth/react'
 
 /**
  * Client better-auth singleton pour le navigateur.
- * La baseURL est déduite automatiquement depuis window.location en développement.
- * En production, BETTER_AUTH_URL est utilisé.
+ *
+ * baseURL strategy :
+ * - En production : NEXT_PUBLIC_APP_URL (ex: https://ogolong.com)
+ * - En dev (navigateur) : window.location.origin → s'adapte automatiquement
+ *   que l'on accède via localhost:3000 ou via l'IP LAN (10.x.x.x:3000),
+ *   ce qui évite les erreurs "Failed to fetch" depuis un autre appareil.
+ * - En dev (SSR/build) : fallback localhost:3000 (window n'existe pas)
  */
 export const authClient = createAuthClient({
-  // URL de base de l'API d'auth (doit correspondre à BETTER_AUTH_URL)
-  baseURL: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
+  baseURL:
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (typeof window !== 'undefined'
+      ? window.location.origin
+      : 'http://localhost:3000'),
 })
 
 // ─── Exports nommés pour une utilisation directe ──────────────────────────────

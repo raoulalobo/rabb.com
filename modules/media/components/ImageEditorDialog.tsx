@@ -28,6 +28,7 @@
 
 import dynamic from 'next/dynamic'
 import React, { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 // Chargement dynamique SANS SSR — Filerobot utilise Canvas API (non disponible côté serveur)
 const FilerobotImageEditor = dynamic(
@@ -185,7 +186,9 @@ export function ImageEditorDialog({
   // Ne rien rendre si le dialog est fermé
   if (!open) return null
 
-  return (
+  // Portal : téléporte le dialog dans document.body pour éviter les conflits
+  // de structure HTML (ex: <div> interdit dans <tbody> quand utilisé dans MediaListView).
+  return createPortal(
     // Overlay plein écran avec z-index élevé (au-dessus des autres dialogs)
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* ── Barre d'en-tête ────────────────────────────────────────────────── */}
@@ -237,10 +240,14 @@ export function ImageEditorDialog({
           // Outil actif par défaut au chargement
           defaultTabId="Adjust"
           defaultToolId="Crop"
-          savingPixelRatio={3}
-          previewPixelRatio={window.devicePixelRatio}
+          // Sur mobile (devicePixelRatio ≥ 2), limiter les ratios pour éviter
+          // un canvas trop grand qui cause des crashs mémoire.
+          // savingPixelRatio=3 + mobile 3x = canvas 9× la taille visuelle → OOM.
+          savingPixelRatio={Math.min(window.devicePixelRatio, 2)}
+          previewPixelRatio={Math.min(window.devicePixelRatio, 1.5)}
         />
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
