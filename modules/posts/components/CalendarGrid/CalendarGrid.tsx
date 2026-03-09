@@ -318,10 +318,17 @@ export function CalendarGrid({
   const isLoading = l1 || (needsTwoMonths && l2)
 
   // ── Posts du jour sélectionné (Sheet mobile) ───────────────────────────────
-  /** Liste de posts pour le jour tapoté sur mobile — utilisée par le Sheet */
-  const mobileSelectedPosts: Post[] = mobileSelectedDay
-    ? (postsByDate.get(toDateKey(mobileSelectedDay)) ?? [])
-    : []
+  /**
+   * Liste de posts pour le jour tapoté sur mobile — utilisée par le Sheet.
+   * On applique filterPosts ici pour que les filtres actifs (plateforme, statut)
+   * soient respectés dans le Sheet, comme dans les cellules du calendrier.
+   */
+  const mobileSelectedPosts: Post[] = useMemo(() => {
+    const raw = mobileSelectedDay
+      ? (postsByDate.get(toDateKey(mobileSelectedDay)) ?? [])
+      : []
+    return filterPosts ? filterPosts(raw) : raw
+  }, [mobileSelectedDay, postsByDate, filterPosts])
 
   // ── Calcul des jours ───────────────────────────────────────────────────────
 
