@@ -5,7 +5,9 @@
  *   Affiche uniquement les plateformes CONNECTÉES de l'utilisateur.
  *   Permet la sélection multiple (publier sur plusieurs réseaux en même temps).
  *
- *   Design : badges cliquables avec logo + nom, couleur de marque quand sélectionné.
+ *   Design : cercles avatar (44px) avec photo de profil du compte + mini logo
+ *   réseau en overlay bas-droite. Grayscale → couleur quand sélectionné.
+ *   Tooltip natif au survol. Fallback : cercle coloré avec initiale du compte.
  *
  * @example
  *   const [selected, setSelected] = useState<Platform[]>([])
@@ -16,8 +18,6 @@
  */
 
 'use client'
-
-import { Check } from 'lucide-react'
 
 import type { LatePlatform } from '@/lib/late'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
@@ -87,11 +87,15 @@ export function PlatformPicker({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    /* gap-2.5 légèrement réduit pour les cercles vs les anciens badges */
+    <div className="flex flex-wrap gap-2.5">
       {platforms.map((account) => {
         const platform = account.platform as LatePlatform
         const config = PLATFORM_CONFIG[platform]
         const isSelected = selected.includes(platform)
+
+        /* Initiale de secours (sans le '@') pour le fallback avatar */
+        const initial = account.accountName.replace('@', '').charAt(0).toUpperCase()
 
         return (
           <button
@@ -99,32 +103,48 @@ export function PlatformPicker({
             type="button"
             onClick={() => toggle(platform)}
             disabled={disabled}
-            className={[
-              'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-              isSelected
-                ? 'shadow-sm'
-                : 'border-border bg-background text-muted-foreground hover:border-border/80 hover:text-foreground',
-            ].join(' ')}
-            style={
-              isSelected
-                ? {
-                    borderColor: config.color,
-                    backgroundColor: config.bgColor,
-                    color: config.color,
-                  }
-                : undefined
-            }
+            /* Tooltip natif navigateur : "TikTok — raoulalobo" */
+            title={`${config.label} — ${account.accountName}`}
             aria-pressed={isSelected}
-            aria-label={`${isSelected ? 'Désélectionner' : 'Sélectionner'} ${config.label}`}
+            aria-label={`${isSelected ? 'Désélectionner' : 'Sélectionner'} ${config.label} (${account.accountName})`}
+            className={[
+              'relative size-11 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all duration-150',
+              disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+            ].join(' ')}
           >
-            <PlatformIcon platform={platform} className="size-3.5" />
-            <span>{config.label}</span>
-            {/* Compte connecté affiché en plus petit */}
-            <span className="opacity-60">{account.accountName}</span>
-            {/* Coche si sélectionné */}
-            {isSelected && <Check className="size-3 ml-0.5" />}
+            {/* ── Photo de profil ──────────────────────────────────────────────── */}
+            {account.avatarUrl ? (
+              /* grayscale quand non sélectionné, couleur normale quand sélectionné */
+              <img
+                src={account.avatarUrl}
+                alt={account.accountName}
+                referrerPolicy="no-referrer"
+                className={[
+                  'size-full rounded-full object-cover transition-all duration-200',
+                  isSelected ? '' : 'grayscale',
+                ].join(' ')}
+              />
+            ) : (
+              /* Fallback initiale : gris neutre si non sélectionné, couleur de marque si sélectionné */
+              isSelected ? (
+                <span
+                  className="flex size-full items-center justify-center rounded-full text-sm font-semibold text-white transition-all duration-200"
+                  style={{ backgroundColor: config.color }}
+                >
+                  {initial}
+                </span>
+              ) : (
+                <span className="flex size-full items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground transition-all duration-200">
+                  {initial}
+                </span>
+              )
+            )}
+
+            {/* ── Mini logo réseau — badge 16px absolu en bas à droite ─────────── */}
+            <span className="absolute bottom-0 right-0 flex size-4 items-center justify-center rounded-full bg-background ring-1 ring-border">
+              <PlatformIcon platform={platform} className="size-2.5" />
+            </span>
+
           </button>
         )
       })}
