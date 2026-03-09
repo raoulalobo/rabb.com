@@ -53,7 +53,7 @@ export function Editor({
   placeholder = 'Rédigez votre post...',
   rows = 6,
 }: EditorProps): React.JSX.Element {
-  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, appendSignature } =
+  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, readOnly, appendSignature } =
     usePostComposerContext()
 
   // ─── Limite de caractères selon l'onglet actif ──────────────────────────────
@@ -90,7 +90,8 @@ export function Editor({
         onChange={handleChange}
         placeholder={placeholder}
         rows={rows}
-        disabled={isSubmitting}
+        disabled={isSubmitting || readOnly}
+        readOnly={readOnly}
         className={[
           'w-full resize-none rounded-none border-0 bg-transparent p-0',
           'text-sm leading-relaxed text-foreground',

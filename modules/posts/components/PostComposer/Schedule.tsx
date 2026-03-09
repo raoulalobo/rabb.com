@@ -49,7 +49,7 @@ function getMinDate(): Date {
  * @returns Section planification avec label, picker et confirmation
  */
 export function Schedule(): React.JSX.Element {
-  const { scheduledFor, setScheduledFor, isSubmitting } = usePostComposerContext()
+  const { scheduledFor, setScheduledFor, isSubmitting, readOnly } = usePostComposerContext()
 
   return (
     <div className="space-y-2">
@@ -64,7 +64,7 @@ export function Schedule(): React.JSX.Element {
         value={scheduledFor}
         onChange={setScheduledFor}
         minDate={getMinDate()}
-        disabled={isSubmitting}
+        disabled={isSubmitting || readOnly}
         placeholder="Choisir une date de publication…"
       />
 

@@ -20,7 +20,7 @@
 
 'use client'
 
-import { Filter, X } from 'lucide-react'
+import { CheckSquare, Filter, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -80,6 +80,10 @@ interface CalendarFiltersProps {
   selectedStatuses: PostStatus[]
   /** Callback déclenché à chaque changement de sélection de statuts */
   onStatusesChange: (statuses: PostStatus[]) => void
+  /** true si le mode sélection multiple est actif */
+  isSelectMode?: boolean
+  /** Callback pour basculer le mode sélection */
+  onToggleSelectMode?: () => void
 }
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -99,6 +103,8 @@ export function CalendarFilters({
   onPlatformsChange,
   selectedStatuses,
   onStatusesChange,
+  isSelectMode = false,
+  onToggleSelectMode,
 }: CalendarFiltersProps): React.JSX.Element {
   /**
    * Seules les plateformes accessibles aux utilisateurs (DISPLAYED_PLATFORMS).
@@ -149,7 +155,7 @@ export function CalendarFilters({
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5">
             <Filter className="size-3.5" />
-            Statut
+            <span className="hidden sm:inline">Statut</span>
             {/* Badge compteur — visible uniquement si au moins 1 statut actif */}
             {selectedStatuses.length > 0 && (
               <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold leading-none text-primary-foreground">
@@ -228,6 +234,25 @@ export function CalendarFilters({
           <span className="flex size-4 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">
             {totalActiveFilters}
           </span>
+        </Button>
+      )}
+
+      {/* ── Bouton mode sélection multiple ───────────────────────────────── */}
+      {/*
+       * Variant 'default' (rempli) quand le mode est actif pour indiquer l'état.
+       * Variant 'outline' quand inactif.
+       * ml-auto : pousse le bouton à droite de la barre d'outils.
+       */}
+      {onToggleSelectMode && (
+        <Button
+          variant={isSelectMode ? 'default' : 'outline'}
+          size="sm"
+          onClick={onToggleSelectMode}
+          className="gap-1.5 sm:ml-auto"
+          aria-pressed={isSelectMode}
+        >
+          <CheckSquare className="size-3.5" />
+          {isSelectMode ? 'Annuler la sélection' : 'Sélectionner'}
         </Button>
       )}
     </div>

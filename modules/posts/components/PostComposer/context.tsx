@@ -139,6 +139,14 @@ export interface PostComposerContextValue {
    */
   appendSignature: (sigText: string) => void
 
+  // ── Mode lecture seule ─────────────────────────────────────────────────────
+  /**
+   * Si true : tous les champs du composer sont non-interactifs (disabled/readOnly).
+   * Utilisé pour l'affichage des posts PUBLISHED dans le calendrier — le contenu
+   * est visible mais ne peut pas être modifié ni replanifié.
+   */
+  readOnly: boolean
+
   // ── État de soumission ─────────────────────────────────────────────────────
   /** Vrai pendant la sauvegarde (Server Action en cours) */
   isSubmitting: boolean

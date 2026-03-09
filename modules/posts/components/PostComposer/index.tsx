@@ -76,6 +76,14 @@ interface PostComposerProps {
    *   <PostComposer onSuccess={() => setDialogOpen(false)}>...</PostComposer>
    */
   onSuccess?: () => void
+  /**
+   * Si true : tous les champs sont affichés en lecture seule (non-interactifs).
+   * Utilisé pour consulter un post PUBLISHED dans le calendrier sans pouvoir le modifier.
+   *
+   * @example
+   *   <PostComposer readOnly>...</PostComposer>
+   */
+  readOnly?: boolean
 }
 
 // ─── Composant racine ────────────────────────────────────────────────────────
@@ -84,10 +92,11 @@ interface PostComposerProps {
  * Composant racine du PostComposer.
  * Instancie le Provider de contexte et orchestre l'état global du compositeur.
  *
- * @param children - Sous-composants du PostComposer
- * @param className - Classe CSS optionnelle
+ * @param children   - Sous-composants du PostComposer
+ * @param className  - Classe CSS optionnelle
+ * @param readOnly   - Mode lecture seule (post PUBLISHED non modifiable)
  */
-function PostComposerRoot({ children, className, onSuccess }: PostComposerProps): React.JSX.Element {
+function PostComposerRoot({ children, className, onSuccess, readOnly = false }: PostComposerProps): React.JSX.Element {
   // ─── État brouillon depuis Zustand ──────────────────────────────────────────
   const {
     text,
@@ -601,6 +610,8 @@ function PostComposerRoot({ children, className, onSuccess }: PostComposerProps)
         removeUploadedFile,
         // Insertion de signature
         appendSignature,
+        // Lecture seule (post PUBLISHED — aucun champ modifiable)
+        readOnly,
         // Soumission
         isSubmitting,
         saveDraft,

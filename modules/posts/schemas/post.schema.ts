@@ -241,3 +241,75 @@ export const BulkApplyEditsSchema = z.object({
   edits: z.array(ProposedEditSchema).min(1).max(50),
 })
 export type BulkApplyEdits = z.infer<typeof BulkApplyEditsSchema>
+
+// ─── Schémas de sélection multiple (bulk actions depuis le calendrier) ─────────
+
+/**
+ * Mise à jour en masse : replanifier ou passer en brouillon.
+ * Requiert soit scheduledFor (pour SCHEDULED), soit newStatus (pour DRAFT).
+ * Les posts PUBLISHED sont ignorés côté serveur.
+ *
+ * @example
+ *   BulkUpdateSchema.parse({ postIds: ['abc'], scheduledFor: new Date('2026-04-01T10:00:00') })
+ *   BulkUpdateSchema.parse({ postIds: ['abc'], newStatus: 'DRAFT' })
+ */
+export const BulkUpdateSchema = z.object({
+  /** IDs des posts à mettre à jour (1–100) */
+  postIds: z.array(z.string().min(1)).min(1).max(100),
+  /** Nouvelle date de planification (obligatoire si newStatus === 'SCHEDULED') */
+  scheduledFor: z.date().refine((d) => d > new Date(), {
+    message: 'La date doit être dans le futur',
+  }).optional(),
+  /** Nouveau statut à appliquer ('DRAFT' ou 'SCHEDULED') */
+  newStatus: z.enum(['DRAFT', 'SCHEDULED']).optional(),
+}).superRefine((data, ctx) => {
+  // SCHEDULED sans date → erreur
+  if (data.newStatus === 'SCHEDULED' && !data.scheduledFor) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'scheduledFor est requis pour planifier',
+      path: ['scheduledFor'],
+    })
+  }
+  // Ni date ni statut → erreur
+  if (!data.scheduledFor && !data.newStatus) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Fournir scheduledFor ou newStatus',
+      path: [],
+    })
+  }
+})
+export type BulkUpdate = z.infer<typeof BulkUpdateSchema>
+
+/**
+ * Édition de contenu en masse : appliquer un texte commun et/ou des médias communs
+ * à plusieurs posts d'un coup.
+ * textMode 'replace' remplace le texte existant ; 'append' l'ajoute à la fin.
+ *
+ * @example
+ *   BulkContentEditSchema.parse({
+ *     postIds: ['abc', 'def'],
+ *     text: '#promo2026',
+ *     textMode: 'append',
+ *     mediaUrls: [],
+ *   })
+ */
+export const BulkContentEditSchema = z.object({
+  /** IDs des posts à modifier (1–100) */
+  postIds: z.array(z.string().min(1)).min(1).max(100),
+  /** Texte à appliquer (optionnel si on ne modifie que les médias) */
+  text: z.string().max(63206).optional(),
+  /**
+   * Mode d'application du texte :
+   * - 'replace' : remplace entièrement le texte existant du post
+   * - 'append'  : ajoute le nouveau texte à la fin du texte existant
+   */
+  textMode: z.enum(['replace', 'append']).default('replace'),
+  /** URLs des médias à appliquer (remplace les médias existants, max 10) */
+  mediaUrls: z.array(z.string().url()).max(10).default([]),
+}).refine(
+  (d) => d.text !== undefined || d.mediaUrls.length > 0,
+  { message: 'Fournir text ou au moins un média' },
+)
+export type BulkContentEdit = z.infer<typeof BulkContentEditSchema>

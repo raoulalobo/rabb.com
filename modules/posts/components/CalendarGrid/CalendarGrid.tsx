@@ -220,6 +220,23 @@ interface CalendarGridProps {
    *   onPostClick={(post) => openEditDialog(post)}
    */
   onPostClick?: (post: Post) => void
+  /**
+   * Si true : active le mode sélection multiple.
+   * Les chips affichent une checkbox, les cellules vides ne créent plus de post.
+   * Default: false → comportement normal.
+   */
+  isSelectMode?: boolean
+  /**
+   * Set des IDs de posts actuellement sélectionnés.
+   * Propagé à chaque chip pour afficher l'état coché/décoché.
+   */
+  selectedIds?: Set<string>
+  /**
+   * Callback déclenché quand l'utilisateur clique sur un chip en mode sélection.
+   *
+   * @param postId - ID du post à basculer dans la sélection
+   */
+  onToggleSelect?: (postId: string) => void
 }
 
 // ─── Composant principal ───────────────────────────────────────────────────────
@@ -247,6 +264,9 @@ export function CalendarGrid({
   onMonthChange,
   onDayClick,
   onPostClick,
+  isSelectMode = false,
+  selectedIds,
+  onToggleSelect,
 }: CalendarGridProps): React.JSX.Element {
   const now = new Date()
 
@@ -543,6 +563,10 @@ export function CalendarGrid({
                 // Props mobile : tap sur la cellule → ouvre le Sheet
                 isMobile={isMobile}
                 onMobileSelect={setMobileSelectedDay}
+                // Props mode sélection multiple
+                isSelectMode={isSelectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={onToggleSelect}
               />
             )
           })}
@@ -582,11 +606,16 @@ export function CalendarGrid({
                 <CalendarPostChip
                   key={post.id}
                   post={post}
-                  // onEdit : ferme le Sheet puis ouvre le Dialog d'édition existant
+                  // onEdit : ferme le Sheet puis ouvre le Dialog.
+                  // CalendarContent détermine le mode (edit vs view) selon le statut.
                   onEdit={() => {
                     setMobileSelectedDay(null)
                     onPostClick?.(post)
                   }}
+                  // Mode sélection multiple propagé au Sheet mobile
+                  isSelectMode={isSelectMode}
+                  isSelected={selectedIds?.has(post.id) ?? false}
+                  onToggleSelect={onToggleSelect}
                 />
               ))}
             </div>
@@ -654,6 +683,12 @@ interface CalendarCellProps {
    * @param date - Jour tapoté
    */
   onMobileSelect?: (date: Date) => void
+  /** Propagé depuis CalendarGrid : active le mode sélection multiple */
+  isSelectMode?: boolean
+  /** Propagé depuis CalendarGrid : Set des IDs sélectionnés */
+  selectedIds?: Set<string>
+  /** Propagé depuis CalendarGrid : callback de bascule de sélection */
+  onToggleSelect?: (postId: string) => void
 }
 
 /**
@@ -682,6 +717,9 @@ function CalendarCell({
   onPostClick,
   isMobile = false,
   onMobileSelect,
+  isSelectMode = false,
+  selectedIds,
+  onToggleSelect,
 }: CalendarCellProps): React.JSX.Element {
   // Nombre de posts visibles : plus généreux en vue semaine
   const MAX_VISIBLE = view === 'week' ? 6 : 3
@@ -691,7 +729,8 @@ function CalendarCell({
   const visiblePosts = effectivePosts.slice(0, MAX_VISIBLE)
   const hiddenCount = effectivePosts.length - MAX_VISIBLE
 
-  const isClickable = Boolean(onDayClick)
+  // En mode sélection, bloquer la création de posts (clic sur cellule vide)
+  const isClickable = Boolean(onDayClick) && !isSelectMode
 
   /**
    * Couleur de fond de la cellule (priorité décroissante) :
@@ -902,6 +941,10 @@ function CalendarCell({
                   // onEdit propagé depuis CalendarGrid.onPostClick :
                   // active le mode bouton d'édition quand interactive=false
                   onEdit={onPostClick}
+                  // Props mode sélection multiple
+                  isSelectMode={isSelectMode}
+                  isSelected={selectedIds?.has(post.id) ?? false}
+                  onToggleSelect={onToggleSelect}
                 />
               ))}
 

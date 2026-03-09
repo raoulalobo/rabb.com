@@ -30,7 +30,7 @@ import { usePostComposerContext } from './context'
  * Connecté au draftStore via le contexte PostComposer.
  */
 export function Platforms(): React.JSX.Element {
-  const { platforms, setPlatforms, isSubmitting } = usePostComposerContext()
+  const { platforms, setPlatforms, isSubmitting, readOnly } = usePostComposerContext()
 
   return (
     <div className="space-y-2">
@@ -38,7 +38,7 @@ export function Platforms(): React.JSX.Element {
       <PlatformPicker
         selected={platforms as LatePlatform[]}
         onChange={(selected) => setPlatforms(selected as Platform[])}
-        disabled={isSubmitting}
+        disabled={isSubmitting || readOnly}
       />
     </div>
   )

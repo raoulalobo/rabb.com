@@ -36,6 +36,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 
 import {
   Dialog,
@@ -46,10 +47,15 @@ import {
 } from '@/components/ui/dialog'
 import { CalendarGrid } from '@/modules/posts/components/CalendarGrid/CalendarGrid'
 import { PostComposer } from '@/modules/posts/components/PostComposer'
+import { bulkDeletePosts } from '@/modules/posts/actions/bulk-delete-posts.action'
+import { bulkEditContent } from '@/modules/posts/actions/bulk-edit-content.action'
+import { bulkUpdatePosts } from '@/modules/posts/actions/bulk-update-posts.action'
+import { useBulkSelection } from '@/modules/posts/hooks/useBulkSelection'
 import { postQueryKeys } from '@/modules/posts/queries/posts.queries'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { Post, PostStatus } from '@/modules/posts/types'
 
+import { BulkActionBar } from './BulkActionBar'
 import { CalendarFilters } from './CalendarFilters'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -128,12 +134,23 @@ export function CalendarContent(): React.JSX.Element {
     [selectedPlatforms, selectedStatuses],
   )
 
+  // ── État de chargement pour les opérations bulk ──────────────────────────────
+  const [isBulkLoading, setIsBulkLoading] = useState(false)
+
+  // ── Hook de sélection multiple ────────────────────────────────────────────────
+  const { isSelectMode, selectedIds, selectedCount, toggleSelectMode, togglePost, exitSelectMode } =
+    useBulkSelection()
+
   // ── État local du Dialog ─────────────────────────────────────────────────────
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  /** 'create' = clic sur cellule vide | 'edit' = clic sur un chip de post existant */
-  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
-  /** Post en cours d'édition (uniquement en mode 'edit') */
+  /**
+   * 'create' = clic sur cellule vide (nouveau post)
+   * 'edit'   = clic sur chip DRAFT / SCHEDULED / FAILED (modification possible)
+   * 'view'   = clic sur chip PUBLISHED (lecture seule — non replanifiable)
+   */
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create')
+  /** Post en cours d'édition ou de consultation (modes 'edit' et 'view') */
   const [editingPost, setEditingPost] = useState<Post | null>(null)
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -193,19 +210,35 @@ export function CalendarContent(): React.JSX.Element {
 
   /**
    * Déclenché au clic sur un chip de post existant dans la grille.
-   * Charge le post dans le draft store et ouvre le Dialog en mode édition.
+   * - En mode sélection → bascule la sélection du post (pas d'ouverture du Dialog)
+   * - PUBLISHED → mode 'view' : contenu visible, footer masqué (lecture seule)
+   * - Autres    → mode 'edit' : modification possible
    *
    * @param post - Post DB cliqué dans la grille calendrier
    */
   const handlePostClick = useCallback(
     (post: Post): void => {
-      // Charger le post dans le store (reset + remplissage des champs)
+      // En mode sélection → basculer la sélection du post (pas d'ouverture du Dialog)
+      if (isSelectMode) {
+        togglePost(post.id)
+        return
+      }
+
+      // Charger le post dans le store pour afficher son contenu dans le dialog
       loadPost(post)
       setEditingPost(post)
-      setDialogMode('edit')
+
+      if (post.status === 'PUBLISHED') {
+        // Post déjà publié → vue lecture seule (pas de footer d'action)
+        setDialogMode('view')
+      } else {
+        // Draft / Scheduled / Failed → édition normale
+        setDialogMode('edit')
+      }
+
       setDialogOpen(true)
     },
-    [loadPost],
+    [isSelectMode, togglePost, loadPost],
   )
 
   /**
@@ -223,6 +256,118 @@ export function CalendarContent(): React.JSX.Element {
       setDialogMode('create')
     }
   }, [])
+
+  // ─── Handlers bulk (actions groupées sur les posts sélectionnés) ─────────────
+
+  /**
+   * Applique une édition de contenu (texte + médias) à tous les posts sélectionnés.
+   * Invalide le cache calendrier après succès.
+   *
+   * @param text      - Texte à appliquer (undefined = ne pas toucher)
+   * @param textMode  - Mode 'replace' ou 'append'
+   * @param mediaUrls - URLs des médias à appliquer
+   */
+  const handleBulkEditContent = useCallback(
+    async (
+      text: string | undefined,
+      textMode: 'replace' | 'append',
+      mediaUrls: string[],
+    ): Promise<void> => {
+      setIsBulkLoading(true)
+      try {
+        const result = await bulkEditContent({
+          postIds: Array.from(selectedIds),
+          text,
+          textMode,
+          mediaUrls,
+        })
+        if (result.errors.length > 0) {
+          toast.error(result.errors[0])
+        } else {
+          const skippedMsg = result.skipped > 0
+            ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
+            : ''
+          toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} modifié${result.updated > 1 ? 's' : ''}${skippedMsg}`)
+          exitSelectMode()
+          void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+        }
+      } finally {
+        setIsBulkLoading(false)
+      }
+    },
+    [selectedIds, exitSelectMode, queryClient],
+  )
+
+  /**
+   * Replanifie tous les posts sélectionnés à une nouvelle date.
+   *
+   * @param newDate - Nouvelle date de planification
+   */
+  const handleBulkReschedule = useCallback(
+    async (newDate: Date): Promise<void> => {
+      setIsBulkLoading(true)
+      try {
+        const result = await bulkUpdatePosts(Array.from(selectedIds), { scheduledFor: newDate })
+        if (result.errors.length > 0) {
+          toast.error(result.errors[0])
+        } else {
+          const skippedMsg = result.skipped > 0
+            ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
+            : ''
+          toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} replanifié${result.updated > 1 ? 's' : ''}${skippedMsg}`)
+          exitSelectMode()
+          void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+        }
+      } finally {
+        setIsBulkLoading(false)
+      }
+    },
+    [selectedIds, exitSelectMode, queryClient],
+  )
+
+  /**
+   * Passe tous les posts sélectionnés en DRAFT.
+   */
+  const handleBulkMakeDraft = useCallback(async (): Promise<void> => {
+    setIsBulkLoading(true)
+    try {
+      const result = await bulkUpdatePosts(Array.from(selectedIds), { newStatus: 'DRAFT' })
+      if (result.errors.length > 0) {
+        toast.error(result.errors[0])
+      } else {
+        const skippedMsg = result.skipped > 0
+          ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
+          : ''
+        toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} passé${result.updated > 1 ? 's' : ''} en brouillon${skippedMsg}`)
+        exitSelectMode()
+        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+      }
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }, [selectedIds, exitSelectMode, queryClient])
+
+  /**
+   * Supprime tous les posts sélectionnés.
+   */
+  const handleBulkDelete = useCallback(async (): Promise<void> => {
+    setIsBulkLoading(true)
+    try {
+      const result = await bulkDeletePosts(Array.from(selectedIds))
+      if (result.errors.length > 0) {
+        toast.error(result.errors[0])
+      } else {
+        const skippedMsg = result.skipped > 0
+          ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
+          : ''
+        toast.success(`${result.deleted} post${result.deleted > 1 ? 's' : ''} supprimé${result.deleted > 1 ? 's' : ''}${skippedMsg}`)
+        exitSelectMode()
+        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+      }
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }, [selectedIds, exitSelectMode, queryClient])
 
   // ─── Formatage des dates pour le titre du Dialog ──────────────────────────────
 
@@ -261,10 +406,11 @@ export function CalendarContent(): React.JSX.Element {
 
   return (
     <>
-      {/* ── Toolbar de filtres plateforme + statut ───────────────────────── */}
+      {/* ── Toolbar de filtres plateforme + statut + bouton sélection ──────── */}
       {/*
        * Les filtres sont en state local (pas de store Zustand) :
        * ils se réinitialisent à chaque navigation — comportement MVP souhaité.
+       * isSelectMode + onToggleSelectMode : bouton "Sélectionner" en fin de toolbar.
        */}
       <div className="mb-4 flex items-center gap-2">
         <CalendarFilters
@@ -272,6 +418,8 @@ export function CalendarContent(): React.JSX.Element {
           onPlatformsChange={setSelectedPlatforms}
           selectedStatuses={selectedStatuses}
           onStatusesChange={setSelectedStatuses}
+          isSelectMode={isSelectMode}
+          onToggleSelectMode={toggleSelectMode}
         />
       </div>
 
@@ -279,46 +427,78 @@ export function CalendarContent(): React.JSX.Element {
       {/*
        * interactive=false : pas de Popover d'aperçu sur les chips
        * filterPosts       : filtre client-side mémoïsé (plateformes + statuts)
-       * onDayClick        : cellules vides → ouvre le Dialog en mode création
-       * onPostClick       : chips existants → ouvre le Dialog en mode édition
+       * onDayClick        : undefined en mode sélection (bloque la création de posts)
+       * onPostClick       : chips existants → édition OU sélection selon isSelectMode
+       * isSelectMode      : active le mode sélection multiple dans la grille
+       * selectedIds       : Set des IDs sélectionnés propagé aux chips
+       * onToggleSelect    : callback de bascule de sélection d'un chip
        */}
       <CalendarGrid
         interactive={false}
         filterPosts={filterPosts}
-        onDayClick={handleDayClick}
+        onDayClick={isSelectMode ? undefined : handleDayClick}
         onPostClick={handlePostClick}
+        isSelectMode={isSelectMode}
+        selectedIds={selectedIds}
+        onToggleSelect={togglePost}
       />
+
+      {/* ── Barre d'actions groupées (visible si sélection active) ──────── */}
+      {/*
+       * Flottante en bas de l'écran (fixed bottom-6).
+       * Affichée uniquement quand au moins 1 post est sélectionné.
+       */}
+      {selectedCount > 0 && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onEditContent={handleBulkEditContent}
+          onReschedule={handleBulkReschedule}
+          onMakeDraft={handleBulkMakeDraft}
+          onDelete={handleBulkDelete}
+          onCancel={exitSelectMode}
+          isLoading={isBulkLoading}
+        />
+      )}
 
       {/* ── Dialog PostComposer (création ou édition) ─────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            {/* Titre conditionnel selon le mode (création ou édition) */}
+            {/* Titre conditionnel selon le mode */}
             <DialogTitle>
-              {dialogMode === 'edit'
-                ? `Modifier le post${formattedEditDate ? ` — ${formattedEditDate}` : ''}`
-                : `Nouveau post — ${formattedDate}`}
+              {dialogMode === 'view'
+                ? `Post publié${formattedEditDate ? ` — ${formattedEditDate}` : ''}`
+                : dialogMode === 'edit'
+                  ? `Modifier le post${formattedEditDate ? ` — ${formattedEditDate}` : ''}`
+                  : `Nouveau post — ${formattedDate}`}
             </DialogTitle>
             <DialogDescription>
-              {dialogMode === 'edit'
-                ? 'Modifiez votre post et sauvegardez.'
-                : 'Composez et planifiez votre post pour cette date.'}
+              {dialogMode === 'view'
+                ? 'Ce post a déjà été publié. Il ne peut plus être modifié ni replanifié.'
+                : dialogMode === 'edit'
+                  ? 'Modifiez votre post et sauvegardez.'
+                  : 'Composez et planifiez votre post pour cette date.'}
             </DialogDescription>
           </DialogHeader>
 
           {/*
-           * PostComposer pré-rempli via le draft store.
-           * Mode création : scheduledFor défini dans handleDayClick.
-           * Mode édition  : tous les champs définis dans handlePostClick via loadPost().
-           * onSuccess : ferme le Dialog + invalide le cache après soumission réussie.
+           * PostComposer pré-rempli via le draft store (loadPost).
+           * Mode 'create' : scheduledFor défini dans handleDayClick.
+           * Mode 'edit'   : tous les champs définis dans handlePostClick via loadPost().
+           * Mode 'view'   : même chose qu'édition mais sans PostComposer.Footer
+           *                 (lecture seule — le post PUBLISHED ne peut pas être replanifié).
            */}
-          <PostComposer onSuccess={handleSuccess}>
+          {/*
+           * readOnly=true en mode 'view' : tous les champs sont disabled (non-interactifs).
+           * Le footer est masqué — le post publié ne peut pas être replanifié.
+           */}
+          <PostComposer onSuccess={handleSuccess} readOnly={dialogMode === 'view'}>
             <PostComposer.PlatformTabs />
             <PostComposer.Editor />
             <PostComposer.Platforms />
             <PostComposer.MediaUpload />
             <PostComposer.Schedule />
-            <PostComposer.Footer />
+            {dialogMode !== 'view' && <PostComposer.Footer />}
           </PostComposer>
         </DialogContent>
       </Dialog>

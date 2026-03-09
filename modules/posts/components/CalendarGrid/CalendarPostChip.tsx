@@ -85,6 +85,21 @@ interface CalendarPostChipProps {
    * Compatible avec interactive=false uniquement (le mode Popover prend la priorité).
    */
   onEdit?: (post: Post) => void
+  /**
+   * Si true : le chip est en mode sélection multiple.
+   * Affiche une checkbox au lieu du comportement normal.
+   * PUBLISHED reste sélectionnable — le serveur gère l'éligibilité.
+   */
+  isSelectMode?: boolean
+  /** true si ce post est actuellement sélectionné (mode sélection) */
+  isSelected?: boolean
+  /**
+   * Callback déclenché au clic en mode sélection.
+   * Bascule la sélection de ce post.
+   *
+   * @param postId - ID du post à basculer
+   */
+  onToggleSelect?: (postId: string) => void
 }
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -110,6 +125,9 @@ export function CalendarPostChip({
   post,
   interactive = false,
   onEdit,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
 }: CalendarPostChipProps): React.JSX.Element {
   // Config plateforme : fournit bgColor (fond pastel), color (accent), iconPath, label
   const platformConfig = PLATFORM_CONFIG[post.platform as keyof typeof PLATFORM_CONFIG]
@@ -161,9 +179,58 @@ export function CalendarPostChip({
     </>
   )
 
+  // ── Mode sélection multiple : checkbox + chip cliquable ────────────────────
+  // Prioritaire sur tous les autres modes (onEdit, interactive).
+  // PUBLISHED reste sélectionnable — le serveur filtre côté Server Action.
+  if (isSelectMode) {
+    return (
+      <button
+        type="button"
+        style={chipStyle}
+        className={[
+          chipClasses,
+          'cursor-pointer',
+          // Anneau de sélection : bleu si sélectionné, gris sinon
+          isSelected ? 'ring-2 ring-primary' : 'ring-1 ring-border hover:ring-primary/50',
+        ].join(' ')}
+        aria-pressed={isSelected}
+        aria-label={`${isSelected ? 'Désélectionner' : 'Sélectionner'} le post`}
+        onClick={(e) => {
+          // Stopper la propagation vers la cellule calendrier parente
+          e.stopPropagation()
+          onToggleSelect?.(post.id)
+        }}
+      >
+        {/*
+         * Indicateur visuel de sélection : <div> au lieu de <Checkbox> (shadcn rend un <button>).
+         * Un <button> dans un <button> est invalide HTML → hydration error.
+         * On simule visuellement la checkbox avec un <div> pur.
+         */}
+        <div
+          aria-hidden
+          className={[
+            'size-3 shrink-0 rounded-[3px] border flex items-center justify-center transition-colors',
+            isSelected
+              ? 'bg-primary border-primary text-primary-foreground'
+              : 'border-muted-foreground/50 bg-background',
+          ].join(' ')}
+        >
+          {/* Coche SVG visible uniquement si sélectionné */}
+          {isSelected && (
+            <svg viewBox="0 0 10 10" className="size-2 stroke-current" strokeWidth={2} fill="none">
+              <polyline points="1.5,5 4,7.5 8.5,2.5" />
+            </svg>
+          )}
+        </div>
+        {chipContent}
+      </button>
+    )
+  }
+
   // ── Mode non interactif + onEdit : bouton cliquable pour édition /calendar ──
-  // Ce mode s'active quand interactive=false mais onEdit est fourni.
-  // Le chip devient un <button> qui charge le post dans le draft store.
+  // Ce mode s'active quand interactive=false et onEdit est fourni.
+  // Tous les statuts (y compris PUBLISHED) déclenchent onEdit : c'est CalendarContent
+  // qui décide du mode dialog (edit vs view) selon le statut du post.
   if (!interactive && onEdit) {
     return (
       <button
@@ -176,15 +243,19 @@ export function CalendarPostChip({
           e.stopPropagation()
           onEdit(post)
         }}
-        title={`Modifier — [${STATUS_LABELS[post.status]}] ${post.text}`}
+        title={
+          post.status === 'PUBLISHED'
+            ? `Voir le post — ${post.text}`
+            : `Modifier — [${STATUS_LABELS[post.status]}] ${post.text}`
+        }
       >
         {chipContent}
       </button>
     )
   }
 
-  // ── Mode non interactif (comportement /calendar/ original) ────────────────
-  // Aucune prop onEdit → <div> non interactif (lecture seule)
+  // ── Mode non interactif (lecture seule) ───────────────────────────────────
+  // S'applique uniquement quand aucune prop onEdit n'est fournie.
   if (!interactive) {
     return (
       <div

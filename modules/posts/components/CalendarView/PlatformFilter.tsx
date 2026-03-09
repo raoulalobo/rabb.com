@@ -70,7 +70,7 @@ export function PlatformFilter({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Globe className="size-3.5" />
-          Réseaux
+          <span className="hidden sm:inline">Réseaux</span>
           {/* Badge compteur — visible uniquement si au moins 1 plateforme active */}
           {selectedPlatforms.length > 0 && (
             <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold leading-none text-primary-foreground">

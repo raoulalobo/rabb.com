@@ -114,6 +114,7 @@ export function MediaUpload(): React.JSX.Element {
     removeUploadedFile,
     addActiveMediaUrl,
     isSubmitting,
+    readOnly,
   } = usePostComposerContext()
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -135,7 +136,7 @@ export function MediaUpload(): React.JSX.Element {
 
   // Total de fichiers (uploadés + en cours)
   const totalFiles = activeMediaUrls.length + uploadingFiles.length
-  const canAddMore = totalFiles < maxFiles && !isSubmitting
+  const canAddMore = totalFiles < maxFiles && !isSubmitting && !readOnly
 
   // ── Traitement des fichiers (partagé entre clic et drop) ──────────────────
 
@@ -189,7 +190,7 @@ export function MediaUpload(): React.JSX.Element {
     e.preventDefault()
     if (!e.dataTransfer.types.includes('Files')) return
     dragCounterRef.current++
-    if (!isSubmitting) setIsDragging(true)
+    if (!isSubmitting && !readOnly) setIsDragging(true)
   }
 
   /**
@@ -219,7 +220,7 @@ export function MediaUpload(): React.JSX.Element {
     e.preventDefault()
     dragCounterRef.current = 0
     setIsDragging(false)
-    if (isSubmitting) return
+    if (isSubmitting || readOnly) return
     const files = Array.from(e.dataTransfer.files)
     await processFiles(files)
   }
@@ -251,7 +252,7 @@ export function MediaUpload(): React.JSX.Element {
                 key={url}
                 url={url}
                 onRemove={() => removeUploadedFile('', url)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || readOnly}
               />
             ))}
 
@@ -310,7 +311,7 @@ export function MediaUpload(): React.JSX.Element {
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || readOnly}
                 className={[
                   'flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground',
                   'border-l border-border/40 transition-colors hover:text-primary',
