@@ -50,11 +50,11 @@ export default async function AnalyticsPage(): Promise<React.JSX.Element> {
   if (!session) redirect('/login')
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+    <div className="space-y-6">
       {/* ── En-tête ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Performances de vos publications sur tous vos réseaux sociaux.
           </p>

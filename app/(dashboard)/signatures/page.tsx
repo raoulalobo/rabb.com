@@ -58,10 +58,10 @@ export default async function SignaturesPage(): Promise<React.JSX.Element> {
   ]
 
   return (
-    <div className="container max-w-3xl py-8 space-y-8">
+    <div className="space-y-8">
       {/* ── En-tête ────────────────────────────────────────────────────── */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Signatures</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Signatures</h1>
         <p className="text-sm text-muted-foreground">
           Créez des blocs de texte réutilisables (hashtags, CTA, liens) par réseau social.
           Insérez-les en un clic dans vos posts depuis le Composer.

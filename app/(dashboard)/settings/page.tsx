@@ -1,10 +1,10 @@
 /**
  * @file app/(dashboard)/settings/page.tsx
  * @description Page des paramètres utilisateur (/settings).
- *   Sections :
+ *   Sections (organisées en onglets via SettingsTabs) :
  *   - Réseaux sociaux connectés (PlatformList)
- *   - Dictée vocale (SpeechSettings)
- *   - Données & compte (AccountDangerZone) — export RGPD + suppression de compte
+ *   - Préférences : dictée vocale (SpeechSettings)
+ *   - Compte : export RGPD + suppression (AccountDangerZone)
  *
  *   Gère les query params success/error du callback OAuth pour afficher des toasts.
  *
@@ -16,67 +16,35 @@
 
 import { Suspense } from 'react'
 
-import { AccountDangerZone } from '@/modules/auth/components/AccountDangerZone'
-import { PlatformCardSkeleton } from '@/modules/platforms/components/PlatformCardSkeleton'
-import { PlatformList } from '@/modules/platforms/components/PlatformList'
-
 import { SettingsToastHandler } from './SettingsToastHandler'
-import { SpeechSettings } from './SpeechSettings'
+import { SettingsTabs } from './SettingsTabs'
 
 /**
- * Page des paramètres.
- * Server Component pour le layout — PlatformList et AccountDangerZone sont des Client Components.
+ * Page des paramètres — Server Component.
+ * Délègue la navigation en onglets à SettingsTabs (Client Component).
  */
 export default function SettingsPage(): React.JSX.Element {
   return (
-    <div className="mx-auto max-w-2xl space-y-10 py-8">
-      {/* Handler des toasts issus des query params OAuth (client-side) */}
+    <div className="space-y-6">
+      {/* Handler silencieux des toasts OAuth (query params success/error) */}
       <Suspense>
         <SettingsToastHandler />
       </Suspense>
 
-      {/* ── En-tête ── */}
+      {/* ── En-tête ───────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Paramètres</h1>
+        <h1 className="text-2xl font-bold text-foreground">Paramètres</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Gère tes réseaux sociaux et les préférences de ton compte.
         </p>
       </div>
 
-      {/* ── Section : Réseaux sociaux ── */}
-      <section>
-        <div className="mb-4">
-          <h2 className="text-base font-semibold">Réseaux sociaux connectés</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Connecte tes comptes pour commencer à planifier et publier du contenu.
-          </p>
-        </div>
-
-        {/* Suspense : skeleton pendant l'hydratation du Client Component */}
-        <Suspense fallback={<PlatformCardSkeleton count={4} />}>
-          <PlatformList />
-        </Suspense>
-      </section>
-
-      {/* ── Section : Dictée vocale ── */}
-      <section>
-        <div className="mb-4">
-          <h2 className="text-base font-semibold">Dictée vocale</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Règle le comportement du micro lors de la saisie vocale.
-          </p>
-        </div>
-        {/* Client Component : lit/écrit speechSilenceTimeoutMs dans le store Zustand persisté */}
-        <SpeechSettings />
-      </section>
-
-      {/* ── Section : Données & compte (RGPD) ── */}
+      {/* ── Navigation en onglets (Client Component) ──────────────────────── */}
       {/*
-        AccountDangerZone expose :
-        - Export des données (droit à la portabilité — art. 20 RGPD)
-        - Suppression du compte (droit à l'effacement — art. 17 RGPD)
-      */}
-      <AccountDangerZone />
+       * SettingsTabs organise les 3 sections en onglets distincts :
+       * "Réseaux sociaux" / "Préférences" / "Compte"
+       */}
+      <SettingsTabs />
     </div>
   )
 }
