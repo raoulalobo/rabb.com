@@ -5,7 +5,7 @@
  *
  *   Visible uniquement lorsque l'utilisateur a des posts avec le statut FAILED
  *   (erreur de publication). Dans ce cas, affiche un bandeau rouge avec le nombre
- *   de posts en erreur et un lien vers /compose pour corriger.
+ *   de posts en erreur et un lien vers /calendar?status=FAILED pour corriger.
  *
  *   Comportement :
  *   - isLoading → rien affiché (invisible, le layout ne bouge pas)
@@ -76,9 +76,9 @@ export function FailedPostsAlert(): React.JSX.Element | null {
         </span>
       </div>
 
-      {/* Lien vers /compose pour corriger */}
+      {/* Lien vers le calendrier filtré sur les posts FAILED pour corriger */}
       <Link
-        href="/compose"
+        href="/calendar?status=FAILED"
         className="shrink-0 text-sm font-medium text-red-700 underline-offset-2 hover:underline dark:text-red-400"
       >
         Voir et corriger →

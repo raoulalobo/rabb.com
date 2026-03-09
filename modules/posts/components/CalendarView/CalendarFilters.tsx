@@ -24,7 +24,7 @@ import { Filter, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
+import { DISPLAYED_PLATFORMS } from '@/modules/platforms/constants'
 import { PlatformFilter } from '@/modules/posts/components/CalendarView/PlatformFilter'
 import type { PostStatus } from '@/modules/posts/types'
 
@@ -100,8 +100,12 @@ export function CalendarFilters({
   selectedStatuses,
   onStatusesChange,
 }: CalendarFiltersProps): React.JSX.Element {
-  /** Toutes les plateformes connues (clés de PLATFORM_CONFIG) */
-  const allPlatforms = Object.keys(PLATFORM_CONFIG)
+  /**
+   * Seules les plateformes accessibles aux utilisateurs (DISPLAYED_PLATFORMS).
+   * Exclut Bluesky, Reddit, Telegram et Google Business — non disponibles dans l'UI.
+   * Synchronisé avec constants.ts : mettre à jour là-bas suffit à changer le filtre.
+   */
+  const allPlatforms = DISPLAYED_PLATFORMS
 
   /** Nombre total de filtres actifs (plateformes + statuts) */
   const totalActiveFilters = selectedPlatforms.length + selectedStatuses.length
@@ -131,8 +135,8 @@ export function CalendarFilters({
     <div className="flex flex-wrap items-center gap-2">
       {/* ── Filtre par réseau social (composant réutilisé) ────────────────── */}
       {/*
-       * availablePlatforms = toutes les plateformes connues dans PLATFORM_CONFIG.
-       * Le filtre affiche un Popover multi-sélection par réseau social.
+       * availablePlatforms = DISPLAYED_PLATFORMS (9 réseaux accessibles dans l'UI).
+       * Exclut les réseaux non disponibles (Bluesky, Reddit, Telegram, Google Business).
        */}
       <PlatformFilter
         selectedPlatforms={selectedPlatforms}

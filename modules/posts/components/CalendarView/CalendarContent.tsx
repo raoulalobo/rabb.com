@@ -32,9 +32,10 @@
 
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 
 import {
   Dialog,
@@ -64,13 +65,35 @@ export function CalendarContent(): React.JSX.Element {
   // ── Client TanStack Query pour invalider le cache après succès ───────────────
   const queryClient = useQueryClient()
 
-  // ── État local des filtres (pas de persistance — MVP) ────────────────────────
+  // ── Lecture des paramètres URL pour le pré-filtrage initial ─────────────────
+  // Exemple : /calendar?status=FAILED → pré-sélectionne le filtre FAILED au montage.
+  // Utilisé notamment depuis le lien "Voir et corriger" du dashboard.
+  const searchParams = useSearchParams()
+
+  /**
+   * Extrait et valide le(s) statut(s) passés dans l'URL (?status=FAILED ou ?status=SCHEDULED,...).
+   * Seuls les statuts connus (DRAFT, SCHEDULED, PUBLISHED, FAILED) sont acceptés.
+   * Exemple : ?status=FAILED → ['FAILED']
+   */
+  const initialStatuses = useMemo<PostStatus[]>(() => {
+    // Valeurs autorisées (correspondant à l'enum Prisma PostStatus)
+    const VALID: PostStatus[] = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
+    // Récupère toutes les valeurs du paramètre "status" (peut être répété)
+    const raw = searchParams.getAll('status')
+    return raw.filter((s): s is PostStatus => VALID.includes(s as PostStatus))
+  }, [searchParams])
+
+  // ── État local des filtres (initialisé depuis URL si présent, sinon vide) ────
 
   /** Plateformes actives dans le filtre (vide = tout afficher) */
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
 
-  /** Statuts actifs dans le filtre (vide = tout afficher) */
-  const [selectedStatuses, setSelectedStatuses] = useState<PostStatus[]>([])
+  /**
+   * Statuts actifs dans le filtre.
+   * Initialisé depuis ?status=XXX si présent dans l'URL, sinon vide (tout afficher).
+   * Exemple : /calendar?status=FAILED → seuls les posts FAILED sont affichés au montage.
+   */
+  const [selectedStatuses, setSelectedStatuses] = useState<PostStatus[]>(initialStatuses)
 
   /**
    * Filtre les posts d'une cellule selon les plateformes et statuts sélectionnés.

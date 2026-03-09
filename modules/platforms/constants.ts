@@ -190,14 +190,17 @@ export const PRIORITY_PLATFORMS: LatePlatform[] = [
 ]
 
 /**
- * Plateformes affichées par défaut dans la page Paramètres (Settings).
- * Correspond aux 5 plateformes actives du projet (= PRIORITY_PLATFORMS).
- * Les autres plateformes (LinkedIn, Snapchat, Reddit, etc.) restent masquées
- * tant qu'elles ne sont pas connectées.
+ * Plateformes auxquelles les utilisateurs peuvent se connecter depuis l'UI.
+ * Inclut les 5 plateformes prioritaires + 4 nouvelles plateformes activées :
+ * LinkedIn, Snapchat, Pinterest et Threads.
+ * Les autres (Bluesky, Reddit, Telegram, Google Business) restent masquées.
  */
 export const DISPLAYED_PLATFORMS: LatePlatform[] = [
   ...PRIORITY_PLATFORMS,
-  // Snapchat retiré — plateforme non active pour ce projet
+  'linkedin',
+  'snapchat',
+  'pinterest',
+  'threads',
 ]
 
 /**

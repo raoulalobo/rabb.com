@@ -15,11 +15,14 @@
  *   // Route : GET /calendar
  */
 
+import { Suspense } from 'react'
+
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
 import { CalendarContent } from '@/modules/posts/components/CalendarView/CalendarContent'
+import { Skeleton } from '@/components/ui/skeleton'
 
 import type { Metadata } from 'next'
 
@@ -53,11 +56,23 @@ export default async function CalendarPage(): Promise<React.JSX.Element> {
 
       {/* ── Contenu principal (Client Component) ─────────────────────── */}
       {/*
-       * CalendarContent orchestre :
-       * - CalendarGrid  : grille mensuelle cliquable
-       * - Dialog        : modal PostComposer pré-rempli avec la date sélectionnée
+       * Suspense requis par Next.js : CalendarContent utilise useSearchParams()
+       * (lecture de ?status=FAILED etc.). Sans Suspense, Next.js lèverait un
+       * avertissement de SSR et dé-optimiserait la page en rendu dynamique.
+       * Fallback : grille skeleton 7×5 pour reproduire la forme du calendrier.
        */}
-      <CalendarContent />
+      <Suspense
+        fallback={
+          // Skeleton grille calendrier 7 colonnes × 5 lignes
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-md" />
+            ))}
+          </div>
+        }
+      >
+        <CalendarContent />
+      </Suspense>
     </div>
   )
 }

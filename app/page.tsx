@@ -30,11 +30,11 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
   description:
-    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube et Facebook en quelques secondes grâce à l\'IA.',
+    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, LinkedIn, Snapchat, Pinterest et Threads en quelques secondes.',
   openGraph: {
     title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
     description:
-      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube et Facebook en quelques secondes grâce à l\'IA.',
+      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, LinkedIn, Snapchat, Pinterest et Threads en quelques secondes.',
     type: 'website',
   },
 }
@@ -42,7 +42,9 @@ export const metadata: Metadata = {
 // ─── Données des plateformes ──────────────────────────────────────────────────
 
 /**
- * Liste des plateformes prioritaires affichées dans le hero.
+ * Plateformes affichées dans la section "Compatible avec" du hero.
+ * Reflète exactement DISPLAYED_PLATFORMS de modules/platforms/constants.ts :
+ * 5 plateformes prioritaires + LinkedIn, Snapchat, Pinterest, Threads.
  * Chaque entrée référence un SVG dans /public/icons/.
  */
 const PLATFORMS = [
@@ -72,7 +74,26 @@ const PLATFORMS = [
     icon: '/icons/twitter.svg',
     color: '#000000',
   },
-  // Snapchat retiré — plateforme non active pour ce projet
+  {
+    name: 'LinkedIn',
+    icon: '/icons/linkedin.svg',
+    color: '#0A66C2',
+  },
+  {
+    name: 'Snapchat',
+    icon: '/icons/snapchat.svg',
+    color: '#FFFC00',
+  },
+  {
+    name: 'Pinterest',
+    icon: '/icons/pinterest.svg',
+    color: '#E60023',
+  },
+  {
+    name: 'Threads',
+    icon: '/icons/threads.svg',
+    color: '#000000',
+  },
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
