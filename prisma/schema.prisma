@@ -53,6 +53,8 @@ model User {
   notifPrefs    NotificationPrefs?
   signatures    Signature[]
   media         Media[]
+  mediaFolders  MediaFolder[]
+  mediaTags     MediaTag[]
 
   @@map("users")
 }
@@ -226,9 +228,48 @@ model Signature {
 }
 
 /**
+ * Dossier virtuel pour organiser les médias de la galerie.
+ * Un dossier appartient à un seul utilisateur.
+ * La suppression d'un dossier met folderId à null sur ses médias (SetNull).
+ */
+model MediaFolder {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media[]
+
+  @@index([userId])
+  @@map("media_folders")
+}
+
+/**
+ * Tag coloré pour étiqueter les médias de la galerie.
+ * Un tag appartient à un seul utilisateur.
+ * Couleur stockée en hex (ex: "#6366f1").
+ * Unicité : un user ne peut pas avoir deux tags du même nom.
+ */
+model MediaTag {
+  id     String  @id @default(cuid())
+  userId String
+  name   String
+  color  String  @default("#6366f1")  // Couleur hex du badge (défaut : indigo)
+
+  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media[] @relation("MediaToTag")
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("media_tags")
+}
+
+/**
  * Média (image ou vidéo) uploadé par l'utilisateur dans sa galerie personnelle.
  * Stocké dans Supabase Storage (bucket `post-media`, chemin `{userId}/gallery/…`).
  * Un média peut être réutilisé dans plusieurs posts via MediaPicker.
+ * Peut être organisé dans un dossier (folderId) et étiqueté avec des tags.
  *
  * Cycle de vie :
  *  1. Upload client → presigned URL `/api/gallery/upload-url`
@@ -244,6 +285,13 @@ model Media {
   mimeType  String                // "image/jpeg", "video/mp4", etc.
   size      Int                   // Taille en octets
   createdAt DateTime @default(now())
+
+  // Dossier optionnel — null = pas de dossier (racine)
+  folderId  String?
+  folder    MediaFolder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  // Tags associés (relation many-to-many)
+  tags      MediaTag[]    @relation("MediaToTag")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

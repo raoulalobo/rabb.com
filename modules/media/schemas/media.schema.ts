@@ -1,17 +1,14 @@
 /**
  * @file modules/media/schemas/media.schema.ts
  * @module media
- * @description Schémas Zod pour la validation des données du module Galerie.
- *   Utilisés dans les Server Actions (saveMedia) et côté client (MediaUploader).
+ * @description Schémas Zod pour la validation des données du module Galerie (Media Library).
+ *   Utilisés dans les Server Actions (saveMedia, createFolder, createTag, updateMedia)
+ *   et côté client (MediaUploader, NewFolderDialog, TagsDialog).
  *
  * @example
- *   import { MediaSaveSchema } from '@/modules/media/schemas/media.schema'
- *   const result = MediaSaveSchema.safeParse({
- *     url: 'https://....supabase.co/...',
- *     filename: 'photo.jpg',
- *     mimeType: 'image/jpeg',
- *     size: 204800,
- *   })
+ *   import { MediaSaveSchema, MediaFolderCreateSchema } from '@/modules/media/schemas/media.schema'
+ *   const result = MediaSaveSchema.safeParse({ url, filename, mimeType, size })
+ *   const folder = MediaFolderCreateSchema.parse({ name: 'Campagne été' })
  */
 
 import { z } from 'zod'
@@ -70,3 +67,66 @@ export const MediaDeleteSchema = z.object({
 })
 
 export type MediaDelete = z.infer<typeof MediaDeleteSchema>
+
+/**
+ * Schéma de mise à jour d'un média (déplacement de dossier, changement de tags).
+ * Appelé par updateMedia().
+ *
+ * @example
+ *   MediaUpdateSchema.parse({
+ *     id: 'clx123',
+ *     folderId: 'clf456',    // ou null pour retirer du dossier
+ *     tagIds: ['clt789'],
+ *   })
+ */
+export const MediaUpdateSchema = z.object({
+  /** Identifiant du média à mettre à jour */
+  id: z.string().min(1, "L'ID du média est requis"),
+  /** ID du dossier cible — null pour retirer le média de tout dossier */
+  folderId: z.string().nullable().optional(),
+  /** IDs des tags à associer (remplace la liste actuelle entièrement) */
+  tagIds: z.array(z.string()).optional(),
+})
+
+export type MediaUpdate = z.infer<typeof MediaUpdateSchema>
+
+// ─── Schémas dossiers ─────────────────────────────────────────────────────────
+
+/**
+ * Schéma de création d'un dossier de galerie.
+ *
+ * @example
+ *   MediaFolderCreateSchema.parse({ name: 'Campagne Printemps 2026' })
+ */
+export const MediaFolderCreateSchema = z.object({
+  /** Nom du dossier — 1 à 50 caractères */
+  name: z
+    .string()
+    .min(1, 'Le nom du dossier est requis')
+    .max(50, 'Le nom du dossier ne doit pas dépasser 50 caractères'),
+})
+
+export type MediaFolderCreate = z.infer<typeof MediaFolderCreateSchema>
+
+// ─── Schémas tags ─────────────────────────────────────────────────────────────
+
+/**
+ * Schéma de création d'un tag coloré.
+ *
+ * @example
+ *   MediaTagCreateSchema.parse({ name: 'Été', color: '#f59e0b' })
+ */
+export const MediaTagCreateSchema = z.object({
+  /** Nom du tag — 1 à 30 caractères */
+  name: z
+    .string()
+    .min(1, 'Le nom du tag est requis')
+    .max(30, 'Le nom du tag ne doit pas dépasser 30 caractères'),
+
+  /** Couleur hexadécimale du badge (ex: "#6366f1") */
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'La couleur doit être un code hexadécimal valide (ex: #6366f1)'),
+})
+
+export type MediaTagCreate = z.infer<typeof MediaTagCreateSchema>

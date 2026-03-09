@@ -72,7 +72,7 @@ export function MediaGrid({
     if (isLoadingMore || !nextCursor) return
 
     setIsLoadingMore(true)
-    const { data, error } = await listMedia(nextCursor)
+    const { data, error } = await listMedia({ cursor: nextCursor })
 
     if (error || !data) {
       console.error('[MediaGrid] Erreur chargement page suivante :', error)

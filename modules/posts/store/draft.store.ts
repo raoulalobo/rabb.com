@@ -28,6 +28,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
 import type { Platform } from '@/modules/platforms/types'
+import type { Post } from '@/modules/posts/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,19 @@ interface DraftStore {
 
   /** Remet le store à l'état initial (après publication ou abandon) */
   reset: () => void
+
+  /**
+   * Charge un post existant dans le store pour édition depuis la grille calendrier.
+   * Réinitialise d'abord tout le store, puis remplit les champs depuis le post DB.
+   * Utilisé par CalendarContent.handlePostClick pour pré-remplir le Dialog.
+   *
+   * @param post - Post DB complet à charger dans le brouillon
+   *
+   * @example
+   *   const { loadPost } = useDraftStore()
+   *   loadPost(existingPost) // postId, text, platform, mediaUrls, scheduledFor pré-remplis
+   */
+  loadPost: (post: Post) => void
 
   // ── Actions sur les overrides ─────────────────────────────────────────────────
 
@@ -260,6 +274,25 @@ export const useDraftStore = create<DraftStore>()(
       // Vide aussi tous les overrides de plateformes
       reset: () =>
         set(() => initialState),
+
+      // Charge un post existant dans le store pour édition depuis /calendar.
+      // Réinitialise d'abord tout le store (évite les données résiduelles d'un brouillon
+      // précédent), puis remplit chaque champ depuis le post DB.
+      // La plateforme est wrappée dans un tableau car le store gère un tableau de platforms,
+      // mais chaque post en DB ne cible qu'une seule plateforme (1 post = 1 plateforme).
+      loadPost: (post) =>
+        set((state) => {
+          // Réinitialisation complète avant chargement
+          Object.assign(state, initialState)
+          // Identifiant DB pour déclencher un PATCH au lieu d'un POST dans save-post.action.ts
+          state.postId = post.id
+          state.text = post.text
+          // Chaque post DB = 1 plateforme → on la wrap dans un tableau pour le store
+          state.platforms = [post.platform as Platform]
+          state.mediaUrls = post.mediaUrls
+          // Convertir en Date si c'est une string ISO (cas réhydratation depuis l'API)
+          state.scheduledFor = post.scheduledFor ? new Date(post.scheduledFor) : null
+        }),
 
       // ── Actions overrides ────────────────────────────────────────────────────
 

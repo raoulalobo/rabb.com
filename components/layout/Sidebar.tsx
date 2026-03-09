@@ -8,7 +8,7 @@
  *
  * Navigation principale (MVP) :
  *   - Dashboard (/dashboard)  → vue d'ensemble rapide
- *   - Composer (/compose)     → créer / lister / éditer des posts
+ *   - Calendrier (/calendar)  → planifier et visualiser les posts
  *   - Analytics (/analytics)  → statistiques
  *   - Inbox (/inbox)          → messages unifiés
  *   - Settings (/settings)    → compte et réseaux
@@ -22,11 +22,11 @@
 
 import {
   BarChart2,
+  CalendarDays,
   FileSignature,
   Images,
   Inbox,
   LayoutDashboard,
-  PenSquare,
   Settings,
   UserCircle,
 } from 'lucide-react'
@@ -54,7 +54,8 @@ interface NavItem {
  */
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',   href: '/dashboard',   icon: LayoutDashboard },
-  { label: 'Composer',    href: '/compose',     icon: PenSquare },
+  // Calendrier : vue mensuelle des posts planifiés + création rapide par clic sur un jour
+  { label: 'Calendrier',  href: '/calendar',    icon: CalendarDays },
   // Galerie : bibliothèque de médias réutilisables dans les posts
   { label: 'Galerie',     href: '/gallery',     icon: Images },
   // Signatures : blocs de texte réutilisables (hashtags, CTA) par plateforme

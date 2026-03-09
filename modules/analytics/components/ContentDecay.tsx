@@ -63,9 +63,9 @@ export function ContentDecay({ data }: ContentDecayProps): React.JSX.Element {
             />
           </div>
 
-          {/* Pourcentage */}
-          <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">
-            {bucket.percentage}%
+          {/* Pourcentage (arrondi à l'entier pour éviter le débordement) */}
+          <span className="w-12 shrink-0 text-right text-xs font-medium text-muted-foreground">
+            {Math.round(bucket.percentage)}%
           </span>
         </div>
       ))}
@@ -78,7 +78,7 @@ export function ContentDecay({ data }: ContentDecayProps): React.JSX.Element {
             if (!first || first.percentage < 80) return null
             return (
               <span>
-                💡 Votre contenu atteint <strong>{first.percentage}%</strong> de son
+                💡 Votre contenu atteint <strong>{Math.round(first.percentage)}%</strong> de son
                 engagement dans les <strong>{BUCKET_LABELS[first.bucket] ?? first.bucket}</strong>.
               </span>
             )

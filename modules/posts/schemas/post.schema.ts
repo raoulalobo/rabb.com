@@ -163,8 +163,12 @@ export const PoolMediaSchema = z.object({
   url: z.string().url(),
   /** Type du média : photo ou vidéo */
   type: z.enum(['photo', 'video']),
-  /** Nom du fichier original (ex: "banner.jpg") */
-  filename: z.string(),
+  /**
+   * Nom du fichier original (ex: "banner.jpg").
+   * .default('fichier') : évite l'erreur "Expected string, received undefined"
+   * si le champ est absent lors de la sérialisation du pool depuis l'UI.
+   */
+  filename: z.string().default('fichier'),
 })
 export type PoolMediaItem = z.infer<typeof PoolMediaSchema>
 
@@ -211,10 +215,18 @@ export const ProposedEditSchema = z.object({
   postId: z.string().min(1),
   /** Texte proposé par l'IA (respecte les contraintes de la plateforme) */
   text: z.string().min(1).max(63206),
-  /** URLs des médias à conserver */
-  mediaUrls: z.array(z.string().url()),
-  /** Date de planification ISO 8601, null si pas de date */
-  scheduledFor: z.string().datetime().nullable(),
+  /**
+   * URLs des médias à conserver.
+   * .default([]) : accepte `undefined` (champ absent) sans lever d'erreur Zod.
+   */
+  mediaUrls: z.array(z.string().url()).default([]),
+  /**
+   * Date de planification ISO 8601, null si pas de date.
+   * .nullish() accepte null ET undefined (champ omis par Claude) ;
+   * .transform(v => v ?? null) normalise undefined → null pour le reste du code.
+   * Type inféré : string | null (undefined n'atteint jamais les consommateurs).
+   */
+  scheduledFor: z.string().datetime().nullish().transform((v) => v ?? null),
 })
 export type ProposedEdit = z.infer<typeof ProposedEditSchema>
 

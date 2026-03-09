@@ -68,6 +68,14 @@ interface PostComposerProps {
   children: React.ReactNode
   /** Classe CSS optionnelle pour le conteneur racine */
   className?: string
+  /**
+   * Callback appelé après une soumission réussie (brouillon sauvegardé ou post planifié).
+   * Utilisé par CalendarContent pour fermer le Dialog après planification.
+   *
+   * @example
+   *   <PostComposer onSuccess={() => setDialogOpen(false)}>...</PostComposer>
+   */
+  onSuccess?: () => void
 }
 
 // ─── Composant racine ────────────────────────────────────────────────────────
@@ -79,7 +87,7 @@ interface PostComposerProps {
  * @param children - Sous-composants du PostComposer
  * @param className - Classe CSS optionnelle
  */
-function PostComposerRoot({ children, className }: PostComposerProps): React.JSX.Element {
+function PostComposerRoot({ children, className, onSuccess }: PostComposerProps): React.JSX.Element {
   // ─── État brouillon depuis Zustand ──────────────────────────────────────────
   const {
     text,
@@ -444,74 +452,119 @@ function PostComposerRoot({ children, className }: PostComposerProps): React.JSX
 
   /**
    * Sauvegarde le brouillon en DB avec status DRAFT.
-   * Transmet les overrides de plateformes à la Server Action.
+   * Crée UN post par plateforme sélectionnée (modèle : 1 post = 1 plateforme).
+   * Pour chaque plateforme, utilise le contenu de l'override s'il existe,
+   * sinon le texte et médias de base.
+   *
+   * Cas particulier :
+   * - 0 plateforme → toast d'erreur, aucun appel réseau
+   * - 1 plateforme + postId → mise à jour du post existant (PATCH)
+   * - N plateformes → N créations indépendantes (POST), postId ignoré
    */
   const saveDraft = useCallback((): void => {
-    startTransition(async () => {
-      const result = await savePost({
-        ...(postId ? { id: postId } : {}),
-        text,
-        platforms,
-        mediaUrls,
-        status: 'DRAFT',
-        // Transmission des overrides pour upsert en DB
-        platformOverrides: Object.fromEntries(
-          Object.entries(platformOverrides).map(([platform, override]) => [
-            platform,
-            { text: override!.text, mediaUrls: override!.mediaUrls },
-          ]),
-        ),
-      })
+    // Validation locale : au moins une plateforme requise
+    if (platforms.length === 0) {
+      toast.error('Sélectionne au moins une plateforme avant de sauvegarder')
+      return
+    }
 
-      if (result.success && result.post) {
-        setPostId(result.post.id)
-        toast.success('Brouillon sauvegardé')
-      } else {
-        toast.error(result.error ?? 'Erreur lors de la sauvegarde')
+    startTransition(async () => {
+      // Créer un post par plateforme en parallèle
+      const results = await Promise.all(
+        platforms.map((platform) => {
+          // L'override de la plateforme prend le dessus sur le contenu de base
+          const platformText = platformOverrides[platform]?.text ?? text
+          const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
+
+          return savePost({
+            // Mise à jour uniquement si 1 seule plateforme ET post déjà en DB
+            ...(platforms.length === 1 && postId ? { id: postId } : {}),
+            platform,         // champ singulier attendu par PostCreateSchema
+            text: platformText,
+            mediaUrls: platformMediaUrls,
+            status: 'DRAFT',
+          })
+        }),
+      )
+
+      const firstError = results.find((r) => !r.success)
+      if (firstError) {
+        toast.error(firstError.error ?? 'Erreur lors de la sauvegarde')
+        return
       }
+
+      // Mémoriser le postId uniquement pour une sélection mono-plateforme
+      if (platforms.length === 1 && results[0]?.post) {
+        setPostId(results[0].post.id)
+      }
+
+      toast.success('Brouillon sauvegardé')
+      // Notifier le parent du succès (ex: fermeture du Dialog dans CalendarContent)
+      onSuccess?.()
     })
-  }, [text, platforms, mediaUrls, platformOverrides, postId, setPostId])
+  }, [text, platforms, mediaUrls, platformOverrides, postId, setPostId, onSuccess])
 
   /**
    * Planifie le post avec la date définie dans scheduledFor.
-   * Transmet les overrides de plateformes à la Server Action.
+   * Crée UN post planifié par plateforme sélectionnée (modèle : 1 post = 1 plateforme).
+   * Pour chaque plateforme, utilise le contenu de l'override s'il existe,
+   * sinon le texte et médias de base.
+   *
+   * Cas particulier :
+   * - scheduledFor null → retour immédiat (bouton "Planifier" désactivé si aucune date)
+   * - 0 plateforme → toast d'erreur, aucun appel réseau
+   * - 1 plateforme + postId → mise à jour du post existant
+   * - N plateformes → N planifications indépendantes, postId ignoré
    */
   const handleSchedulePost = useCallback((): void => {
     if (!scheduledFor) return
 
+    // Validation locale : au moins une plateforme requise
+    if (platforms.length === 0) {
+      toast.error('Sélectionne au moins une plateforme avant de planifier')
+      return
+    }
+
     startTransition(async () => {
-      const result = await schedulePost(
-        {
-          text,
-          platforms,
-          mediaUrls,
-          scheduledFor,
-          // Transmission des overrides pour upsert en DB
-          platformOverrides: Object.fromEntries(
-            Object.entries(platformOverrides).map(([platform, override]) => [
-              platform,
-              { text: override!.text, mediaUrls: override!.mediaUrls },
-            ]),
-          ),
-        },
-        postId ?? undefined,
+      // Planifier un post par plateforme en parallèle
+      const results = await Promise.all(
+        platforms.map((platform) => {
+          // L'override de la plateforme prend le dessus sur le contenu de base
+          const platformText = platformOverrides[platform]?.text ?? text
+          const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
+
+          return schedulePost(
+            {
+              platform,           // champ singulier attendu par PostCreateSchema
+              text: platformText,
+              mediaUrls: platformMediaUrls,
+              scheduledFor,
+            },
+            // Mise à jour uniquement si 1 seule plateforme ET post déjà en DB
+            platforms.length === 1 ? (postId ?? undefined) : undefined,
+          )
+        }),
       )
 
-      if (result.success && result.post) {
-        toast.success(
-          `Post planifié pour le ${scheduledFor.toLocaleDateString('fr-FR', {
-            day: 'numeric',
-            month: 'long',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}`,
-        )
-        reset()
-      } else {
-        toast.error(result.error ?? 'Erreur lors de la planification')
+      const firstError = results.find((r) => !r.success)
+      if (firstError) {
+        toast.error(firstError.error ?? 'Erreur lors de la planification')
+        return
       }
+
+      toast.success(
+        `Post${platforms.length > 1 ? 's' : ''} planifié${platforms.length > 1 ? 's' : ''} pour le ${scheduledFor.toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}`,
+      )
+      reset()
+      // Notifier le parent du succès (ex: fermeture du Dialog dans CalendarContent)
+      onSuccess?.()
     })
-  }, [text, platforms, mediaUrls, platformOverrides, scheduledFor, postId, reset])
+  }, [text, platforms, mediaUrls, platformOverrides, scheduledFor, postId, reset, onSuccess])
 
   // ─── Rendu ──────────────────────────────────────────────────────────────────
 
