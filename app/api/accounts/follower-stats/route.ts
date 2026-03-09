@@ -14,10 +14,21 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/lib/auth'
 import { late } from '@/lib/late'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+
+  // Récupération du lateWorkspaceId pour filtrer les stats par workspace utilisateur
+  // (même pattern que tous les autres endpoints analytics)
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { lateWorkspaceId: true },
+  })
+  if (!user?.lateWorkspaceId) {
+    return NextResponse.json({ stats: [], total: 0 })
+  }
 
   const { searchParams } = req.nextUrl
   const platformFilter = searchParams.get('platform') ?? undefined
@@ -25,6 +36,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     // Le type LateFollowerStatsResponse est maintenant complet : accounts + stats + total?
     const raw = await late.accounts.followerStats({
+      profileId: user.lateWorkspaceId,   // Filtre par workspace utilisateur
       from: searchParams.get('from') ?? undefined,
       to: searchParams.get('to') ?? undefined,
       platform: platformFilter,

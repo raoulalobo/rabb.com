@@ -713,6 +713,7 @@ class LateClient {
      *   stats.forEach(s => console.log(s.date, s.platform, s.count))
      */
     followerStats: (params: {
+      profileId?: string   // Filtre par workspace utilisateur (lateWorkspaceId)
       from?: string
       to?: string
       platform?: string
