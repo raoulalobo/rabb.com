@@ -23,6 +23,8 @@
 
 import { useCallback } from 'react'
 
+import { Info, Sparkles } from 'lucide-react'
+
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 import type { Platform } from '@/modules/platforms/types'
 import { getCharLimit } from '@/modules/posts/schemas/post.schema'
@@ -53,7 +55,7 @@ export function Editor({
   placeholder = 'Rédigez votre post...',
   rows = 6,
 }: EditorProps): React.JSX.Element {
-  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, readOnly, appendSignature } =
+  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, readOnly, appendSignature, setAIPanelOpen } =
     usePostComposerContext()
 
   // ─── Limite de caractères selon l'onglet actif ──────────────────────────────
@@ -83,7 +85,16 @@ export function Editor({
     : null
 
   return (
-    <div className="relative">
+    <div className="relative rounded-lg border border-border p-3">
+      {/* Bandeau onglet "Tous" — visible uniquement si 2+ plateformes sélectionnées.
+          Informe l'utilisateur que ce texte sera partagé par défaut avec tous les réseaux. */}
+      {activePlatformTab === null && platforms.length > 1 && (
+        <div className="mb-2.5 flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+          <Info className="size-3.5 shrink-0" aria-hidden="true" />
+          Ce texte est partagé par défaut par tous les réseaux sélectionnés
+        </div>
+      )}
+
       {/* Zone de texte principale */}
       <textarea
         value={activeText}
@@ -112,12 +123,29 @@ export function Editor({
       )}
 
       {/* ── Barre d'outils sous l'éditeur ───────────────────────────────────── */}
-      {/* SignaturePicker gère lui-même la visibilité (caché si platforms vide) */}
-      <div className="mt-2 flex items-center">
+      {/*
+       * SignaturePicker gère lui-même la visibilité (caché si platforms vide).
+       * Bouton ✨ : ouvre le panneau de rédaction IA (AIAssistPanel) — masqué en readOnly.
+       */}
+      <div className="mt-2 flex items-center justify-between">
         <SignaturePicker
           platforms={platforms}
           onInsert={appendSignature}
         />
+
+        {/* Bouton d'ouverture du panneau IA — masqué si readOnly (post publié) */}
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => setAIPanelOpen(true)}
+            title="Rédiger avec l'IA"
+            aria-label="Ouvrir le panneau de rédaction IA"
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            IA
+          </button>
+        )}
       </div>
 
       {/* Compteur de caractères */}

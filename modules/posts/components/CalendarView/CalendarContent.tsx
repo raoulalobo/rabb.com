@@ -38,6 +38,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 
+import { cn } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -143,6 +144,16 @@ export function CalendarContent(): React.JSX.Element {
 
   // ── État local du Dialog ─────────────────────────────────────────────────────
   const [dialogOpen, setDialogOpen] = useState(false)
+
+  /**
+   * Miroir local de l'état du panneau IA.
+   * Mis à jour via onAIPanelChange passé à PostComposer.
+   * Utilisé uniquement pour adapter la largeur du Dialog (max-w-3xl → max-w-5xl).
+   * L'état réel est géré dans PostComposerRoot (index.tsx) via isAIPanelOpen.
+   */
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false)
+
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   /**
    * 'create' = clic sur cellule vide (nouveau post)
@@ -254,6 +265,8 @@ export function CalendarContent(): React.JSX.Element {
       setSelectedDate(null)
       setEditingPost(null)
       setDialogMode('create')
+      // Fermer également le panneau IA pour éviter qu'il reste ouvert à la prochaine ouverture
+      setIsAIPanelOpen(false)
     }
   }, [])
 
@@ -461,8 +474,22 @@ export function CalendarContent(): React.JSX.Element {
       )}
 
       {/* ── Dialog PostComposer (création ou édition) ─────────────────────── */}
+      {/*
+       * La largeur du Dialog s'adapte dynamiquement selon l'état du panneau IA :
+       * - Fermé  → sm:max-w-3xl (largeur standard)
+       * - Ouvert → sm:max-w-5xl (place pour le panneau IA latéral de w-80)
+       * isAIPanelOpen est synchronisé via le callback onAIPanelChange de PostComposer.
+       */}
       <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent
+          className={cn(
+            /* overflow-hidden : c'est le PostComposer interne qui scrolle, pas le Dialog
+             * grid-rows-[auto_1fr] : row 1 = DialogHeader (auto), row 2 = PostComposer (1fr)
+             * Le bouton × est en absolute dans shadcn → pas besoin d'une 3ème row */
+            'max-h-[90vh] overflow-hidden grid-rows-[auto_1fr] transition-all duration-200',
+            isAIPanelOpen ? 'sm:max-w-5xl' : 'sm:max-w-3xl',
+          )}
+        >
           <DialogHeader>
             {/* Titre conditionnel selon le mode */}
             <DialogTitle>
@@ -487,12 +514,15 @@ export function CalendarContent(): React.JSX.Element {
            * Mode 'edit'   : tous les champs définis dans handlePostClick via loadPost().
            * Mode 'view'   : même chose qu'édition mais sans PostComposer.Footer
            *                 (lecture seule — le post PUBLISHED ne peut pas être replanifié).
+           *
+           * onAIPanelChange : synchronise isAIPanelOpen local pour adapter la largeur du Dialog.
+           * readOnly=true en mode 'view' : désactive le bouton ✨ et le panneau IA.
            */}
-          {/*
-           * readOnly=true en mode 'view' : tous les champs sont disabled (non-interactifs).
-           * Le footer est masqué — le post publié ne peut pas être replanifié.
-           */}
-          <PostComposer onSuccess={handleSuccess} readOnly={dialogMode === 'view'}>
+          <PostComposer
+            onSuccess={handleSuccess}
+            readOnly={dialogMode === 'view'}
+            onAIPanelChange={setIsAIPanelOpen}
+          >
             <PostComposer.PlatformTabs />
             <PostComposer.Editor />
             <PostComposer.Platforms />

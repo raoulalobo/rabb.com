@@ -42,6 +42,8 @@
 'use client'
 
 import { useCallback, useState, useTransition } from 'react'
+
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 import { getPlatformViolations } from '@/modules/platforms/config/platform-rules'
@@ -52,6 +54,7 @@ import { schedulePost } from '@/modules/posts/actions/schedule-post.action'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { UploadingFile, UploadUrlResult } from '@/modules/posts/types'
 
+import { AIAssistPanel } from './AIAssistPanel'
 import { PostComposerContext } from './context'
 import { Editor } from './Editor'
 import { Footer } from './Footer'
@@ -84,6 +87,16 @@ interface PostComposerProps {
    *   <PostComposer readOnly>...</PostComposer>
    */
   readOnly?: boolean
+  /**
+   * Callback appelé quand l'état du panneau IA change (ouvert/fermé).
+   * Utilisé par CalendarContent pour adapter la largeur du Dialog en temps réel.
+   *
+   * @param open - true = panneau ouvert, false = panneau fermé
+   *
+   * @example
+   *   <PostComposer onAIPanelChange={setIsAIPanelOpen}>...</PostComposer>
+   */
+  onAIPanelChange?: (open: boolean) => void
 }
 
 // ─── Composant racine ────────────────────────────────────────────────────────
@@ -96,7 +109,7 @@ interface PostComposerProps {
  * @param className  - Classe CSS optionnelle
  * @param readOnly   - Mode lecture seule (post PUBLISHED non modifiable)
  */
-function PostComposerRoot({ children, className, onSuccess, readOnly = false }: PostComposerProps): React.JSX.Element {
+function PostComposerRoot({ children, className, onSuccess, readOnly = false, onAIPanelChange }: PostComposerProps): React.JSX.Element {
   // ─── État brouillon depuis Zustand ──────────────────────────────────────────
   const {
     text,
@@ -119,6 +132,26 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false }: 
     addPlatformOverrideMediaUrl,
     removePlatformOverrideMediaUrl,
   } = useDraftStore()
+
+  // ─── Panneau IA : ouvert/fermé ───────────────────────────────────────────────
+  // Géré ici (dans le Provider) pour être partagé entre Editor (bouton d'ouverture)
+  // et CalendarContent (qui observe l'état pour adapter la largeur du Dialog).
+  const [isAIPanelOpen, setIsAIPanelOpenRaw] = useState(false)
+
+  /**
+   * Ouvre ou ferme le panneau IA.
+   * Notifie également le parent via onAIPanelChange si fourni
+   * (utilisé par CalendarContent pour adapter la largeur du Dialog).
+   *
+   * @param open - true pour ouvrir, false pour fermer
+   */
+  const setAIPanelOpen = useCallback(
+    (open: boolean): void => {
+      setIsAIPanelOpenRaw(open)
+      onAIPanelChange?.(open)
+    },
+    [onAIPanelChange],
+  )
 
   // ─── Onglet actif (null = onglet "Tous") ────────────────────────────────────
   const [activePlatformTab, setActivePlatformTab] = useState<Platform | null>(null)
@@ -610,6 +643,9 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false }: 
         removeUploadedFile,
         // Insertion de signature
         appendSignature,
+        // Panneau IA
+        isAIPanelOpen,
+        setAIPanelOpen,
         // Lecture seule (post PUBLISHED — aucun champ modifiable)
         readOnly,
         // Soumission
@@ -618,8 +654,33 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false }: 
         schedulePost: handleSchedulePost,
       }}
     >
-      <div className={className}>
-        {children}
+      {/*
+       * Conteneur racine : reçoit className du parent (ex: flex-1 depuis CalendarContent).
+       * Div intérieur : layout flex horizontal pour positionner le panneau IA à droite.
+       * Le panneau IA doit rester à l'intérieur du Provider pour accéder au contexte.
+       * La largeur du Dialog parent s'adapte via onAIPanelChange → CalendarContent.
+       */}
+      {/* min-h-0 : nécessaire pour qu'un enfant "1fr" dans un grid puisse scroller
+          sans que ce composant ne déborde (min-height: auto par défaut bloque le scroll) */}
+      <div className={cn('min-h-0', className)}>
+        {/* h-full min-h-0 : propage la hauteur du grid row vers AIAssistPanel
+            qui peut alors utiliser h-full + overflow-y-auto pour scroller en interne */}
+        {/* relative : ancre de positionnement pour l'overlay mobile du panneau IA */}
+        <div className="relative flex h-full min-h-0 gap-4">
+          {/* Zone principale du compositeur (toujours visible) */}
+          <div className="min-w-0 flex-1">
+            {children}
+          </div>
+
+          {/* Panneau IA :
+              - Mobile (< sm) : overlay absolu couvrant tout le conteneur (z-10)
+              - Desktop (≥ sm) : enfant flex statique à droite (comportement actuel) */}
+          {isAIPanelOpen && !readOnly && (
+            <div className="absolute inset-0 z-10 sm:static sm:inset-auto sm:z-auto">
+              <AIAssistPanel onClose={() => setAIPanelOpen(false)} />
+            </div>
+          )}
+        </div>
       </div>
     </PostComposerContext.Provider>
   )
@@ -638,6 +699,7 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false }: 
  * - PostComposer.Schedule   — sélection de la date de planification
  * - PostComposer.Footer     — boutons Brouillon / Planifier
  * - PostComposer.Skeleton   — skeleton de chargement
+ * - PostComposer.AIAssist   — panneau latéral de rédaction IA (ouvrable via bouton ✨)
  */
 export const PostComposer = Object.assign(PostComposerRoot, {
   PlatformTabs,
@@ -647,4 +709,5 @@ export const PostComposer = Object.assign(PostComposerRoot, {
   Schedule,
   Footer,
   Skeleton: PostComposerSkeleton,
+  AIAssist: AIAssistPanel,
 })

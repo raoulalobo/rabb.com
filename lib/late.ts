@@ -177,6 +177,20 @@ export interface LateAccount {
   displayName?: string
   /** Handle/username du compte (ex: "@raoulalobo") */
   username?: string
+  /**
+   * URL de la photo de profil du compte social.
+   * Confirmé par debug : Late API retourne `profilePicture` sur TOUTES les plateformes
+   * (Facebook, TikTok, Twitter/X, YouTube, Instagram).
+   * Peut être absent si le compte n'a pas de photo de profil.
+   *
+   * @example "https://pbs.twimg.com/profile_images/.../photo_normal.jpg"
+   */
+  profilePicture?: string
+  /** Alias alternatifs conservés pour compatibilité (non utilisés par Late actuellement) */
+  profileImage?: string
+  avatarUrl?: string
+  picture?: string
+  thumbnailUrl?: string
 }
 
 /**

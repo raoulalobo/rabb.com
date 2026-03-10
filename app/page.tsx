@@ -228,25 +228,17 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
           </div>
 
-          {/* ── Logos plateformes ──────────────────────────────────────────── */}
+          {/* ── Section "Compatible avec" ───────────────────────────────────── */}
           {/*
-           * Affichage horizontal des 4 plateformes prioritaires.
-           * Chaque logo est un SVG servi statiquement depuis /public/icons/.
-           * alt descriptif pour l'accessibilité (lecteurs d'écran).
+           * Badges horizontaux affichant les 9 plateformes supportées.
+           * Icône + nom masqué sur mobile (span sm:inline).
+           * Espacement mt-14 pour respirer après les CTAs.
            */}
           <div
             className="mt-14 flex flex-col items-center gap-4"
             aria-label="Plateformes supportées"
           >
-            <p className="text-sm text-gray-400">
-              Compatible avec
-            </p>
-
-            {/*
-             * flex-wrap : les badges passent à la ligne sur mobile si l'espace manque.
-             * justify-center : toujours centré quelle que soit la largeur.
-             * gap-3 : espacement réduit par rapport aux 4 logos (gap-5) pour tenir en une ligne sur desktop.
-             */}
+            <p className="text-sm text-gray-400">Compatible avec</p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               {PLATFORMS.map((platform) => (
                 <div
@@ -254,11 +246,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                   className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm transition-shadow hover:shadow-md"
                   title={platform.name}
                 >
-                  {/* Icone SVG de la plateforme — taille fixe pour l'alignement */}
-                  {/*
-                   * next/image est utilisé pour l'optimisation automatique (LCP, bandwidth).
-                   * width/height obligatoires pour les images statiques non-layout-fill.
-                   */}
                   <Image
                     src={platform.icon}
                     alt={`Logo ${platform.name}`}
@@ -266,7 +253,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                     width={20}
                     height={20}
                   />
-                  {/* Nom de la plateforme — masqué sur très petit écran */}
                   <span className="hidden text-sm font-medium text-gray-700 sm:inline">
                     {platform.name}
                   </span>
@@ -277,7 +263,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
           {/* ── Disclaimer discret ─────────────────────────────────────────── */}
           {/*
-           * Texte de réassurance affiché sous les CTAs.
+           * Texte de réassurance affiché sous les badges de plateformes.
            * Renforce la confiance : pas de CB, gratuit au lancement.
            */}
           <p className="mt-10 text-sm text-gray-400">

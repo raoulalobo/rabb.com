@@ -5,16 +5,17 @@
  *
  *   Colonnes affichées :
  *   - [Checkbox]  : visible uniquement en mode sélection (isSelectMode)
- *   - Name        : miniature 32×32 + nom du fichier (lien externe)
+ *   - Name        : miniature 32×32 + nom du fichier (ouvre la lightbox modal)
  *   - Dossier     : icône + nom, ou "—" si aucun dossier
  *   - Tags        : badges colorés
  *   - Type        : "Image" ou "Vidéo"
  *   - Taille      : formatFileSize()
  *   - Date        : DD/MM/YYYY
- *   - ↗           : lien externe vers l'URL publique
+ *   - ↗           : lien externe vers l'URL publique (colonne Actions)
  *
  *   Actions par ligne :
- *   - Clic sur le nom ou ↗ : ouvre l'URL dans un nouvel onglet
+ *   - Clic sur le nom : ouvre la lightbox modal (prévisualisation in-app)
+ *   - Bouton ↗ : ouvre l'URL dans un nouvel onglet (colonne Actions)
  *   - Bouton ✏️ : ouvre ImageEditorDialog (images seulement)
  *   - Bouton 🗑️ : supprime le média (avec confirmation inline)
  *
@@ -37,6 +38,12 @@ import { useState } from 'react'
 import { Pencil, Trash2, ExternalLink, FolderOpen, Video, Image as ImageIcon } from 'lucide-react'
 
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { isVideoUrl, formatFileSize } from '@/modules/posts/utils/media.utils'
 import { ImageEditorDialog } from './ImageEditorDialog'
 import { saveMedia } from '@/modules/media/actions/media.action'
@@ -170,6 +177,8 @@ function MediaListRow({
   const [isDeleting, setIsDeleting] = useState(false)
   /** Éditeur d'image ouvert */
   const [editorOpen, setEditorOpen] = useState(false)
+  /** Modal de prévisualisation (lightbox) ouvert */
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   // Détecter si c'est une vidéo (URL + mimeType)
   const isVideo = isVideoUrl(item.url) || item.mimeType.startsWith('video/')
@@ -246,16 +255,15 @@ function MediaListRow({
                 />
               )}
             </div>
-            {/* Nom fichier (tronqué) */}
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="max-w-[180px] truncate text-sm font-medium hover:underline md:max-w-[240px]"
+            {/* Nom fichier (tronqué) — clic ouvre la lightbox modale in-app */}
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="max-w-[180px] truncate text-sm font-medium text-left hover:underline md:max-w-[240px]"
               title={item.filename}
             >
               {item.filename}
-            </a>
+            </button>
           </div>
         </td>
 
@@ -370,6 +378,34 @@ function MediaListRow({
           </div>
         </td>
       </tr>
+
+      {/* ── Lightbox modale — prévisualisation in-app ─────────────────────── */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-3xl p-2">
+          <DialogHeader className="px-2 pt-2">
+            <DialogTitle className="truncate text-sm font-medium">{item.filename}</DialogTitle>
+          </DialogHeader>
+          {/* Affiche une vidéo ou une image selon le type MIME du fichier */}
+          {isVideo ? (
+            <video src={item.url} controls className="w-full rounded" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.url} alt={item.filename} className="w-full rounded object-contain max-h-[80vh]" />
+          )}
+          {/* Lien de secours pour ouvrir dans un nouvel onglet */}
+          <div className="flex justify-end px-2 pb-2">
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+            >
+              <ExternalLink className="size-3" />
+              Ouvrir dans un nouvel onglet
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Éditeur d'image Filerobot ─────────────────────────────────────── */}
       {!isVideo && (

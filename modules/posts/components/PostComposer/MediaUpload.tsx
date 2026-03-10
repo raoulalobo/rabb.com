@@ -37,7 +37,7 @@
 
 'use client'
 
-import { ImagePlus, Images, Loader2, UploadCloud, X } from 'lucide-react'
+import { ImagePlus, Images, Link, Loader2, UploadCloud, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 
 import { MediaPicker } from '@/modules/media/components/MediaPicker'
@@ -115,6 +115,7 @@ export function MediaUpload(): React.JSX.Element {
     addActiveMediaUrl,
     isSubmitting,
     readOnly,
+    isPlatformCustomized,
   } = usePostComposerContext()
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -240,9 +241,26 @@ export function MediaUpload(): React.JSX.Element {
           'rounded-lg border-2 border-dashed transition-all duration-150',
           isDragging && canAddMore
             ? 'border-primary bg-primary/5'
-            : 'border-border/40',
+            : 'border-border/60',
         ].join(' ')}
       >
+        {/* Indicateur A — onglet "Tous" avec 2+ plateformes.
+            Informe que ces médias seront partagés par défaut par tous les réseaux. */}
+        {activePlatformTab === null && platforms.length > 1 && (
+          <p className="px-3 pt-2 text-xs text-muted-foreground">
+            Ces médias seront partagés par tous les réseaux sélectionnés
+          </p>
+        )}
+
+        {/* Indicateur B — onglet plateforme SANS override avec 2+ plateformes.
+            Signale que les médias affichés proviennent de l'onglet "Tous" (héritage). */}
+        {activePlatformTab !== null && !isPlatformCustomized(activePlatformTab) && platforms.length > 1 && (
+          <div className="flex items-center gap-1.5 px-3 pt-2 text-xs text-muted-foreground">
+            <Link className="size-3.5 shrink-0" aria-hidden="true" />
+            Médias hérités de l&apos;onglet Tous
+          </div>
+        )}
+
         {/* Aperçus des médias (uploadés + en cours) */}
         {(activeMediaUrls.length > 0 || uploadingFiles.length > 0) && (
           <div className="flex flex-wrap gap-2 p-2">

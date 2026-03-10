@@ -139,6 +139,19 @@ export interface PostComposerContextValue {
    */
   appendSignature: (sigText: string) => void
 
+  // ── Panneau IA ─────────────────────────────────────────────────────────────
+  /**
+   * Vrai si le panneau de rédaction IA (AIAssistPanel) est ouvert.
+   * Piloté par le bouton ✨ dans Editor et par le bouton × dans AIAssistPanel.
+   */
+  isAIPanelOpen: boolean
+
+  /**
+   * Ouvre ou ferme le panneau IA.
+   * @param open - true pour ouvrir, false pour fermer
+   */
+  setAIPanelOpen: (open: boolean) => void
+
   // ── Mode lecture seule ─────────────────────────────────────────────────────
   /**
    * Si true : tous les champs du composer sont non-interactifs (disabled/readOnly).

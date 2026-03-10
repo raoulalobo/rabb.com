@@ -3,8 +3,15 @@
  * @description Client Prisma singleton pour l'application.
  *
  *   Prisma 7 : le PrismaClient exige un adapter de driver (ici @prisma/adapter-pg).
- *   L'adapter reçoit DATABASE_URL (connection pooler PgBouncer port 6543) pour
- *   la mise en pool des connexions en production.
+ *   L'adapter reçoit un pg.Pool configuré avec DATABASE_URL (port 5432, session mode).
+ *
+ *   Stratégie de résilience face aux connexions périmées (PgBouncer) :
+ *   - On ne tente PAS de maintenir les connexions en vie artificiellement.
+ *   - PgBouncer ferme les connexions idle côté serveur : c'est son rôle.
+ *   - pool.on('error') empêche un crash Node.js quand pg détecte une connexion morte.
+ *   - Une extension Prisma retry automatiquement si la 1re requête tombe sur une
+ *     connexion périmée (race condition : pg ne sait pas encore qu'elle est morte).
+ *   - max: 3 → limite les connexions actives (adapté au plan Supabase free).
  *
  *   Évite la création de multiples connexions en développement
  *   (le Hot Module Replacement de Next.js recharge les modules,
@@ -21,26 +28,92 @@
 
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
+import { Pool } from 'pg'
 
 // Typage de l'extension de globalThis pour TypeScript
 declare global {
-
   var prisma: PrismaClient | undefined
 }
 
 /**
- * Crée une nouvelle instance PrismaClient avec l'adapter pg.
- * Utilise DATABASE_URL (pooler PgBouncer port 6543) pour le runtime.
+ * Détermine si une erreur provient d'une connexion pg périmée (fermée par PgBouncer).
+ * Ces erreurs sont transitoires : une retry avec une connexion fraîche suffit.
  *
- * @returns Instance PrismaClient prête à l'emploi
+ * @param err - L'erreur attrapée dans le bloc catch
+ * @returns true si l'erreur est due à une connexion morte, false sinon
+ *
+ * @example
+ *   isStaleConnectionError(new Error('Server has closed the connection')) // → true
+ *   isStaleConnectionError(new Error('Invalid query'))                     // → false
+ */
+function isStaleConnectionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  return (
+    err.message.includes('Server has closed the connection') ||
+    err.message.includes('Connection terminated unexpectedly') ||
+    // Certaines versions de pg lèvent ce message quand le socket est détruit
+    err.message.includes('Cannot read properties of undefined')
+  )
+}
+
+/**
+ * Crée une nouvelle instance PrismaClient avec l'adapter pg et une extension retry.
+ *
+ * @returns Instance PrismaClient étendue, prête à l'emploi
  */
 function createPrismaClient(): PrismaClient {
-  // Adapter pg : gère la mise en pool des connexions PostgreSQL via PgBouncer
-  const adapter = new PrismaPg({
+  // Pool pg minimal : PgBouncer gère la durée de vie des connexions.
+  // On n'utilise pas keepAlive ni idleTimeoutMillis car on préfère laisser
+  // PgBouncer fermer les connexions idle naturellement, et gérer le retry côté Prisma.
+  const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    max: 3, // max 3 connexions simultanées (adapté au plan Supabase free)
+    // Pas de keepAlive ni idleTimeoutMillis :
+    // PgBouncer gère la durée de vie des connexions — c'est son rôle.
   })
 
-  return new PrismaClient({ adapter })
+  // Gestionnaire d'erreur pool : évite un crash Node.js quand PgBouncer ferme
+  // une connexion idle côté serveur (le client pg reçoit une notification d'erreur).
+  // pg retire silencieusement le client défaillant du pool → prochaine requête = connexion fraîche.
+  pool.on('error', (_err) => {
+    // Intentionnellement vide : pg gère déjà le retrait du client mort du pool.
+    // Sans ce handler, Node.js lèverait un uncaughtException qui crasherait le process.
+  })
+
+  // PrismaPg accepte une instance Pool directement (Prisma 7)
+  const adapter = new PrismaPg(pool)
+  const client = new PrismaClient({ adapter })
+
+  // Extension Prisma : retry transparent sur toutes les opérations en cas de connexion périmée.
+  // Race condition typique : pg sort du pool une connexion que PgBouncer vient de fermer,
+  // mais pg ne l'a pas encore détecté. La 1re tentative échoue → la 2e obtient une connexion fraîche.
+  return client.$extends({
+    query: {
+      $allModels: {
+        /**
+         * Intercepte toutes les opérations Prisma.
+         * En cas d'erreur de connexion périmée, rejoue la requête une seule fois.
+         *
+         * @param args - Arguments de la requête Prisma
+         * @param query - Fonction de requête originale
+         * @returns Résultat de la requête (1re ou 2e tentative)
+         */
+        async $allOperations({ args, query }) {
+          try {
+            return await query(args)
+          } catch (err) {
+            if (isStaleConnectionError(err)) {
+              // 2e tentative : pg a retiré la connexion morte du pool,
+              // cette requête obtient une connexion fraîche.
+              return await query(args)
+            }
+            // Toute autre erreur est relancée telle quelle
+            throw err
+          }
+        },
+      },
+    },
+  }) as unknown as PrismaClient
 }
 
 /**
