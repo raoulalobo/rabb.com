@@ -30,11 +30,11 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
   description:
-    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, LinkedIn, Snapchat, Pinterest et Threads en quelques secondes.',
+    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, X (Twitter) et Snapchat en quelques secondes.',
   openGraph: {
     title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
     description:
-      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, LinkedIn, Snapchat, Pinterest et Threads en quelques secondes.',
+      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, X (Twitter) et Snapchat en quelques secondes.',
     type: 'website',
   },
 }
@@ -44,7 +44,8 @@ export const metadata: Metadata = {
 /**
  * Plateformes affichées dans la section "Compatible avec" du hero.
  * Reflète exactement DISPLAYED_PLATFORMS de modules/platforms/constants.ts :
- * 5 plateformes prioritaires + LinkedIn, Snapchat, Pinterest, Threads.
+ * 5 plateformes prioritaires + Snapchat.
+ * LinkedIn, Pinterest et Threads ne sont pas encore proposés (MVP).
  * Chaque entrée référence un SVG dans /public/icons/.
  */
 const PLATFORMS = [
@@ -75,24 +76,9 @@ const PLATFORMS = [
     color: '#000000',
   },
   {
-    name: 'LinkedIn',
-    icon: '/icons/linkedin.svg',
-    color: '#0A66C2',
-  },
-  {
     name: 'Snapchat',
     icon: '/icons/snapchat.svg',
     color: '#FFFC00',
-  },
-  {
-    name: 'Pinterest',
-    icon: '/icons/pinterest.svg',
-    color: '#E60023',
-  },
-  {
-    name: 'Threads',
-    icon: '/icons/threads.svg',
-    color: '#000000',
   },
 ] as const
 
@@ -230,7 +216,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
 
           {/* ── Section "Compatible avec" ───────────────────────────────────── */}
           {/*
-           * Badges horizontaux affichant les 9 plateformes supportées.
+           * Badges horizontaux affichant les 6 plateformes proposées.
            * Icône + nom masqué sur mobile (span sm:inline).
            * Espacement mt-14 pour respirer après les CTAs.
            */}

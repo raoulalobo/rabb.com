@@ -24,8 +24,9 @@ import { PlatformCardSkeleton } from './PlatformCardSkeleton'
 
 /**
  * Liste complète des plateformes sociales.
- * Affiche les 5 plateformes prioritaires (DISPLAYED_PLATFORMS : Instagram, TikTok,
- * YouTube, Facebook, X/Twitter) + toutes les autres déjà connectées.
+ * Affiche les plateformes de DISPLAYED_PLATFORMS (Instagram, TikTok, YouTube,
+ * Facebook, X/Twitter, Snapchat) + toutes les autres déjà connectées.
+ * LinkedIn, Pinterest et Threads sont masqués (non proposés dans le MVP).
  * Gère les états de chargement et les actions connect/disconnect.
  */
 export function PlatformList(): React.JSX.Element {

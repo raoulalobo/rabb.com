@@ -191,16 +191,13 @@ export const PRIORITY_PLATFORMS: LatePlatform[] = [
 
 /**
  * Plateformes auxquelles les utilisateurs peuvent se connecter depuis l'UI.
- * Inclut les 5 plateformes prioritaires + 4 nouvelles plateformes activées :
- * LinkedIn, Snapchat, Pinterest et Threads.
+ * Inclut les 5 plateformes prioritaires + Snapchat.
+ * LinkedIn, Pinterest et Threads ne sont pas encore proposés (MVP).
  * Les autres (Bluesky, Reddit, Telegram, Google Business) restent masquées.
  */
 export const DISPLAYED_PLATFORMS: LatePlatform[] = [
   ...PRIORITY_PLATFORMS,
-  'linkedin',
   'snapchat',
-  'pinterest',
-  'threads',
 ]
 
 /**
