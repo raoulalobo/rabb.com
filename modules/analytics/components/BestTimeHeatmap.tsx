@@ -85,6 +85,8 @@ export function BestTimeHeatmap({ data }: BestTimeHeatmapProps): React.JSX.Eleme
     <div className="space-y-3">
       {/* Grille : lignes = jours, colonnes = heures */}
       <div className="overflow-x-auto">
+        {/* Wrapper min-width pour éviter la compression sur mobile */}
+        <div className="min-w-[500px] lg:min-w-0">
         {/* En-tête heures */}
         <div
           className="mb-1 grid"
@@ -128,6 +130,7 @@ export function BestTimeHeatmap({ data }: BestTimeHeatmapProps): React.JSX.Eleme
             })}
           </div>
         ))}
+        </div>
       </div>
 
       {/* Meilleurs créneaux en badges */}

@@ -148,11 +148,11 @@ export function AnalyticsContent(): React.JSX.Element {
 
       {/* ── 5. Best Time + Top Posts (2 colonnes) ───────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Meilleur moment pour publier">
+        <Section title="Meilleur moment pour publier" className="min-w-0">
           <BestTimeHeatmap data={bestTime} />
         </Section>
 
-        <Section title="Top posts">
+        <Section title="Top posts" className="min-w-0">
           <TopPerformingPosts posts={analyticsPosts?.posts} />
         </Section>
       </div>

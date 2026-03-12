@@ -215,7 +215,7 @@ export function SignatureForm({
       </div>
 
       {/* Actions : Enregistrer / Annuler */}
-      <div className="flex items-center gap-2 justify-end">
+      <div className="sticky bottom-0 z-10 flex items-center gap-2 justify-end bg-background pb-2 pt-2">
         <Button
           type="button"
           variant="ghost"

@@ -64,6 +64,11 @@ export const auth = betterAuth({
      */
     sendOnSignUp: true,
     /**
+     * requireEmailVerification : bloque le sign-in tant que l'email n'est pas
+     * vérifié. better-auth renverra une erreur si user.emailVerified === false.
+     */
+    requireEmailVerification: true,
+    /**
      * autoSignInAfterVerification : connecte automatiquement l'utilisateur après
      * qu'il ait cliqué sur le lien de vérification, sans repasser par le login.
      */

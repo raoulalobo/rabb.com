@@ -67,7 +67,7 @@ export function Footer(): React.JSX.Element {
         : null
 
   return (
-    <div className="flex flex-col gap-3 pt-2">
+    <div className="sticky bottom-0 bg-background flex flex-col gap-3 pt-2">
       {/* Message d'aide contextuel */}
       {helpText && !isSubmitting && (
         <p className="text-xs text-muted-foreground" role="status">

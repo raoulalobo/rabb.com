@@ -668,7 +668,9 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
         {/* relative : ancre de positionnement pour l'overlay mobile du panneau IA */}
         <div className="relative flex h-full min-h-0 gap-4">
           {/* Zone principale du compositeur (toujours visible) */}
-          <div className="min-w-0 flex-1">
+          {/* overflow-y-auto : permet le scroll interne quand le contenu
+              (éditeur + médias + schedule) dépasse la hauteur du dialog mobile */}
+          <div className="min-w-0 flex-1 overflow-y-auto">
             {children}
           </div>
 

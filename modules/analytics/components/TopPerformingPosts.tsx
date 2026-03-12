@@ -105,7 +105,7 @@ export function TopPerformingPosts({ posts }: TopPerformingPostsProps): React.JS
       {/* Liste des posts */}
       <div className="space-y-2">
         {sorted.map((post, index) => (
-          <div key={post.id} className="flex items-start gap-3">
+          <div key={post.id} className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
             {/* Rang */}
             <span
               className="mt-0.5 min-w-[1.25rem] text-center text-sm font-bold"
@@ -133,7 +133,7 @@ export function TopPerformingPosts({ posts }: TopPerformingPostsProps): React.JS
             </div>
 
             {/* Métriques clés */}
-            <div className="flex shrink-0 items-center gap-2 text-xs">
+            <div className="flex items-center gap-2 text-xs basis-full sm:basis-auto sm:shrink-0 pl-8 sm:pl-0">
               {post.metrics.engagementRate > 0 && (
                 <span className="rounded bg-green-500/10 px-1.5 py-0.5 font-medium text-green-500">
                   ER {post.metrics.engagementRate.toFixed(2)}%

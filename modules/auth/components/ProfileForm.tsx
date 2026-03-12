@@ -373,7 +373,7 @@ export function ProfileForm({ profile }: ProfileFormProps): React.JSX.Element {
       </div>
 
       {/* ── Footer : message de feedback + bouton sauvegarder ─────────────── */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="sticky bottom-0 z-10 flex items-center justify-between gap-4 bg-background pb-4 pt-2">
         {/* Message succès / erreur */}
         {saveMessage ? (
           <p className={[

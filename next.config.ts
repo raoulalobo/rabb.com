@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
   // Nécessaire quand l'app est accédée depuis une autre machine du réseau local
   // (ex: 10.187.189.160 → localhost). Sans cette config, Next.js affiche un warning
   // et bloquera ces requêtes dans une future version majeure.
-  allowedDevOrigins: ['10.187.189.160'],
+  allowedDevOrigins: ['10.187.189.160', '172.30.231.160'],
 
   // Config Turbopack — déclare explicitement l'usage de Turbopack pour `next dev`.
   // `root: __dirname` pointe sur /home/alobo/Bureau/NextJS/rsx/rsxv1 pour que

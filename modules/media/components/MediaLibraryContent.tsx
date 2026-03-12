@@ -453,7 +453,7 @@ export function MediaLibraryContent({
 
       {/* ── Barre d'actions bulk (mode sélection) ────────────────────────── */}
       {isSelectMode && selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5">
+        <div className="sticky bottom-4 z-10 flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-2.5 shadow-lg">
           <span className="text-sm font-medium">
             {selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
           </span>
