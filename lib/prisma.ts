@@ -80,8 +80,11 @@ function createPrismaClient(): PrismaClient {
     // Sans ce handler, Node.js lèverait un uncaughtException qui crasherait le process.
   })
 
-  // PrismaPg accepte une instance Pool directement (Prisma 7)
-  const adapter = new PrismaPg(pool)
+  // PrismaPg accepte une instance Pool directement (Prisma 7).
+  // Cast nécessaire : @prisma/adapter-pg bundle sa propre copie de @types/pg,
+  // qui peut diverger structurellement de @types/pg racine (ex: connect() → void vs ClientBase).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adapter = new PrismaPg(pool as any)
   const client = new PrismaClient({ adapter })
 
   // Extension Prisma : retry transparent sur toutes les opérations en cas de connexion périmée.
