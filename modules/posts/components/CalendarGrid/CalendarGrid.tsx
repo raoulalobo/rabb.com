@@ -43,6 +43,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/utils'
@@ -955,11 +956,35 @@ function CalendarCell({
                 />
               ))}
 
-              {/* Indicateur "+N autres" quand MAX_VISIBLE est dépassé */}
+              {/* Popover "+N autres" : affiche les posts cachés au-delà de MAX_VISIBLE */}
               {hiddenCount > 0 && (
-                <p className="pl-1 text-[10px] text-muted-foreground">
-                  +{hiddenCount} autre{hiddenCount > 1 ? 's' : ''}
-                </p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full pl-1 text-left text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      +{hiddenCount} autre{hiddenCount > 1 ? 's' : ''}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="start">
+                    {/* Zone scrollable — max ~8 posts visibles, scroll au-delà */}
+                    <div className="max-h-64 space-y-1 overflow-y-auto">
+                      {effectivePosts.slice(MAX_VISIBLE).map((post) => (
+                        <CalendarPostChip
+                          key={post.id}
+                          post={post}
+                          interactive={interactive}
+                          onEdit={onPostClick}
+                          isSelectMode={isSelectMode}
+                          isSelected={selectedIds?.has(post.id) ?? false}
+                          onToggleSelect={onToggleSelect}
+                        />
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
             </>
           )}
