@@ -30,6 +30,8 @@ import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
+import { FailureAlert } from '@/modules/posts/components/FailureAlert'
+import { getFailureAdvice } from '@/modules/posts/utils/failure-advice'
 import {
   STATUS_BADGE_CLASSES,
   STATUS_LABELS,
@@ -246,7 +248,9 @@ export function CalendarPostChip({
         title={
           post.status === 'PUBLISHED'
             ? `Voir le post — ${post.text}`
-            : `Modifier — [${STATUS_LABELS[post.status]}] ${post.text}`
+            : post.status === 'FAILED' && post.failureReason
+              ? `Erreur : ${getFailureAdvice(post.failureReason).summary} — Cliquer pour corriger`
+              : `Modifier — [${STATUS_LABELS[post.status]}] ${post.text}`
         }
       >
         {chipContent}
@@ -331,6 +335,11 @@ export function CalendarPostChip({
             </div>
           )}
         </div>
+
+        {/* ── Alerte d'échec compacte (visible uniquement pour les posts FAILED) ── */}
+        {post.status === 'FAILED' && post.failureReason && (
+          <FailureAlert compact failureReason={post.failureReason} />
+        )}
       </PopoverContent>
     </Popover>
   )

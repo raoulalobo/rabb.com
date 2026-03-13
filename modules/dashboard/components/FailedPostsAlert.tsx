@@ -22,6 +22,7 @@
 import Link from 'next/link'
 
 import { useDashboardStats } from '@/modules/dashboard/hooks/useDashboardStats'
+import { getFailureAdvice } from '@/modules/posts/utils/failure-advice'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,13 @@ export function FailedPostsAlert(): React.JSX.Element | null {
 
   const count = data.postsFailed
   // Pluralisation du message : "1 post" vs "2 posts"
-  const label = count === 1 ? 'post en erreur de publication' : 'posts en erreur de publication'
+  const label = count === 1 ? 'post en erreur' : 'posts en erreur'
+
+  // Résumé du premier échec récent (si disponible dans recentFailures)
+  const firstFailureSummary =
+    data.recentFailures && data.recentFailures.length > 0
+      ? getFailureAdvice(data.recentFailures[0]).summary
+      : null
 
   return (
     <div
@@ -70,9 +77,12 @@ export function FailedPostsAlert(): React.JSX.Element | null {
           <path d="M12 9v4" />
           <path d="M12 17h.01" />
         </svg>
-        {/* Nombre de posts + libellé pluralisé */}
+        {/* Nombre de posts + résumé du premier échec */}
         <span>
           <strong>{count}</strong> {label}
+          {firstFailureSummary && (
+            <span className="text-red-600 dark:text-red-300"> · {firstFailureSummary}</span>
+          )}
         </span>
       </div>
 

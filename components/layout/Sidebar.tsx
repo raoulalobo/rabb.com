@@ -53,12 +53,12 @@ interface NavItem {
  */
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',   href: '/dashboard',   icon: LayoutDashboard },
-  // Calendrier : vue mensuelle des posts planifiés + création rapide par clic sur un jour
-  { label: 'Calendrier',  href: '/calendar',    icon: CalendarDays },
+  // Planifier : vue mensuelle des posts planifiés + création rapide par clic sur un jour
+  { label: 'Planifier',   href: '/calendar',    icon: CalendarDays },
   // Galerie : bibliothèque de médias réutilisables dans les posts
   { label: 'Galerie',     href: '/gallery',     icon: Images },
-  // Signatures : blocs de texte réutilisables (hashtags, CTA) par plateforme
-  { label: 'Signatures',  href: '/signatures',  icon: FileSignature },
+  // Hashtag : blocs de texte réutilisables (hashtags, CTA) par plateforme
+  { label: 'Hashtag',     href: '/signatures',  icon: FileSignature },
   { label: 'Analytics',   href: '/analytics',   icon: BarChart2 },
   // { label: 'Inbox', href: '/inbox', icon: Inbox },  // masqué — module non implémenté (à réactiver plus tard)
   { label: 'Profil',      href: '/profile',     icon: UserCircle },
@@ -104,10 +104,10 @@ export function Sidebar(): React.JSX.Element {
               href={href}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                // Actif : fond accentué + couleur primaire
+                // Actif : fond teinté primary + texte primary + barre latérale gauche colorée
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                  ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground border-l-2 border-transparent'
               )}
             >
               <Icon className="size-4 shrink-0" />

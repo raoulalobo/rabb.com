@@ -114,7 +114,7 @@ const FEATURES: Feature[] = [
   {
     id: 'signatures',
     icon: FileSignature,
-    label: 'Signatures',
+    label: 'Hashtag',
     title: 'Personnalisez chaque publication',
     description:
       'Créez des signatures réutilisables (hashtags, mentions, emojis) et attachez-les automatiquement à vos posts par plateforme.',

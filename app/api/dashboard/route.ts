@@ -42,6 +42,8 @@ export interface DashboardStatsResponse {
   impressions: number
   /** Taux d'engagement moyen sur les 30 derniers jours, en % (Late API) */
   engagementRate: number
+  /** failureReason des 2 derniers posts FAILED (pour l'aperçu dans FailedPostsAlert) */
+  recentFailures: string[]
 }
 
 /** Réponse brute de la Late API analytics (structure minimale attendue) */
@@ -58,11 +60,21 @@ export async function GET(): Promise<NextResponse> {
 
   // ── 1. Comptages Prisma (rapides, toujours disponibles) ───────────────────
   // On lance les trois counts en parallèle pour minimiser la latence DB.
-  const [postsPublished, postsScheduled, postsFailed] = await Promise.all([
+  const [postsPublished, postsScheduled, postsFailed, recentFailedPosts] = await Promise.all([
     prisma.post.count({ where: { userId, status: 'PUBLISHED' } }),
     prisma.post.count({ where: { userId, status: 'SCHEDULED' } }),
     prisma.post.count({ where: { userId, status: 'FAILED' } }),
+    // Récupère les 2 derniers posts FAILED avec leur failureReason pour l'aperçu dashboard
+    prisma.post.findMany({
+      where: { userId, status: 'FAILED', failureReason: { not: null } },
+      select: { failureReason: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 2,
+    }),
   ])
+
+  // Extraire les failureReason (filtrées non-null par la requête Prisma)
+  const recentFailures = recentFailedPosts.map((p) => p.failureReason as string)
 
   // ── 2. Analytics Late API (dégradation gracieuse si aucune plateforme) ────
   let impressions = 0
@@ -115,5 +127,6 @@ export async function GET(): Promise<NextResponse> {
     postsFailed,
     impressions,
     engagementRate,
+    recentFailures,
   } satisfies DashboardStatsResponse)
 }

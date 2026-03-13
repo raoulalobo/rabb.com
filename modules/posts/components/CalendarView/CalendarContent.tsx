@@ -47,10 +47,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CalendarGrid } from '@/modules/posts/components/CalendarGrid/CalendarGrid'
+import { FailureAlert } from '@/modules/posts/components/FailureAlert'
 import { PostComposer } from '@/modules/posts/components/PostComposer'
 import { bulkDeletePosts } from '@/modules/posts/actions/bulk-delete-posts.action'
 import { bulkEditContent } from '@/modules/posts/actions/bulk-edit-content.action'
 import { bulkUpdatePosts } from '@/modules/posts/actions/bulk-update-posts.action'
+import { schedulePost } from '@/modules/posts/actions/schedule-post.action'
 import { useBulkSelection } from '@/modules/posts/hooks/useBulkSelection'
 import { postQueryKeys } from '@/modules/posts/queries/posts.queries'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
@@ -269,6 +271,38 @@ export function CalendarContent(): React.JSX.Element {
       setIsAIPanelOpen(false)
     }
   }, [])
+
+  /**
+   * Replanifie un post FAILED : appelle schedulePost() avec les données du post
+   * et une date scheduledFor à now + 5 minutes (délai minimum raisonnable).
+   * Ferme le Dialog et invalide le cache calendrier après succès.
+   */
+  const handleRetry = useCallback(async (): Promise<void> => {
+    if (!editingPost) return
+
+    // Planifier dans 5 minutes
+    const retryDate = new Date(Date.now() + 5 * 60 * 1000)
+
+    const result = await schedulePost(
+      {
+        text: editingPost.text,
+        platform: editingPost.platform,
+        mediaUrls: editingPost.mediaUrls,
+        scheduledFor: retryDate,
+      },
+      editingPost.id,
+    )
+
+    if (result.success) {
+      toast.success('Post replanifié dans 5 minutes')
+      setDialogOpen(false)
+      setEditingPost(null)
+      setDialogMode('create')
+      void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+    } else {
+      toast.error(result.error ?? 'Erreur lors de la replanification')
+    }
+  }, [editingPost, queryClient])
 
   // ─── Handlers bulk (actions groupées sur les posts sélectionnés) ─────────────
 
@@ -491,22 +525,34 @@ export function CalendarContent(): React.JSX.Element {
           )}
         >
           <DialogHeader>
-            {/* Titre conditionnel selon le mode */}
+            {/* Titre conditionnel selon le mode et le statut du post */}
             <DialogTitle>
               {dialogMode === 'view'
                 ? `Post publié${formattedEditDate ? ` — ${formattedEditDate}` : ''}`
-                : dialogMode === 'edit'
-                  ? `Modifier le post${formattedEditDate ? ` — ${formattedEditDate}` : ''}`
-                  : `Nouveau post — ${formattedDate}`}
+                : dialogMode === 'edit' && editingPost?.status === 'FAILED'
+                  ? 'Post échoué'
+                  : dialogMode === 'edit'
+                    ? `Modifier le post${formattedEditDate ? ` — ${formattedEditDate}` : ''}`
+                    : `Nouveau post — ${formattedDate}`}
             </DialogTitle>
             <DialogDescription>
               {dialogMode === 'view'
                 ? 'Ce post a déjà été publié. Il ne peut plus être modifié ni replanifié.'
-                : dialogMode === 'edit'
-                  ? 'Modifiez votre post et sauvegardez.'
-                  : 'Composez et planifiez votre post pour cette date.'}
+                : dialogMode === 'edit' && editingPost?.status === 'FAILED'
+                  ? 'Ce post n\'a pas pu être publié. Consultez l\'erreur ci-dessous.'
+                  : dialogMode === 'edit'
+                    ? 'Modifiez votre post et sauvegardez.'
+                    : 'Composez et planifiez votre post pour cette date.'}
             </DialogDescription>
           </DialogHeader>
+
+          {/* ── Alerte d'échec avec conseil actionnable (posts FAILED uniquement) ── */}
+          {dialogMode === 'edit' && editingPost?.status === 'FAILED' && editingPost.failureReason && (
+            <FailureAlert
+              failureReason={editingPost.failureReason}
+              onRetry={handleRetry}
+            />
+          )}
 
           {/*
            * PostComposer pré-rempli via le draft store (loadPost).
