@@ -55,6 +55,7 @@ model User {
   media         Media[]
   mediaFolders  MediaFolder[]
   mediaTags     MediaTag[]
+  bioPage       BioPage?
 
   @@map("users")
 }
@@ -300,6 +301,161 @@ model Media {
   // Index composé pour la pagination triée par date (requête principale de la galerie)
   @@index([userId, createdAt])
   @@map("media")
+}
+
+// ─── Modèles Bio Link ─────────────────────────────────────────────────────────
+
+/**
+ * Page "Link in Bio" publique de l'utilisateur.
+ * Accessible à l'URL : ogolong.com/u/{slug}
+ * Relation 1-1 avec User (un utilisateur ne peut avoir qu'une seule BioPage).
+ *
+ * Personnalisation : titre, bio, avatar, thème visuel, couleur d'accent.
+ * Les liens sociaux (icônes en bas de page) sont stockés en JSON.
+ *
+ * Cycle de vie :
+ *  1. Création automatique ou manuelle via l'éditeur /biolink
+ *  2. Ajout de liens (BioLink) via drag & drop
+ *  3. Publication (isPublished = true) → page accessible publiquement
+ *  4. Tracking des clics (totalClicks agrégé)
+ */
+model BioPage {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // URL publique : ogolong.com/u/{slug}
+  slug        String   @unique
+
+  // Personnalisation du profil
+  title       String?              // Nom affiché (défaut: user.name)
+  bio         String?              // Description courte (max 300 chars)
+  avatarUrl   String?              // Défaut: user.avatarUrl
+
+  // Thème visuel
+  theme       String   @default("default")  // "default" | "dark" | "gradient" | "minimal" | "neon"
+  accentColor String   @default("#6366f1")   // Couleur d'accent (hex)
+
+  // Couleurs personnalisées (null = hérite du thème)
+  titleColor  String?                           // Couleur hex du titre (#RRGGBB)
+  bioColor    String?                           // Couleur hex de la bio
+  linkColor   String?                           // Couleur hex du texte des boutons de liens
+
+  // Personnalisation avancée — polices, boutons, avatar
+  fontFamily         String   @default("inter")        // inter|poppins|playfair|space-grotesk|dm-sans|outfit|lora|bebas-neue
+  buttonShape        String   @default("rounded-lg")   // rounded-lg|rounded-full|rounded-none
+  buttonVariant      String   @default("filled")       // filled|outline|shadow
+  avatarShape        String   @default("circle")       // circle|rounded-square|square
+
+  // Fond personnalisé (image ou dégradé custom)
+  backgroundImageUrl String?                           // URL image de fond
+  gradientFrom       String?                           // Hex dégradé custom (couleur 1)
+  gradientTo         String?                           // Hex dégradé custom (couleur 2)
+
+  // Mise en page des liens
+  linkSpacing        String   @default("normal")       // compact|normal|airy
+  hoverAnimation     String   @default("none")         // none|scale|glow|slide
+
+  // Style de mise en page (structure du header et du contenu)
+  headerStyle        String   @default("classic")      // classic|hero|banner|minimal|card
+
+  // Branding et bannière
+  bannerUrl          String?                           // URL bannière large en haut
+  hideBranding       Boolean  @default(false)          // Masquer "Créé avec ogolong"
+  faviconUrl         String?                           // Favicon personnalisé
+
+  // Formulaire de contact intégré
+  showContactForm    Boolean  @default(false)
+
+  // Dernier template appliqué (null = aucun template, personnalisation manuelle)
+  templateId         String?
+
+  // Domaine personnalisé (post-MVP)
+  customDomain       String?  @unique
+
+  // SEO (balises meta personnalisées)
+  seoTitle       String?
+  seoDescription String?
+
+  // Liens vers les réseaux sociaux (icônes en bas de page)
+  // Format JSON : [{platform: "instagram", url: "https://..."}, ...]
+  socialLinks Json     @default("[]")
+
+  // Statistiques agrégées
+  totalClicks Int      @default(0)
+
+  // Publication : la page n'est visible publiquement que si isPublished = true
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Liens individuels (boutons cliquables sur la page)
+  links       BioLink[]
+  // Messages reçus via le formulaire de contact
+  contacts    BioContact[]
+
+  @@index([userId])
+  @@map("bio_pages")
+}
+
+/**
+ * Lien individuel affiché sur une BioPage (bouton cliquable).
+ * Chaque lien a un titre, une URL de destination, un ordre d'affichage,
+ * et un compteur de clics indépendant.
+ *
+ * Le champ `position` détermine l'ordre d'affichage (drag & drop).
+ * Les liens inactifs (isActive = false) ne sont pas visibles sur la page publique.
+ */
+model BioLink {
+  id           String   @id @default(cuid())
+  bioPageId    String
+  bioPage      BioPage  @relation(fields: [bioPageId], references: [id], onDelete: Cascade)
+
+  // Type de lien : link (bouton cliquable), header (titre de section),
+  // separator (ligne horizontale), video (embed YouTube/TikTok), music (embed Spotify)
+  type         String   @default("link")   // link|header|separator|video|music
+
+  title        String                 // Libellé du bouton : "Ma dernière vidéo", "Ma boutique", etc.
+  url          String?                // URL de destination (null pour header/separator)
+  icon         String?                // Emoji ou nom d'icône Lucide (optionnel)
+  thumbnailUrl String?                // Image miniature affichée dans le bouton (optionnel)
+
+  // Planification temporelle : le lien n'est visible que dans la fenêtre [activeFrom, activeUntil]
+  activeFrom   DateTime?              // Début de visibilité (null = immédiat)
+  activeUntil  DateTime?              // Fin de visibilité (null = permanent)
+
+  // Ordre d'affichage (0 = premier). Modifiable par drag & drop dans l'éditeur.
+  position     Int      @default(0)
+
+  // Statistiques : nombre de clics sur ce lien
+  clicks       Int      @default(0)
+
+  // Un lien inactif n'apparaît pas sur la page publique (toggle dans l'éditeur)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([bioPageId, position])
+  @@map("bio_links")
+}
+
+/**
+ * Message reçu via le formulaire de contact intégré à la BioPage.
+ * Visible uniquement par le propriétaire de la page dans l'éditeur.
+ */
+model BioContact {
+  id          String   @id @default(cuid())
+  bioPageId   String
+  bioPage     BioPage  @relation(fields: [bioPageId], references: [id], onDelete: Cascade)
+
+  name        String                 // Nom de l'expéditeur
+  email       String                 // Email de l'expéditeur
+  message     String                 // Contenu du message
+
+  createdAt   DateTime @default(now())
+
+  @@index([bioPageId, createdAt])
+  @@map("bio_contacts")
 }
 
 /**
