@@ -63,8 +63,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Galerie',     href: '/gallery',     icon: Images },
   // Hashtag : blocs de texte réutilisables (hashtags, CTA) par plateforme
   { label: 'Hashtag',     href: '/signatures',  icon: FileSignature },
-  // Bio Link : page publique "Link in Bio" personnalisable
-  { label: 'Bio Link',    href: '/biolink',     icon: Link2 },
+  // Bio Link : page publique "Link in Bio" personnalisable (module supprimé — à réactiver plus tard)
+  // { label: 'Bio Link',    href: '/biolink',     icon: Link2 },
   { label: 'Analytics',   href: '/analytics',   icon: BarChart2 },
   // { label: 'Inbox', href: '/inbox', icon: Inbox },  // masqué — module non implémenté (à réactiver plus tard)
   { label: 'Profil',      href: '/profile',     icon: UserCircle },
