@@ -21,6 +21,7 @@ import { useAnalyticsStore } from '@/modules/analytics/store/analytics.store'
 
 import { ActivityHeatmap } from './ActivityHeatmap'
 import { AnalyticsExport } from './AnalyticsExport'
+import { AnalyticsFilters } from './AnalyticsFilters'
 import { BestTimeHeatmap } from './BestTimeHeatmap'
 import { ContentDecay } from './ContentDecay'
 import { FollowersChart } from './FollowersChart'
@@ -117,18 +118,18 @@ export function AnalyticsContent(): React.JSX.Element {
       {/* ── Indicateur discret de rechargement (changement de filtre) ───────
           Visible uniquement lors d'un re-fetch avec données précédentes visibles.
           Absent au chargement initial (isLoading masque tout via le skeleton).       */}
-      {/* ── Barre d'actions (export + indicateur rechargement) ──────────── */}
-      <div className="flex items-center justify-between">
-        {isFetching ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="size-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
-            Actualisation…
-          </div>
-        ) : (
-          <div />
-        )}
+      {/* ── Filtres + export CSV (même ligne) ──────────────────────────── */}
+      <AnalyticsFilters>
         <AnalyticsExport posts={analyticsPosts?.posts} />
-      </div>
+      </AnalyticsFilters>
+
+      {/* ── Indicateur discret de rechargement (changement de filtre) ──── */}
+      {isFetching && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="size-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
+          Actualisation…
+        </div>
+      )}
 
       {/* ── 1. Heatmap d'activité ───────────────────────────────────────── */}
       <Section title="Activité de publication">

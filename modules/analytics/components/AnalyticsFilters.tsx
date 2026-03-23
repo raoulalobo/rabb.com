@@ -53,7 +53,7 @@ const SORT_OPTIONS = [
  * Barre de filtres analytics avec dropdowns shadcn/ui.
  * Synchronisée avec le store Zustand — les queries se recalculent automatiquement.
  */
-export function AnalyticsFilters(): React.JSX.Element {
+export function AnalyticsFilters({ children }: { children?: React.ReactNode }): React.JSX.Element {
   const { platform, dateRange, sortBy, setPlatform, setDateRange, setSortBy } =
     useAnalyticsStore()
 
@@ -128,6 +128,9 @@ export function AnalyticsFilters(): React.JSX.Element {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Slot pour des actions supplémentaires (ex: bouton Export CSV) */}
+      {children}
     </div>
   )
 }
