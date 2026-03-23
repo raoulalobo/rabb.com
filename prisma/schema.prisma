@@ -56,6 +56,9 @@ model User {
   mediaFolders  MediaFolder[]
   mediaTags     MediaTag[]
   bioPage       BioPage?
+  webhookEvents WebhookEvent[]
+  notifications Notification[]
+  queueSlots    QueueSlot[]
 
   @@map("users")
 }
@@ -163,6 +166,17 @@ model Post {
   text          String     // Contenu textuel adapté à la plateforme (max 63 206 chars)
   mediaUrls     String[]   @default([])   // URLs Supabase Storage
   platform      String     // Ex: "tiktok" — une seule plateforme par post
+  /**
+   * Surcharges de contenu par plateforme (JSON optionnel).
+   * Stocke les contenus personnalisés quand l'utilisateur adapte le texte
+   * et/ou les médias par plateforme dans le PostComposer (mode multi-plateformes).
+   *
+   * Format attendu : { "instagram": { "text": "...", "mediaUrls": [...] }, ... }
+   * null = pas de surcharges (toutes les plateformes utilisent le contenu de base).
+   *
+   * @see modules/posts/schemas/platform-overrides.schema.ts pour le schéma Zod
+   */
+  platformOverrides Json?
   status        PostStatus @default(DRAFT)
   scheduledFor  DateTime?  // Null si brouillon, défini si planifié
   publishedAt   DateTime?  // Rempli par Inngest après publication réussie
@@ -471,4 +485,104 @@ model NotificationPrefs {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_prefs")
+}
+
+// ─── Modèles Webhooks et Notifications ───────────────────────────────────────
+
+/**
+ * Événement webhook reçu de getlate.dev.
+ * Stocke le payload brut pour traçabilité et audit.
+ * Chaque événement est traité par une fonction Inngest (process-webhook).
+ *
+ * Types d'événements supportés :
+ *   - post.published  → post publié avec succès
+ *   - post.failed     → échec de publication
+ *   - account.disconnected → compte social déconnecté (token révoqué)
+ *
+ * Cycle de vie :
+ *   1. Réception POST /api/webhooks/late → validation signature → stockage ici
+ *   2. Dispatch Inngest event "webhook/received" avec { webhookEventId }
+ *   3. Fonction Inngest traite l'event → met à jour processedAt
+ */
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  userId      String                        // Utilisateur concerné par l'événement
+  eventType   String                        // "post.published" | "post.failed" | "account.disconnected"
+  postId      String?                       // ID du post concerné (null pour account.disconnected)
+  payload     Json                          // Payload brut reçu de getlate.dev
+  processedAt DateTime?                     // Rempli après traitement par Inngest (null = en attente)
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@map("webhook_events")
+}
+
+/**
+ * Notification in-app pour l'utilisateur.
+ * Affichée dans le dropdown NotificationBell (Header).
+ *
+ * Types de notifications :
+ *   - post.published       → "Ton post a été publié sur {plateforme}"
+ *   - post.failed          → "Échec de publication sur {plateforme}"
+ *   - account.disconnected → "Ton compte {plateforme} a été déconnecté"
+ *
+ * Cycle de vie :
+ *   1. Créée par la fonction Inngest process-webhook après traitement
+ *   2. Affichée dans NotificationBell (badge count = non lues)
+ *   3. Marquée lue via PATCH /api/notifications/[id]/read
+ */
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String                         // Destinataire de la notification
+  type      String                         // Type d'événement (ex: "post.published")
+  title     String                         // Titre court (ex: "Publication réussie")
+  message   String                         // Message détaillé
+  read      Boolean  @default(false)       // true = notification lue par l'utilisateur
+  postId    String?                        // ID du post concerné (lien vers la page du post)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// ─── Modèle File d'attente (Queue) ──────────────────────────────────────────
+
+/**
+ * Créneau horaire récurrent pour la publication automatique.
+ * Chaque créneau définit un jour de la semaine et une heure à laquelle
+ * un post en attente sera automatiquement programmé.
+ *
+ * dayOfWeek : 0 = dimanche, 1 = lundi, ..., 6 = samedi
+ * hour : 0-23, minute : 0-59
+ *
+ * Si platform est null, le créneau s'applique à toutes les plateformes.
+ * Si platform est défini (ex: "instagram"), le créneau ne s'applique qu'à cette plateforme.
+ *
+ * Cycle de vie :
+ *   1. L'utilisateur crée des créneaux via /queue (grille 7 jours)
+ *   2. Lors de la création d'un post sans date, le système propose le prochain créneau libre
+ *   3. Inngest peut automatiquement attribuer les posts DRAFT aux prochains créneaux
+ */
+model QueueSlot {
+  id        String   @id @default(cuid())
+  userId    String
+  dayOfWeek Int                          // 0 = dimanche, 1 = lundi, ..., 6 = samedi
+  hour      Int                          // 0-23
+  minute    Int                          // 0-59
+  platform  String?                      // null = toutes plateformes, sinon filtre par plateforme
+  active    Boolean  @default(true)      // Créneau actif/inactif (toggle rapide sans suppression)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, dayOfWeek])
+  @@map("queue_slots")
 }

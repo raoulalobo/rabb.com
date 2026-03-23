@@ -27,6 +27,7 @@ import {
   Images,
   LayoutDashboard,
   Link2,
+  ListOrdered,
   Settings,
   UserCircle,
 } from 'lucide-react'
@@ -56,6 +57,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',   href: '/dashboard',   icon: LayoutDashboard },
   // Planifier : vue mensuelle des posts planifiés + création rapide par clic sur un jour
   { label: 'Planifier',   href: '/calendar',    icon: CalendarDays },
+  // File d'attente : créneaux horaires récurrents pour la programmation automatique des posts
+  { label: "File d'attente", href: '/queue',     icon: ListOrdered },
   // Galerie : bibliothèque de médias réutilisables dans les posts
   { label: 'Galerie',     href: '/gallery',     icon: Images },
   // Hashtag : blocs de texte réutilisables (hashtags, CTA) par plateforme
