@@ -156,10 +156,10 @@ export function MetricsPanel({ analyticsPosts, dailyMetrics, previousOverview }:
                   {formatMetric(displayValue, metric.key)}
                 </span>
               </div>
-              {/* Variation vs période précédente (↑↓ %) */}
-              {(() => {
-                const prevValue = previousOverview?.[metric.key]
-                if (prevValue === undefined || prevValue === 0) {
+              {/* Variation vs période précédente (↑↓ %) — visible uniquement si comparaison activée */}
+              {previousOverview ? (() => {
+                const prevValue = previousOverview[metric.key]
+                if (prevValue === 0) {
                   return <span className="text-[10px] text-muted-foreground">—</span>
                 }
                 const change = ((displayValue - prevValue) / prevValue) * 100
@@ -177,7 +177,7 @@ export function MetricsPanel({ analyticsPosts, dailyMetrics, previousOverview }:
                     {Math.abs(change).toFixed(1)}%
                   </span>
                 )
-              })()}
+              })() : null}
             </button>
           )
         })}

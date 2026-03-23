@@ -11,7 +11,7 @@
 
 'use client'
 
-import { ChevronDown } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -54,7 +54,7 @@ const SORT_OPTIONS = [
  * Synchronisée avec le store Zustand — les queries se recalculent automatiquement.
  */
 export function AnalyticsFilters({ children }: { children?: React.ReactNode }): React.JSX.Element {
-  const { platform, dateRange, sortBy, setPlatform, setDateRange, setSortBy } =
+  const { platform, dateRange, sortBy, compareEnabled, setPlatform, setDateRange, setSortBy, toggleCompare } =
     useAnalyticsStore()
 
   const currentPlatform =
@@ -128,6 +128,18 @@ export function AnalyticsFilters({ children }: { children?: React.ReactNode }): 
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* ── Toggle comparaison période précédente ─────────────────────── */}
+      <Button
+        variant={compareEnabled ? 'default' : 'outline'}
+        size="sm"
+        className="gap-1.5 text-xs"
+        onClick={toggleCompare}
+        title={compareEnabled ? 'Masquer la comparaison' : 'Comparer avec la période précédente'}
+      >
+        <ArrowLeftRight className="size-3.5" />
+        Comparer
+      </Button>
 
       {/* Slot pour des actions supplémentaires (ex: bouton Export CSV) */}
       {children}

@@ -87,7 +87,7 @@ export interface UseAnalyticsReturn {
  */
 export function useAnalytics(): UseAnalyticsReturn {
   // Abonnement explicite à dateRange pour déclencher un re-render quand la période change
-  const { platform, dateRange, getFromDate } = useAnalyticsStore()
+  const { platform, dateRange, compareEnabled, getFromDate } = useAnalyticsStore()
 
   // Paramètres communs à toutes les queries (recalculés à chaque changement de période)
   const from = getFromDate()
@@ -151,12 +151,13 @@ export function useAnalytics(): UseAnalyticsReturn {
         retry: 0,
       },
       // 6 — Période précédente (pour comparaison ↑↓ % dans MetricsPanel)
+      // Désactivée (enabled: false) tant que l'utilisateur n'a pas cliqué "Comparer"
       {
         queryKey: analyticsKeys.posts({ from: previousRange.from, to: previousRange.to, platform: platformParam }),
         queryFn: () => fetchAnalyticsPosts({ from: previousRange.from, to: previousRange.to, platform: platformParam }),
         staleTime: 60 * 60 * 1000,
         placeholderData: keepPreviousData,
-        // retry: 0 — si la période précédente échoue, les deltas restent masqués
+        enabled: compareEnabled,
         retry: 0,
       },
     ],
