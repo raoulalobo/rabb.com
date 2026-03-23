@@ -157,13 +157,12 @@ export function FeatureGrid(): React.JSX.Element {
               </div>
 
               {/* ── Screenshot plein cadre ─────────────────────────────── */}
-              {/* Aspect ratio adapté :
-                  - Cards larges : 4/3 sur mobile (lisible), 2/1 sur desktop (panoramique)
-                  - Cards standard : 4/3 partout (carré-ish, screenshots bien visibles) */}
-              <div className={`relative mx-3 mb-3 overflow-hidden rounded-lg border ${
+              {/* Mobile : bord à bord (pas de mx) + aspect 16/10 (screenshot bien visible)
+                  Desktop : petites marges + aspect adapté (2/1 pour les larges, 4/3 pour les standard) */}
+              <div className={`relative overflow-hidden border-t sm:mx-3 sm:mb-3 sm:rounded-lg sm:border ${
                 isDark ? 'border-gray-800' : 'border-gray-100'
               } transition-transform duration-300 group-hover:scale-[1.01]`}>
-                <div className={`relative ${feature.wide ? 'aspect-[4/3] sm:aspect-[2/1]' : 'aspect-[4/3]'}`}>
+                <div className={`relative ${feature.wide ? 'aspect-[16/10] sm:aspect-[2/1]' : 'aspect-[16/10] sm:aspect-[4/3]'}`}>
                   <Image
                     src={feature.screenshot}
                     alt={`${feature.label} — capture d'écran`}

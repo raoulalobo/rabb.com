@@ -24,7 +24,6 @@ import { headers } from 'next/headers'
 import { Button } from '@/components/ui/button'
 import { auth } from '@/lib/auth'
 import { FeatureGrid } from '@/components/landing/FeatureGrid'
-import { FeatureHighlights } from '@/components/landing/FeatureHighlight'
 import { PlatformLogos } from '@/components/landing/PlatformLogos'
 import { SiteFooter } from '@/components/shared/SiteFooter'
 
@@ -175,11 +174,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         {/* ── Feature Grid (7 cards avec screenshots) ─────────────────────── */}
         <section id="features" className="pb-24 pt-8">
           <FeatureGrid />
-        </section>
-
-        {/* ── Feature Highlights (3 features clés détaillées) ─────────────── */}
-        <section className="border-t border-gray-100 bg-gray-50/50 py-24">
-          <FeatureHighlights />
         </section>
 
         {/* ── Plateformes + CTA final ─────────────────────────────────────── */}
