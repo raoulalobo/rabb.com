@@ -1,12 +1,13 @@
 /**
  * @file components/landing/FeatureGrid.tsx
- * @description Grille de cards features pour la homepage.
- *   Affiche les 7 fonctionnalités principales avec icône, label, description
- *   et screenshot dans un cadre navigateur. Animation d'entrée au scroll.
+ * @description Bento grid asymétrique des fonctionnalités pour la homepage.
+ *   Layout inspiré du style "bento box" : cards de tailles variables
+ *   créant une hiérarchie visuelle naturelle.
  *
- *   Layout : 4 colonnes desktop, 2 tablette, 1 mobile.
- *   Première ligne : 4 cards (composer, calendar, queue, analytics)
- *   Deuxième ligne : 3 cards centrées (gallery, signatures, settings)
+ *   - 2 grandes cards (calendrier, analytics) — 2 colonnes de large
+ *   - 4 cards standard (queue, galerie, hashtags, réseaux)
+ *   - Screenshots plein cadre sans mini-navigateur
+ *   - Fond sombre sur les grandes cards pour le contraste
  *
  * @example
  *   <FeatureGrid />
@@ -27,124 +28,148 @@ import Image from 'next/image'
 
 // ─── Données des features ────────────────────────────────────────────────────
 
-const FEATURES = [
+interface Feature {
+  id: string
+  label: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+  screenshot: string
+  /** Si true, la card prend 2 colonnes (grande) */
+  wide: boolean
+  /** Style de la card */
+  style: 'dark' | 'light'
+}
+
+const FEATURES: Feature[] = [
   {
     id: 'calendar',
     label: 'Calendrier & Compositeur',
-    description: 'Planifiez vos posts sur un mois et composez directement depuis le calendrier',
+    description: 'Planifiez vos posts sur un mois. Composez directement depuis le calendrier avec l\'éditeur multi-plateforme intégré.',
     icon: CalendarDays,
     screenshot: '/screenshots/compose.png',
-    color: 'from-violet-500/20 to-violet-600/5',
-    iconColor: 'text-violet-600',
+    wide: true,
+    style: 'dark',
   },
   {
     id: 'queue',
     label: 'File d\'attente',
-    description: 'Programmez vos créneaux récurrents automatiques',
+    description: 'Créneaux récurrents pour publier automatiquement chaque semaine.',
     icon: ListOrdered,
-    screenshot: '/screenshots/compose.png',
-    color: 'from-amber-500/20 to-amber-600/5',
-    iconColor: 'text-amber-600',
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    description: '11 visualisations de vos performances',
-    icon: BarChart2,
-    screenshot: '/screenshots/analytics.png',
-    color: 'from-emerald-500/20 to-emerald-600/5',
-    iconColor: 'text-emerald-600',
+    screenshot: '/screenshots/settings.png',
+    wide: false,
+    style: 'light',
   },
   {
     id: 'gallery',
     label: 'Galerie média',
-    description: 'Centralisez vos photos et vidéos',
+    description: 'Bibliothèque de photos et vidéos réutilisables avec dossiers et tags.',
     icon: Images,
     screenshot: '/screenshots/gallery.png',
-    color: 'from-pink-500/20 to-pink-600/5',
-    iconColor: 'text-pink-600',
+    wide: false,
+    style: 'light',
+  },
+  {
+    id: 'analytics',
+    label: 'Analytics',
+    description: '11 visualisations, comparaison périodique, export CSV, créneaux recommandés — comprenez ce qui fonctionne.',
+    icon: BarChart2,
+    screenshot: '/screenshots/analytics.png',
+    wide: true,
+    style: 'dark',
   },
   {
     id: 'signatures',
-    label: 'Hashtags',
-    description: 'Blocs réutilisables par plateforme',
+    label: 'Hashtags & Signatures',
+    description: 'Blocs de texte réutilisables par plateforme : hashtags, CTAs, mentions.',
     icon: FileSignature,
     screenshot: '/screenshots/signatures.png',
-    color: 'from-cyan-500/20 to-cyan-600/5',
-    iconColor: 'text-cyan-600',
+    wide: false,
+    style: 'light',
   },
   {
     id: 'settings',
-    label: 'Réseaux',
-    description: 'Connectez Instagram, TikTok, YouTube, Facebook...',
+    label: 'Réseaux connectés',
+    description: 'Connectez Instagram, TikTok, YouTube, Facebook et 6 autres en 30 secondes.',
     icon: Settings,
     screenshot: '/screenshots/settings.png',
-    color: 'from-gray-500/20 to-gray-600/5',
-    iconColor: 'text-gray-600',
+    wide: false,
+    style: 'light',
   },
-] as const
+]
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
- * Grille de cards features avec screenshots et animations d'entrée au scroll.
+ * Bento grid des fonctionnalités avec cards asymétriques.
+ * Les features principales (calendrier, analytics) sont en grand format (2 colonnes).
  */
 export function FeatureGrid(): React.JSX.Element {
   return (
     <div className="mx-auto max-w-6xl px-6">
       {/* Titre de section */}
-      <motion.p
-        className="mb-8 text-center text-sm font-medium uppercase tracking-widest text-gray-400"
+      <motion.div
+        className="mb-12 text-center"
         initial={{ opacity: 0, y: 10 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.4 }}
       >
-        Tout ce dont vous avez besoin
-      </motion.p>
+        <p className="mb-3 text-sm font-medium uppercase tracking-widest text-gray-400">
+          Fonctionnalités
+        </p>
+        <h2 className="text-3xl font-bold tracking-tight text-gray-900 lg:text-4xl">
+          Tout ce dont vous avez besoin
+        </h2>
+      </motion.div>
 
-      {/* Grille responsive */}
+      {/* Bento grid : 4 colonnes desktop, 2 tablette, 1 mobile */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {FEATURES.map((feature, index) => {
           const Icon = feature.icon
+          const isDark = feature.style === 'dark'
+          const colSpan = feature.wide ? 'sm:col-span-2' : ''
+
           return (
             <motion.div
               key={feature.id}
-              className={`group relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-b ${feature.color} p-5 transition-shadow hover:shadow-lg`}
+              className={`group relative overflow-hidden rounded-2xl border ${colSpan} ${
+                isDark
+                  ? 'border-gray-800 bg-gray-950 text-white'
+                  : 'border-gray-200 bg-white text-gray-900'
+              }`}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: index * 0.06 }}
             >
-              {/* En-tête : icône + label */}
-              <div className="mb-3 flex items-center gap-2.5">
-                <div className={`flex size-8 items-center justify-center rounded-lg bg-white shadow-sm ${feature.iconColor}`}>
-                  <Icon className="size-4" />
+              {/* ── Contenu texte ──────────────────────────────────────── */}
+              <div className="p-5 pb-3">
+                {/* Icône + label */}
+                <div className="mb-2 flex items-center gap-2.5">
+                  <Icon className={`size-5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+                  <h3 className="text-sm font-semibold">{feature.label}</h3>
                 </div>
-                <h3 className="text-sm font-semibold text-gray-900">{feature.label}</h3>
+
+                {/* Description */}
+                <p className={`text-sm leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {feature.description}
+                </p>
               </div>
 
-              {/* Description */}
-              <p className="mb-4 text-xs leading-relaxed text-gray-500">
-                {feature.description}
-              </p>
-
-              {/* Screenshot dans un mini cadre */}
-              <div className="overflow-hidden rounded-lg border border-gray-200/60 bg-white shadow-sm transition-transform duration-300 group-hover:scale-[1.02]">
-                {/* Barre de titre mini */}
-                <div className="flex items-center gap-1 border-b border-gray-100 px-2 py-1">
-                  <div className="size-1.5 rounded-full bg-red-400" />
-                  <div className="size-1.5 rounded-full bg-amber-400" />
-                  <div className="size-1.5 rounded-full bg-green-400" />
-                </div>
-                {/* Image */}
-                <div className="relative aspect-[16/10]">
+              {/* ── Screenshot plein cadre ─────────────────────────────── */}
+              <div className={`relative mx-3 mb-3 overflow-hidden rounded-lg border ${
+                isDark ? 'border-gray-800' : 'border-gray-100'
+              } transition-transform duration-300 group-hover:scale-[1.01]`}>
+                <div className={`relative ${feature.wide ? 'aspect-[2/1]' : 'aspect-[4/3]'}`}>
                   <Image
                     src={feature.screenshot}
-                    alt={`Capture d'écran ${feature.label}`}
+                    alt={`${feature.label} — capture d'écran`}
                     fill
                     className="object-cover object-top"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    sizes={feature.wide
+                      ? '(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 50vw'
+                      : '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw'
+                    }
                   />
                 </div>
               </div>
