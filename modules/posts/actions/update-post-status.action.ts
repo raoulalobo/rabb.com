@@ -46,6 +46,9 @@ function mapPrismaPost(record: {
   text: string
   platform: string
   mediaUrls: string[]
+  platformOverrides?: unknown
+  contentType?: string
+  threadItems?: unknown
   scheduledFor: Date | null
   publishedAt: Date | null
   status: string
@@ -61,6 +64,9 @@ function mapPrismaPost(record: {
     text: record.text,
     platform: record.platform,
     mediaUrls: record.mediaUrls,
+    platformOverrides: (record.platformOverrides as Record<string, { text: string; mediaUrls: string[] }> | null) ?? null,
+    contentType: (record.contentType ?? 'feed') as Post['contentType'],
+    threadItems: Array.isArray(record.threadItems) ? record.threadItems as string[] : null,
     scheduledFor: record.scheduledFor,
     publishedAt: record.publishedAt,
     status: record.status as Post['status'],

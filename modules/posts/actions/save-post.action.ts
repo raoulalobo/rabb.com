@@ -31,6 +31,8 @@ import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
+import { Prisma } from '@prisma/client'
+
 import { prisma } from '@/lib/prisma'
 import { cleanPlatformOverrides } from '@/modules/posts/schemas/platform-overrides.schema'
 import { PostCreateSchema, PostUpdateSchema } from '@/modules/posts/schemas/post.schema'
@@ -248,13 +250,16 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
         ...(platform !== undefined && { platform }),
         ...(mediaUrls !== undefined && { mediaUrls }),
         ...(scheduledFor !== undefined && { scheduledFor }),
-        // Persister les overrides nettoyés (undefined = pas de changement, null = suppression)
-        ...(cleanedOverrides !== undefined && { platformOverrides: cleanedOverrides }),
+        // Persister les overrides nettoyés (undefined = pas de changement, DbNull = suppression)
+        // Prisma exige DbNull (pas null) pour mettre un champ JSON nullable à NULL en DB
+        ...(cleanedOverrides !== undefined && {
+          platformOverrides: cleanedOverrides ?? Prisma.DbNull,
+        }),
         // Type de contenu
         ...(contentType !== undefined && { contentType }),
-        // Éléments du thread
+        // Éléments du thread (DbNull si pas un thread)
         ...(threadItems !== undefined && {
-          threadItems: contentType === 'thread' && threadItems ? threadItems : null,
+          threadItems: contentType === 'thread' && threadItems ? threadItems : Prisma.DbNull,
         }),
         status: finalStatus,
         // Effacer l'erreur précédente si le post était en échec (retry propre)

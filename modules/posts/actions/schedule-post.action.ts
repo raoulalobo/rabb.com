@@ -34,6 +34,8 @@ import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
 import { inngest } from '@/lib/inngest/client'
+import { Prisma } from '@prisma/client'
+
 import { prisma } from '@/lib/prisma'
 import { cleanPlatformOverrides } from '@/modules/posts/schemas/platform-overrides.schema'
 import { PostCreateSchema } from '@/modules/posts/schemas/post.schema'
@@ -131,11 +133,11 @@ export async function schedulePost(
             platform,
             mediaUrls: mediaUrls ?? [],
             // Persister les overrides nettoyés (null = suppression des overrides)
-            platformOverrides: cleanedOverrides,
+            platformOverrides: cleanedOverrides ?? Prisma.DbNull,
             // Type de contenu
             contentType: contentType ?? 'feed',
             // Éléments du thread
-            threadItems: contentType === 'thread' && threadItems ? threadItems : null,
+            threadItems: contentType === 'thread' && threadItems ? threadItems : Prisma.DbNull,
             scheduledFor,
             status: 'SCHEDULED',
             // Effacer l'erreur précédente si le post était en échec (retry propre)
@@ -148,12 +150,12 @@ export async function schedulePost(
             text,
             platform,
             mediaUrls: mediaUrls ?? [],
-            // Stocker les overrides nettoyés (null si aucun override effectif)
+            // Stocker les overrides nettoyés (undefined = pas de valeur → NULL en DB)
             platformOverrides: cleanedOverrides ?? undefined,
             // Type de contenu
             contentType: contentType ?? 'feed',
-            // Éléments du thread
-            threadItems: contentType === 'thread' && threadItems ? threadItems : null,
+            // Éléments du thread (undefined → NULL en DB pour le create)
+            threadItems: contentType === 'thread' && threadItems ? threadItems : undefined,
             scheduledFor,
             status: 'SCHEDULED',
           },
@@ -197,6 +199,8 @@ export async function schedulePost(
         mediaUrls: post.mediaUrls,
         // Prisma retourne le champ JSON comme `unknown` — caster vers PlatformOverrides | null
         platformOverrides: (post.platformOverrides as Record<string, { text: string; mediaUrls: string[] }> | null) ?? null,
+        contentType: (post.contentType ?? 'feed') as 'feed' | 'story' | 'reel' | 'thread' | 'carousel',
+        threadItems: Array.isArray(post.threadItems) ? post.threadItems as string[] : null,
         scheduledFor: post.scheduledFor,
         publishedAt: post.publishedAt,
         status: post.status as 'SCHEDULED',

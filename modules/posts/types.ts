@@ -13,6 +13,9 @@ export type { PostCreate, PostUpdate, PostStatus } from './schemas/post.schema'
 export type { PlatformOverrides, PlatformOverrideItem } from './schemas/platform-overrides.schema'
 export type { ContentType } from './schemas/content-type.schema'
 
+import type { PlatformOverrides } from './schemas/platform-overrides.schema'
+import type { ContentType } from './schemas/content-type.schema'
+
 // ─── Type Post (modèle complet depuis la DB) ──────────────────────────────────
 
 /**
