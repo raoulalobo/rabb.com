@@ -23,6 +23,7 @@ import { ActivityHeatmap } from './ActivityHeatmap'
 import { AnalyticsExport } from './AnalyticsExport'
 import { AnalyticsFilters } from './AnalyticsFilters'
 import { BestTimeHeatmap } from './BestTimeHeatmap'
+import { ContentTypeBreakdown } from './ContentTypeBreakdown'
 import { ContentDecay } from './ContentDecay'
 import { FollowersChart } from './FollowersChart'
 import { MetricsPanel } from './MetricsPanel'
@@ -70,7 +71,9 @@ export function AnalyticsContent(): React.JSX.Element {
     isFetching,
   } = useAnalytics()
 
-  const { sortBy } = useAnalyticsStore()
+  const { sortBy, platform, getFromDate } = useAnalyticsStore()
+  const from = getFromDate()
+  const platformParam = platform === 'all' ? undefined : platform
 
   // ── Skeleton global si toutes les données sont en chargement ─────────────
   // N'apparaît qu'au premier chargement (isPending sans placeholder).
@@ -154,6 +157,11 @@ export function AnalyticsContent(): React.JSX.Element {
       {/* ── 4. Répartition par plateforme ───────────────────────────────── */}
       <Section title="Répartition par plateforme">
         <PlatformBreakdown platforms={analyticsPosts?.platforms} />
+      </Section>
+
+      {/* ── 4b. Répartition par type de contenu ────────────────────────── */}
+      <Section title="Répartition par type de contenu">
+        <ContentTypeBreakdown from={from} platform={platformParam} />
       </Section>
 
       {/* ── 5. Best Time + Top Posts (2 colonnes) ───────────────────────── */}
