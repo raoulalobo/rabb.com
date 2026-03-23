@@ -3,15 +3,18 @@
  * @module app
  * @description Page d'accueil publique (landing page) de ogolong.com.
  *
- *   Structure :
- *   - Navbar : logo + liens de navigation + CTA
- *   - Hero : accroche, sous-titre, CTAs primaires, logos plateformes
- *   - FeaturesSection : tabs interactifs Framer Motion (5 rubriques du dashboard)
- *   - Footer : liens légaux RGPD (privacy, terms, legal) + copyright
- *   - Fond : dot grid SVG subtil (CSS background-image)
+ *   Architecture : 4 sections sans duplication de features.
+ *   - Navbar fixe (adapte CTA selon session)
+ *   - Hero compact (titre + sous-titre + CTA + badges plateformes)
+ *   - Feature Grid (7 cards avec screenshots — première impression visuelle)
+ *   - Feature Highlights (3 features clés détaillées en blocs alternés)
+ *   - Plateformes + CTA final (13 logos + inscription)
+ *   - Footer légal RGPD
  *
- *   Server Component pur — FeaturesSection est le seul Client Component (isolé).
- *   Responsive : mobile-first avec breakpoints md/lg.
+ *   Server Component — les composants landing sont Client Components isolés.
+ *
+ * @example
+ *   // Route : GET /
  */
 
 import Image from 'next/image'
@@ -20,7 +23,8 @@ import { headers } from 'next/headers'
 
 import { Button } from '@/components/ui/button'
 import { auth } from '@/lib/auth'
-import { FeaturesSection } from '@/components/landing/FeaturesSection'
+import { FeatureCarousel } from '@/components/landing/FeatureCarousel'
+import { PlatformLogos } from '@/components/landing/PlatformLogos'
 import { SiteFooter } from '@/components/shared/SiteFooter'
 
 import type { Metadata } from 'next'
@@ -30,97 +34,44 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
   description:
-    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, X (Twitter) et Snapchat en quelques secondes.',
+    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 6 autres réseaux en quelques secondes.',
   openGraph: {
     title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
     description:
-      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook, X (Twitter) et Snapchat en quelques secondes.',
+      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 6 autres réseaux en quelques secondes.',
     type: 'website',
   },
 }
 
-// ─── Données des plateformes ──────────────────────────────────────────────────
+// ─── Données des plateformes (hero badges) ───────────────────────────────────
 
-/**
- * Plateformes affichées dans la section "Compatible avec" du hero.
- * Reflète exactement DISPLAYED_PLATFORMS de modules/platforms/constants.ts :
- * 5 plateformes prioritaires + Snapchat.
- * LinkedIn, Pinterest et Threads ne sont pas encore proposés (MVP).
- * Chaque entrée référence un SVG dans /public/icons/.
- */
-const PLATFORMS = [
-  {
-    name: 'Instagram',
-    icon: '/icons/instagram.svg',
-    // Couleur de marque officielle — utilisée pour le label accessible
-    color: '#E1306C',
-  },
-  {
-    name: 'TikTok',
-    icon: '/icons/tiktok.svg',
-    color: '#010101',
-  },
-  {
-    name: 'YouTube',
-    icon: '/icons/youtube.svg',
-    color: '#FF0000',
-  },
-  {
-    name: 'Facebook',
-    icon: '/icons/facebook.svg',
-    color: '#1877F2',
-  },
-  {
-    name: 'X (Twitter)',
-    icon: '/icons/twitter.svg',
-    color: '#000000',
-  },
-  {
-    name: 'Snapchat',
-    icon: '/icons/snapchat.svg',
-    color: '#FFFC00',
-  },
+const HERO_PLATFORMS = [
+  { name: 'Instagram', icon: '/icons/instagram.svg' },
+  { name: 'TikTok', icon: '/icons/tiktok.svg' },
+  { name: 'YouTube', icon: '/icons/youtube.svg' },
+  { name: 'Facebook', icon: '/icons/facebook.svg' },
+  { name: 'X (Twitter)', icon: '/icons/twitter.svg' },
+  { name: 'LinkedIn', icon: '/icons/linkedin.svg' },
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
  * Page d'accueil publique de ogolong.com.
- *
- * Sections :
- * 1. Navbar fixe — logo + CTA adapté selon l'état de session
- *    - Connecté   → bouton "Tableau de bord →"
- *    - Déconnecté → "Se connecter" + "Essayer gratuitement"
- * 2. Hero pleine hauteur — badge, H1 avec gradient, sous-titre, CTAs, plateformes
- *
- * @returns Page d'accueil Server Component (JSX)
+ * Server Component — les sections interactives sont isolées en Client Components.
  */
 export default async function HomePage(): Promise<React.JSX.Element> {
-  // Vérification de session côté serveur pour adapter la navbar
   const session = await auth.api.getSession({ headers: await headers() })
   const isLoggedIn = !!session?.user
+
   return (
-    /*
-     * Conteneur racine avec le fond dot grid.
-     * Le pattern SVG est encodé en data URI pour éviter une requête réseau
-     * supplémentaire. Les points sont gris très légers (oklch ~0.9) pour
-     * rester discrets sur fond blanc.
-     */
-    <div
-      className="relative min-h-screen bg-white font-sans"
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='1' fill='%23e5e7eb' /%3E%3C/svg%3E")`,
-        backgroundRepeat: 'repeat',
-        backgroundSize: '20px 20px',
-      }}
-    >
+    <div className="relative min-h-screen bg-white font-sans">
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
       <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-sm">
         <nav
           className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4"
           aria-label="Navigation principale"
         >
-          {/* Logo — texte pur, sobre et lisible */}
           <Link
             href="/"
             className="text-xl font-semibold tracking-tight text-gray-900 transition-opacity hover:opacity-80"
@@ -129,10 +80,8 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             ogolong
           </Link>
 
-          {/* Actions de navigation — adaptées selon l'état de session */}
           <div className="flex items-center gap-3">
             {isLoggedIn ? (
-              /* Connecté → accès direct au dashboard */
               <Button size="sm" asChild>
                 <Link href="/dashboard">
                   Tableau de bord
@@ -140,7 +89,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 </Link>
               </Button>
             ) : (
-              /* Déconnecté → boutons d'authentification */
               <>
                 <Button variant="ghost" size="sm" asChild>
                   <Link href="/login">Se connecter</Link>
@@ -157,116 +105,84 @@ export default async function HomePage(): Promise<React.JSX.Element> {
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <main>
         <section
-          className="flex min-h-screen flex-col items-center justify-center px-6 pb-16 pt-32 text-center"
+          className="flex flex-col items-center px-6 pb-20 pt-32 text-center"
           aria-labelledby="hero-heading"
         >
-          {/* ── Badge pill ─────────────────────────────────────────────────── */}
-          {/*
-           * Badge de statut bêta — annonce la gratuité pendant le lancement.
-           * L'étoile Unicode ✦ est un caractère décoratif (pas un emoji).
-           */}
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-gray-600 shadow-sm">
-            <span
-              className="text-xs text-gray-400"
-              aria-hidden="true"
-            >
-              ✦
-            </span>
+          {/* Badge beta */}
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm text-gray-600 shadow-sm">
+            <span className="text-xs text-gray-400" aria-hidden="true">✦</span>
             <span>Beta &middot; Gratuit pendant le lancement</span>
           </div>
 
-          {/* ── Titre principal ────────────────────────────────────────────── */}
-          {/*
-           * H1 avec deux parties :
-           * - Ligne 1 : texte noir normal
-           * - Derniers mots : gradient sombre noir→gris (sobre, pas flashy)
-           * text-balance améliore la lisibilité sur mobile (Chrome 114+)
-           */}
+          {/* Titre */}
           <h1
             id="hero-heading"
-            className="mx-auto max-w-4xl text-balance text-5xl font-bold leading-tight tracking-tight text-gray-900 md:text-7xl"
+            className="mx-auto max-w-4xl text-balance text-4xl font-bold leading-tight tracking-tight text-gray-900 sm:text-5xl lg:text-6xl"
           >
-            Publiez sur tous vos réseaux{' '}
-            <span
-              className="bg-gradient-to-r from-gray-900 to-gray-500 bg-clip-text text-transparent"
-              aria-label="en quelques secondes"
-            >
-              en quelques secondes
+            Planifiez. Publiez. Analysez.{' '}
+            <span className="bg-gradient-to-r from-gray-900 to-gray-400 bg-clip-text text-transparent">
+              Tous vos réseaux, un seul outil.
             </span>
           </h1>
 
-          {/* ── Sous-titre ─────────────────────────────────────────────────── */}
-          <p className="mx-auto mt-6 max-w-xl text-balance text-xl leading-relaxed text-gray-500">
-            Ogolong utilise l&apos;IA pour générer du contenu adapté à chaque plateforme
-            et le publie automatiquement au bon moment.
+          {/* Sous-titre */}
+          <p className="mx-auto mt-5 max-w-xl text-balance text-lg leading-relaxed text-gray-500">
+            Composez du contenu adapté à chaque plateforme, planifiez-le
+            au bon moment, et suivez vos performances — depuis un seul dashboard.
           </p>
 
-          {/* ── CTAs primaires ─────────────────────────────────────────────── */}
-          <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row">
-            {/* CTA principal — redirige vers l'inscription */}
+          {/* CTAs */}
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
             <Button size="lg" className="h-12 rounded-xl px-8 text-base font-medium" asChild>
               <Link href="/register">
                 Commencer gratuitement
-                {/* Flèche decorative en texte — pas de SVG externe requis */}
                 <span aria-hidden="true" className="ml-1">&rarr;</span>
               </Link>
             </Button>
-
+            <Button variant="outline" size="lg" className="h-12 rounded-xl px-8 text-base" asChild>
+              <Link href="#features">Voir les fonctionnalités</Link>
+            </Button>
           </div>
 
-          {/* ── Section "Compatible avec" ───────────────────────────────────── */}
-          {/*
-           * Badges horizontaux affichant les 6 plateformes proposées.
-           * Icône + nom masqué sur mobile (span sm:inline).
-           * Espacement mt-14 pour respirer après les CTAs.
-           */}
-          <div
-            className="mt-14 flex flex-col items-center gap-4"
-            aria-label="Plateformes supportées"
-          >
-            <p className="text-sm text-gray-400">Compatible avec</p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {PLATFORMS.map((platform) => (
+          {/* Badges plateformes */}
+          <div className="mt-10 flex flex-col items-center gap-3" aria-label="Plateformes supportées">
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Compatible avec</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {HERO_PLATFORMS.map((platform) => (
                 <div
                   key={platform.name}
-                  className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm transition-shadow hover:shadow-md"
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-100 bg-white px-2.5 py-1.5 shadow-sm"
                   title={platform.name}
                 >
                   <Image
                     src={platform.icon}
-                    alt={`Logo ${platform.name}`}
-                    className="size-5 shrink-0"
-                    width={20}
-                    height={20}
+                    alt={platform.name}
+                    className="size-4"
+                    width={16}
+                    height={16}
                   />
-                  <span className="hidden text-sm font-medium text-gray-700 sm:inline">
+                  <span className="hidden text-xs font-medium text-gray-600 sm:inline">
                     {platform.name}
                   </span>
                 </div>
               ))}
+              <span className="text-xs text-gray-400">+4 autres</span>
             </div>
           </div>
-
-          {/* ── Disclaimer discret ─────────────────────────────────────────── */}
-          {/*
-           * Texte de réassurance affiché sous les badges de plateformes.
-           * Renforce la confiance : pas de CB, gratuit au lancement.
-           */}
-          <p className="mt-10 text-sm text-gray-400">
-            Aucune carte bancaire requise &middot; Gratuit pendant le lancement
-          </p>
         </section>
 
-        {/* ── Section Fonctionnalités ─────────────────────────────────────── */}
-        {/*
-         * Client Component isolé : FeaturesSection gère son propre state
-         * (tab actif) et les animations Framer Motion.
-         * La page reste un Server Component — seul ce composant est hydraté.
-         */}
-        <FeaturesSection />
+        {/* ── Carrousel des fonctionnalités ──────────────────────────────── */}
+        <section id="features" className="pb-12 pt-8">
+          <FeatureCarousel />
+        </section>
+
+        {/* ── Plateformes + CTA final ─────────────────────────────────────── */}
+        <section className="py-12">
+          <PlatformLogos />
+        </section>
       </main>
 
-      {/* ── Footer partagé ─────────────────────────────────────────────────── */}
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <SiteFooter />
     </div>
   )

@@ -12,8 +12,8 @@
 
 'use client'
 
-import { Clock, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
-import { useTransition } from 'react'
+import { Clock, Loader2, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -69,14 +69,18 @@ export function QueueDayColumn({
   onMutationSuccess,
 }: QueueDayColumnProps): React.JSX.Element {
   const [isPending, startTransition] = useTransition()
+  // ID du créneau en cours d'action (toggle ou delete) — pour le feedback visuel
+  const [pendingSlotId, setPendingSlotId] = useState<string | null>(null)
 
   /**
    * Toggle l'état actif/inactif d'un créneau sans ouvrir le dialog.
-   * Appelle directement la Server Action updateQueueSlot.
+   * Affiche un spinner sur le créneau pendant l'action.
    */
   function handleToggleActive(slot: QueueSlot): void {
+    setPendingSlotId(slot.id)
     startTransition(async () => {
       const result = await updateQueueSlot({ id: slot.id, active: !slot.active })
+      setPendingSlotId(null)
       if (result.success) {
         toast.success(slot.active ? 'Créneau désactivé' : 'Créneau activé')
         onMutationSuccess()
@@ -87,11 +91,13 @@ export function QueueDayColumn({
   }
 
   /**
-   * Supprime un créneau après confirmation implicite (action rapide).
+   * Supprime un créneau. Affiche un spinner pendant l'action.
    */
   function handleDelete(slotId: string): void {
+    setPendingSlotId(slotId)
     startTransition(async () => {
       const result = await deleteQueueSlot(slotId)
+      setPendingSlotId(null)
       if (result.success) {
         toast.success('Créneau supprimé')
         onMutationSuccess()
@@ -128,14 +134,18 @@ export function QueueDayColumn({
             Aucun créneau
           </p>
         ) : (
-          day.slots.map((slot) => (
+          day.slots.map((slot) => {
+            const isSlotPending = pendingSlotId === slot.id
+
+            return (
             <div
               key={slot.id}
               className={`
                 group flex items-center gap-2 rounded-md border p-2 text-sm
-                transition-colors cursor-pointer hover:bg-accent/50
+                transition-all cursor-pointer hover:bg-accent/50
                 ${!slot.active ? 'opacity-50' : ''}
-                ${isPending ? 'pointer-events-none' : ''}
+                ${isSlotPending ? 'pointer-events-none opacity-60 animate-pulse' : ''}
+                ${isPending && !isSlotPending ? 'pointer-events-none' : ''}
               `}
               onClick={() => onEditSlot(slot)}
               role="button"
@@ -161,42 +171,47 @@ export function QueueDayColumn({
               {/* Spacer */}
               <div className="flex-1" />
 
-              {/* Actions rapides (visibles au hover) */}
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                {/* Toggle actif/inactif */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleToggleActive(slot)
-                  }}
-                  title={slot.active ? 'Désactiver' : 'Activer'}
-                >
-                  {slot.active ? (
-                    <ToggleRight className="size-3.5 text-green-500" />
-                  ) : (
-                    <ToggleLeft className="size-3.5 text-muted-foreground" />
-                  )}
-                </Button>
+              {/* Actions rapides — spinner si en cours, sinon toggle + delete au hover */}
+              {isSlotPending ? (
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Toggle actif/inactif */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleActive(slot)
+                    }}
+                    title={slot.active ? 'Désactiver' : 'Activer'}
+                  >
+                    {slot.active ? (
+                      <ToggleRight className="size-3.5 text-green-500" />
+                    ) : (
+                      <ToggleLeft className="size-3.5 text-muted-foreground" />
+                    )}
+                  </Button>
 
-                {/* Supprimer */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(slot.id)
-                  }}
-                  title="Supprimer"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
+                  {/* Supprimer */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(slot.id)
+                    }}
+                    title="Supprimer"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
-          ))
+            )
+          })
         )}
 
         {/* ── Bouton ajouter ───────────────────────────────────────────── */}
