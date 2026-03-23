@@ -29,7 +29,7 @@ const FEATURES = [
   {
     id: 'calendar',
     label: 'Calendrier & Compositeur',
-    description: 'Planifiez vos posts sur un mois et composez directement depuis le calendrier.',
+    description: 'Planifiez vos posts sur une periode directement depuis le calendrier.',
     bullets: ['Vue mensuelle complète', 'Éditeur multi-plateforme intégré', 'Création rapide par clic sur un jour', 'Stories, Reels, Threads, Carrousels'],
     icon: CalendarDays,
     accent: '#7c3aed',
