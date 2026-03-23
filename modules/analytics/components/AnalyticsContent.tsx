@@ -65,6 +65,7 @@ export function AnalyticsContent(): React.JSX.Element {
     bestTime,
     contentDecay,
     postingFrequency,
+    previousOverview,
     isLoading,
     isFetching,
   } = useAnalytics()
@@ -146,6 +147,7 @@ export function AnalyticsContent(): React.JSX.Element {
         <MetricsPanel
           analyticsPosts={analyticsPosts}
           dailyMetrics={dailyMetrics}
+          previousOverview={previousOverview}
         />
       </Section>
 

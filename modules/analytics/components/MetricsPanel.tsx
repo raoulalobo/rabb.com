@@ -24,7 +24,9 @@ import {
   YAxis,
 } from 'recharts'
 
-import type { AnalyticsListResponse, DailyMetricsResponse, MetricKey } from '@/modules/analytics/types'
+import { ArrowDown, ArrowUp } from 'lucide-react'
+
+import type { AnalyticsListResponse, AnalyticsOverview, DailyMetricsResponse, MetricKey } from '@/modules/analytics/types'
 
 // ─── Configuration des métriques ─────────────────────────────────────────────
 
@@ -52,6 +54,8 @@ const METRICS: MetricDef[] = [
 interface MetricsPanelProps {
   analyticsPosts: AnalyticsListResponse | undefined
   dailyMetrics: DailyMetricsResponse | undefined
+  /** Overview de la période précédente pour afficher les deltas ↑↓ % */
+  previousOverview?: AnalyticsOverview
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -70,7 +74,7 @@ function formatMetric(value: number, key: MetricKey): string {
  * Panneau métriques avec toggles et bar chart.
  * Par défaut : likes et vues activés.
  */
-export function MetricsPanel({ analyticsPosts, dailyMetrics }: MetricsPanelProps): React.JSX.Element {
+export function MetricsPanel({ analyticsPosts, dailyMetrics, previousOverview }: MetricsPanelProps): React.JSX.Element {
   // Métriques actives (checkboxes)
   const [activeMetrics, setActiveMetrics] = useState<Set<MetricKey>>(
     new Set(['likes', 'views'])
@@ -152,8 +156,28 @@ export function MetricsPanel({ analyticsPosts, dailyMetrics }: MetricsPanelProps
                   {formatMetric(displayValue, metric.key)}
                 </span>
               </div>
-              {/* Variation (placeholder — Late ne retourne pas encore de delta) */}
-              <span className="text-[10px] text-muted-foreground">—</span>
+              {/* Variation vs période précédente (↑↓ %) */}
+              {(() => {
+                const prevValue = previousOverview?.[metric.key]
+                if (prevValue === undefined || prevValue === 0) {
+                  return <span className="text-[10px] text-muted-foreground">—</span>
+                }
+                const change = ((displayValue - prevValue) / prevValue) * 100
+                const isUp = change > 0
+                const isDown = change < 0
+                return (
+                  <span
+                    className={[
+                      'flex items-center gap-0.5 text-[10px] font-medium',
+                      isUp ? 'text-green-500' : isDown ? 'text-red-500' : 'text-muted-foreground',
+                    ].join(' ')}
+                  >
+                    {isUp && <ArrowUp className="size-2.5" />}
+                    {isDown && <ArrowDown className="size-2.5" />}
+                    {Math.abs(change).toFixed(1)}%
+                  </span>
+                )
+              })()}
             </button>
           )
         })}

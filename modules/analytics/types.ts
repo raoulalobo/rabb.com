@@ -78,3 +78,40 @@ export function dateRangeToFrom(range: '7d' | '30d' | '90d' | '180d'): string {
   // Format YYYY-MM-DD (plus compatible avec l'API Late que ISO complet)
   return date.toISOString().slice(0, 10)
 }
+
+/**
+ * Calcule les bornes de la période précédente (même durée, juste avant).
+ * Ex: si dateRange='30d' et aujourd'hui = 2026-03-23 :
+ *   - période actuelle  : 2026-02-21 → 2026-03-23
+ *   - période précédente : 2026-01-22 → 2026-02-21
+ *
+ * @param range - Fenêtre temporelle
+ * @returns { from, to } en YYYY-MM-DD pour la période précédente
+ *
+ * @example
+ *   getPreviousRange('30d')
+ *   // → { from: '2026-01-22', to: '2026-02-21' }
+ */
+export function getPreviousRange(range: '7d' | '30d' | '90d' | '180d'): { from: string; to: string } {
+  const days = parseInt(range, 10)
+  const toDate = new Date()
+  toDate.setDate(toDate.getDate() - days)
+  const fromDate = new Date(toDate)
+  fromDate.setDate(fromDate.getDate() - days)
+  return {
+    from: fromDate.toISOString().slice(0, 10),
+    to: toDate.toISOString().slice(0, 10),
+  }
+}
+
+/** Overview des métriques agrégées (retourné par /api/analytics) */
+export interface AnalyticsOverview {
+  likes: number
+  comments: number
+  shares: number
+  views: number
+  impressions: number
+  reach: number
+  clicks: number
+  engagementRate: number
+}
