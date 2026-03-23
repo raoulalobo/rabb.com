@@ -27,7 +27,6 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
 import { AnalyticsContent } from '@/modules/analytics/components/AnalyticsContent'
-import { AnalyticsFilters } from '@/modules/analytics/components/AnalyticsFilters'
 
 import type { Metadata } from 'next'
 
@@ -52,23 +51,15 @@ export default async function AnalyticsPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       {/* ── En-tête ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Performances de vos publications sur tous vos réseaux sociaux.
-          </p>
-        </div>
-
-        {/* Filtres (Client Component — accède au store Zustand) */}
-        <AnalyticsFilters />
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Performances de vos publications sur tous vos réseaux sociaux.
+        </p>
       </div>
 
       {/* ── Contenu principal (Client Component) ─────────────────────────── */}
-      {/*
-       * AnalyticsContent charge les 6 queries en parallèle via useAnalytics.
-       * Affiche un skeleton par section pendant le chargement.
-       */}
+      {/* Inclut les filtres + export CSV + toutes les sections analytics */}
       <AnalyticsContent />
     </div>
   )

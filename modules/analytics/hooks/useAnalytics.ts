@@ -33,12 +33,14 @@ import {
 import { useAnalyticsStore } from '@/modules/analytics/store/analytics.store'
 import type {
   AnalyticsListResponse,
+  AnalyticsOverview,
   BestTimeResponse,
   ContentDecayResponse,
   DailyMetricsResponse,
   FollowerStatsResponse,
   PostingFrequencyResponse,
 } from '@/modules/analytics/types'
+import { getPreviousRange } from '@/modules/analytics/types'
 
 // ─── Types retournés ──────────────────────────────────────────────────────────
 
@@ -55,6 +57,8 @@ export interface UseAnalyticsReturn {
   contentDecay: ContentDecayResponse | undefined
   /** Fréquence de publication vs engagement (PostingFrequency) */
   postingFrequency: PostingFrequencyResponse | undefined
+  /** Overview de la période précédente (pour comparaison ↑↓ %) */
+  previousOverview: AnalyticsOverview | undefined
   /** Vrai si au moins une query est en chargement initial (aucune donnée en cache) */
   isLoading: boolean
   /** Vrai si au moins une query re-fetche (filtre changé, données précédentes toujours visibles) */
@@ -83,11 +87,14 @@ export interface UseAnalyticsReturn {
  */
 export function useAnalytics(): UseAnalyticsReturn {
   // Abonnement explicite à dateRange pour déclencher un re-render quand la période change
-  const { platform, dateRange, getFromDate } = useAnalyticsStore()
+  const { platform, dateRange, compareEnabled, getFromDate } = useAnalyticsStore()
 
   // Paramètres communs à toutes les queries (recalculés à chaque changement de période)
   const from = getFromDate()
   const platformParam = platform === 'all' ? undefined : platform
+
+  // Période précédente (même durée, juste avant) pour la comparaison ↑↓ %
+  const previousRange = getPreviousRange(dateRange)
 
   // ── Toutes les queries en parallèle ──────────────────────────────────────
   const results = useQueries({
@@ -143,10 +150,20 @@ export function useAnalytics(): UseAnalyticsReturn {
         // retry: 0 — PostingFrequency gère `data: undefined` nativement
         retry: 0,
       },
+      // 6 — Période précédente (pour comparaison ↑↓ % dans MetricsPanel)
+      // Désactivée (enabled: false) tant que l'utilisateur n'a pas cliqué "Comparer"
+      {
+        queryKey: analyticsKeys.posts({ from: previousRange.from, to: previousRange.to, platform: platformParam }),
+        queryFn: () => fetchAnalyticsPosts({ from: previousRange.from, to: previousRange.to, platform: platformParam }),
+        staleTime: 60 * 60 * 1000,
+        placeholderData: keepPreviousData,
+        enabled: compareEnabled,
+        retry: 0,
+      },
     ],
   })
 
-  const [postsQ, dailyQ, followersQ, bestTimeQ, decayQ, freqQ] = results
+  const [postsQ, dailyQ, followersQ, bestTimeQ, decayQ, freqQ, prevPostsQ] = results
 
   return {
     analyticsPosts: postsQ.data,
@@ -155,6 +172,8 @@ export function useAnalytics(): UseAnalyticsReturn {
     bestTime: bestTimeQ.data,
     contentDecay: decayQ.data,
     postingFrequency: freqQ.data,
+    // Overview de la période précédente (pour les deltas ↑↓ % dans MetricsPanel)
+    previousOverview: prevPostsQ.data?.overview as AnalyticsOverview | undefined,
     // Bloque le rendu uniquement sur les 2 queries primaires (posts + daily metrics).
     // Les sections secondaires (FollowersChart, BestTimeHeatmap, etc.) gèrent `undefined` nativement.
     // Cela évite que le skeleton reste bloqué si best-time ou follower-stats ne répondent jamais.

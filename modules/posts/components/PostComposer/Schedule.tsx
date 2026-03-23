@@ -20,7 +20,13 @@
 
 'use client'
 
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, Lightbulb } from 'lucide-react'
+
+import { Badge } from '@/components/ui/badge'
+import {
+  getNextOccurrence,
+  useBestTimeSlots,
+} from '@/modules/analytics/hooks/useBestTimeSlots'
 
 import { usePostComposerContext } from './context'
 import { DateTimePicker } from './DateTimePicker'
@@ -50,6 +56,16 @@ function getMinDate(): Date {
  */
 export function Schedule(): React.JSX.Element {
   const { scheduledFor, setScheduledFor, isSubmitting, readOnly } = usePostComposerContext()
+  const { slots } = useBestTimeSlots(3)
+
+  /**
+   * Applique un créneau recommandé : calcule la prochaine occurrence
+   * et met à jour scheduledFor dans le store.
+   */
+  const applySlot = (dayOfWeek: number, hour: number): void => {
+    const nextDate = getNextOccurrence(dayOfWeek, hour)
+    setScheduledFor(nextDate)
+  }
 
   return (
     <div className="space-y-2">
@@ -67,6 +83,37 @@ export function Schedule(): React.JSX.Element {
         disabled={isSubmitting || readOnly}
         placeholder="Choisir une date de publication…"
       />
+
+      {/* Créneaux recommandés (basés sur l'engagement passé) */}
+      {!readOnly && slots.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Lightbulb className="size-3" />
+            Créneaux recommandés
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {slots.map((slot) => (
+              <button
+                key={`${slot.dayOfWeek}-${slot.hour}`}
+                type="button"
+                onClick={() => applySlot(slot.dayOfWeek, slot.hour)}
+                disabled={isSubmitting}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-md"
+              >
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer gap-1 px-2 py-0.5 text-[11px] transition-colors hover:bg-primary hover:text-primary-foreground"
+                >
+                  {slot.label}
+                </Badge>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Basé sur votre engagement passé
+          </p>
+        </div>
+      )}
 
       {/* Confirmation lisible de la date sélectionnée */}
       {scheduledFor && (

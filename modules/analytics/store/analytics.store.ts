@@ -26,6 +26,10 @@ interface AnalyticsStore extends AnalyticsFiltersState {
   setDateRange: (range: '7d' | '30d' | '90d' | '180d') => void
   /** Définit le critère de tri */
   setSortBy: (sortBy: 'newest' | 'engagement' | 'views') => void
+  /** Active/désactive la comparaison avec la période précédente */
+  compareEnabled: boolean
+  /** Toggle la comparaison */
+  toggleCompare: () => void
 
   // ── Computed ─────────────────────────────────────────────────────────────
   /**
@@ -51,6 +55,7 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
     platform: 'all',
     dateRange: '30d',
     sortBy: 'newest',
+    compareEnabled: false,
 
     // ── Actions ─────────────────────────────────────────────────────────────
     setPlatform: (platform) =>
@@ -66,6 +71,11 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
     setSortBy: (sortBy) =>
       set((state) => {
         state.sortBy = sortBy
+      }),
+
+    toggleCompare: () =>
+      set((state) => {
+        state.compareEnabled = !state.compareEnabled
       }),
 
     // ── Computed ─────────────────────────────────────────────────────────────

@@ -20,7 +20,10 @@ import { useAnalytics } from '@/modules/analytics/hooks/useAnalytics'
 import { useAnalyticsStore } from '@/modules/analytics/store/analytics.store'
 
 import { ActivityHeatmap } from './ActivityHeatmap'
+import { AnalyticsExport } from './AnalyticsExport'
+import { AnalyticsFilters } from './AnalyticsFilters'
 import { BestTimeHeatmap } from './BestTimeHeatmap'
+import { ContentTypeBreakdown } from './ContentTypeBreakdown'
 import { ContentDecay } from './ContentDecay'
 import { FollowersChart } from './FollowersChart'
 import { MetricsPanel } from './MetricsPanel'
@@ -63,11 +66,14 @@ export function AnalyticsContent(): React.JSX.Element {
     bestTime,
     contentDecay,
     postingFrequency,
+    previousOverview,
     isLoading,
     isFetching,
   } = useAnalytics()
 
-  const { sortBy } = useAnalyticsStore()
+  const { sortBy, platform, getFromDate } = useAnalyticsStore()
+  const from = getFromDate()
+  const platformParam = platform === 'all' ? undefined : platform
 
   // ── Skeleton global si toutes les données sont en chargement ─────────────
   // N'apparaît qu'au premier chargement (isPending sans placeholder).
@@ -116,6 +122,12 @@ export function AnalyticsContent(): React.JSX.Element {
       {/* ── Indicateur discret de rechargement (changement de filtre) ───────
           Visible uniquement lors d'un re-fetch avec données précédentes visibles.
           Absent au chargement initial (isLoading masque tout via le skeleton).       */}
+      {/* ── Filtres + export CSV (même ligne) ──────────────────────────── */}
+      <AnalyticsFilters>
+        <AnalyticsExport posts={analyticsPosts?.posts} />
+      </AnalyticsFilters>
+
+      {/* ── Indicateur discret de rechargement (changement de filtre) ──── */}
       {isFetching && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <div className="size-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
@@ -138,12 +150,18 @@ export function AnalyticsContent(): React.JSX.Element {
         <MetricsPanel
           analyticsPosts={analyticsPosts}
           dailyMetrics={dailyMetrics}
+          previousOverview={previousOverview}
         />
       </Section>
 
       {/* ── 4. Répartition par plateforme ───────────────────────────────── */}
       <Section title="Répartition par plateforme">
         <PlatformBreakdown platforms={analyticsPosts?.platforms} />
+      </Section>
+
+      {/* ── 4b. Répartition par type de contenu ────────────────────────── */}
+      <Section title="Répartition par type de contenu">
+        <ContentTypeBreakdown from={from} platform={platformParam} />
       </Section>
 
       {/* ── 5. Best Time + Top Posts (2 colonnes) ───────────────────────── */}

@@ -12,6 +12,11 @@
 
 'use client'
 
+import { useState } from 'react'
+
+import { ChevronDown } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
 import type { AnalyticsPost } from '@/modules/analytics/types'
 import type { AnalyticsFiltersState } from '@/modules/analytics/types'
 
@@ -121,13 +126,24 @@ function PostCard({ post }: PostCardProps): React.JSX.Element {
   )
 }
 
+// ─── Constantes de pagination ─────────────────────────────────────────────────
+
+/** Nombre de posts affichés par page */
+const PAGE_SIZE = 12
+
 // ─── Composant grille ─────────────────────────────────────────────────────────
 
 /**
- * Grille de cartes post analytics.
+ * Grille de cartes post analytics avec pagination côté client.
+ * Affiche PAGE_SIZE posts à la fois avec un bouton "Voir plus" en bas.
  * Applique le tri défini par le store avant le rendu.
+ *
+ * @param posts - Posts analytics à afficher
+ * @param sortBy - Critère de tri actif (newest, engagement, views)
  */
 export function PostDetailsGrid({ posts, sortBy }: PostDetailsGridProps): React.JSX.Element {
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+
   // Tri selon le critère choisi — garde défensive sur metrics (peut être absent)
   const sorted = (Array.isArray(posts) ? posts : [])
     .filter((p) => p?.metrics !== undefined)
@@ -138,6 +154,11 @@ export function PostDetailsGrid({ posts, sortBy }: PostDetailsGridProps): React.
       return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     })
 
+  // Posts visibles selon la pagination
+  const visiblePosts = sorted.slice(0, visibleCount)
+  const hasMore = visibleCount < sorted.length
+  const remainingCount = sorted.length - visibleCount
+
   if (sorted.length === 0) {
     return (
       <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
@@ -147,10 +168,38 @@ export function PostDetailsGrid({ posts, sortBy }: PostDetailsGridProps): React.
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {sorted.map((post) => (
-        <PostCard key={post.id} post={post} />
-      ))}
+    <div className="space-y-4">
+      {/* Grille de cartes */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {visiblePosts.map((post) => (
+          <PostCard key={post.id} post={post} />
+        ))}
+      </div>
+
+      {/* Bouton "Voir plus" + compteur */}
+      {hasMore && (
+        <div className="flex flex-col items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+            className="gap-1.5"
+          >
+            <ChevronDown className="size-3.5" />
+            Voir plus ({Math.min(remainingCount, PAGE_SIZE)} posts)
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            {visibleCount} sur {sorted.length} posts affichés
+          </span>
+        </div>
+      )}
+
+      {/* Indicateur de fin si tout est affiché et > PAGE_SIZE */}
+      {!hasMore && sorted.length > PAGE_SIZE && (
+        <p className="text-center text-[11px] text-muted-foreground">
+          {sorted.length} posts affichés — fin de la liste
+        </p>
+      )}
     </div>
   )
 }
