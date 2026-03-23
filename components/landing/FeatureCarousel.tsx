@@ -94,7 +94,10 @@ export function FeatureCarousel(): React.JSX.Element {
     if (!container) return
     const slide = container.children[index] as HTMLElement | undefined
     if (!slide) return
-    container.scrollTo({ left: slide.offsetLeft - container.offsetLeft, behavior: 'smooth' })
+    // scrollIntoView fonctionne nativement avec scroll-snap (pas de conflit d'offset)
+    slide.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    // Mettre à jour l'index immédiatement (pas attendre l'IntersectionObserver)
+    setActiveIndex(index)
   }, [])
 
   const goNext = useCallback((): void => {
@@ -151,7 +154,7 @@ export function FeatureCarousel(): React.JSX.Element {
       >
         <div
           ref={scrollRef}
-          className="flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-4"
+          className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4"
           style={{ scrollbarWidth: 'none' }}
         >
           {FEATURES.map((feature) => {
