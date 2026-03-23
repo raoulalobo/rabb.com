@@ -21,6 +21,8 @@
 
 'use client'
 
+import { useEffect } from 'react'
+
 import {
   CircleDot,
   Film,
@@ -68,11 +70,12 @@ export function ContentTypePicker(): React.JSX.Element | null {
   const availableTypes = getCommonContentTypes(platforms)
 
   // Si le type actuel n'est plus disponible (changement de plateforme), revenir à "feed"
-  if (!availableTypes.includes(contentType) && contentType !== 'feed') {
-    // Effet secondaire dans le rendu — acceptable car c'est un cas de correction automatique
-    // qui ne se produit que lors d'un changement de plateformes (pas à chaque rendu)
-    setContentType('feed')
-  }
+  // useEffect pour éviter de setState pendant le rendu d'un autre composant
+  useEffect(() => {
+    if (!availableTypes.includes(contentType) && contentType !== 'feed') {
+      setContentType('feed')
+    }
+  }, [availableTypes, contentType, setContentType])
 
   // Ne pas afficher si un seul type disponible (feed) — pas de choix à faire
   if (availableTypes.length <= 1) return null
