@@ -35,11 +35,11 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
   description:
-    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 9 autres réseaux en quelques secondes.',
+    'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 6 autres réseaux en quelques secondes.',
   openGraph: {
     title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
     description:
-      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 9 autres réseaux en quelques secondes.',
+      'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 6 autres réseaux en quelques secondes.',
     type: 'website',
   },
 }
@@ -167,7 +167,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                   </span>
                 </div>
               ))}
-              <span className="text-xs text-gray-400">+7 autres</span>
+              <span className="text-xs text-gray-400">+4 autres</span>
             </div>
           </div>
         </section>

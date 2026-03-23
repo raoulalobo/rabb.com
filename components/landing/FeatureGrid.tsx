@@ -21,7 +21,6 @@ import {
   FileSignature,
   Images,
   ListOrdered,
-  PenLine,
   Settings,
 } from 'lucide-react'
 import Image from 'next/image'
@@ -30,29 +29,20 @@ import Image from 'next/image'
 
 const FEATURES = [
   {
-    id: 'compose',
-    label: 'Compositeur',
-    description: 'Créez des posts pour tous vos réseaux en un clic',
-    icon: PenLine,
+    id: 'calendar',
+    label: 'Calendrier & Compositeur',
+    description: 'Planifiez vos posts sur un mois et composez directement depuis le calendrier',
+    icon: CalendarDays,
     screenshot: '/screenshots/compose.png',
     color: 'from-violet-500/20 to-violet-600/5',
     iconColor: 'text-violet-600',
-  },
-  {
-    id: 'calendar',
-    label: 'Calendrier',
-    description: 'Visualisez et planifiez vos posts sur un mois',
-    icon: CalendarDays,
-    screenshot: '/screenshots/calendar.png',
-    color: 'from-blue-500/20 to-blue-600/5',
-    iconColor: 'text-blue-600',
   },
   {
     id: 'queue',
     label: 'File d\'attente',
     description: 'Programmez vos créneaux récurrents automatiques',
     icon: ListOrdered,
-    screenshot: '/screenshots/queue.png',
+    screenshot: '/screenshots/compose.png',
     color: 'from-amber-500/20 to-amber-600/5',
     iconColor: 'text-amber-600',
   },

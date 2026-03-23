@@ -28,10 +28,7 @@ const PLATFORMS = [
   { name: 'Snapchat', icon: '/icons/snapchat.svg' },
   { name: 'Pinterest', icon: '/icons/pinterest.svg' },
   { name: 'Threads', icon: '/icons/threads.svg' },
-  { name: 'Bluesky', icon: '/icons/bluesky.svg' },
   { name: 'Reddit', icon: '/icons/reddit.svg' },
-  { name: 'Telegram', icon: '/icons/telegram.svg' },
-  { name: 'Google Business', icon: '/icons/google-business.svg' },
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -53,7 +50,7 @@ export function PlatformLogos(): React.JSX.Element {
         Tous vos réseaux, un seul outil
       </h2>
       <p className="mx-auto mt-4 max-w-xl text-base text-gray-500">
-        Publiez sur 13 plateformes depuis un seul tableau de bord.
+        Publiez sur 10 plateformes depuis un seul tableau de bord.
         Connectez vos comptes en 30 secondes.
       </p>
 
