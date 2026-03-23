@@ -84,6 +84,10 @@ export function FeatureCarousel(): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
+  // Ref pour l'index courant — lu par goNext/goPrev sans dépendance au state
+  // Évite les closures stale et les recréations d'interval
+  const activeIndexRef = useRef(0)
+  activeIndexRef.current = activeIndex
 
   const scrollToIndex = useCallback((index: number): void => {
     const container = scrollRef.current
@@ -94,12 +98,12 @@ export function FeatureCarousel(): React.JSX.Element {
   }, [])
 
   const goNext = useCallback((): void => {
-    scrollToIndex((activeIndex + 1) % FEATURES.length)
-  }, [activeIndex, scrollToIndex])
+    scrollToIndex((activeIndexRef.current + 1) % FEATURES.length)
+  }, [scrollToIndex])
 
   const goPrev = useCallback((): void => {
-    scrollToIndex((activeIndex - 1 + FEATURES.length) % FEATURES.length)
-  }, [activeIndex, scrollToIndex])
+    scrollToIndex((activeIndexRef.current - 1 + FEATURES.length) % FEATURES.length)
+  }, [scrollToIndex])
 
   useEffect(() => {
     const container = scrollRef.current
