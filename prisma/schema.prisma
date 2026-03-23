@@ -177,6 +177,23 @@ model Post {
    * @see modules/posts/schemas/platform-overrides.schema.ts pour le schéma Zod
    */
   platformOverrides Json?
+  /**
+   * Type de contenu du post (feed, story, reel, thread, carousel).
+   * Détermine le format de publication sur la plateforme cible.
+   * "feed" = post classique dans le fil (valeur par défaut).
+   *
+   * @see modules/posts/types.ts pour le type ContentType
+   */
+  contentType   String     @default("feed")
+  /**
+   * Éléments d'un thread (JSON optionnel).
+   * Utilisé uniquement quand contentType = "thread".
+   * Stocke un tableau de textes : chaque élément = un tweet/post dans le fil.
+   *
+   * Format : ["Premier tweet", "Deuxième tweet", ...]
+   * null = pas un thread.
+   */
+  threadItems   Json?
   status        PostStatus @default(DRAFT)
   scheduledFor  DateTime?  // Null si brouillon, défini si planifié
   publishedAt   DateTime?  // Rempli par Inngest après publication réussie

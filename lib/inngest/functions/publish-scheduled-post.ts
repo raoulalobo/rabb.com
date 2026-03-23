@@ -36,6 +36,7 @@ import { NonRetriableError } from 'inngest'
 
 import { inngest } from '@/lib/inngest/client'
 import { late } from '@/lib/late'
+import type { LateMediaItem, LateCreatePostParams } from '@/lib/late'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -74,6 +75,9 @@ export const publishScheduledPost = inngest.createFunction(
           text: true,
           platform: true,   // Plateforme unique du post (simplifié)
           mediaUrls: true,
+          platformOverrides: true,  // Surcharges de contenu par plateforme (JSON)
+          contentType: true,       // Type de contenu (feed, story, reel, thread, carousel)
+          threadItems: true,       // Éléments du thread (JSON)
           status: true,
           userId: true,
           scheduledFor: true,
@@ -219,35 +223,72 @@ export const publishScheduledPost = inngest.createFunction(
     //   - content   : texte du post
     //   - platforms : [{ platform, accountId }] (accountId = _id du LateAccount)
     //   - mediaItems : médias (requis pour TikTok / Instagram — sans eux → 400)
+    //
+    // Si le post a des platformOverrides, on utilise le contenu spécifique
+    // à la plateforme du post (s'il existe) à la place du contenu de base.
+    // Cela permet de publier un contenu différent par plateforme à partir
+    // d'un même brouillon multi-plateformes.
+
+    // Résoudre le contenu effectif : override de la plateforme ou contenu de base
+    const overrides = post.platformOverrides as Record<string, { text: string; mediaUrls: string[] }> | null
+    const effectiveText = overrides?.[post.platform]?.text ?? post.text
+    const effectiveMediaUrls = overrides?.[post.platform]?.mediaUrls ?? post.mediaUrls
+
+    // Résoudre le type de contenu et les éléments de thread
+    const contentType = (post.contentType as string) ?? 'feed'
+    const threadItems = Array.isArray(post.threadItems) ? post.threadItems as string[] : null
+
+    /**
+     * Helper : mappe les URLs Supabase Storage vers le format LateMediaItem.
+     * Déduit le type et mimeType depuis l'extension du fichier.
+     */
+    const mapMediaUrls = (urls: string[]): LateMediaItem[] =>
+      urls.map((url) => ({
+        type: /\.(mp4|mov|avi|webm)$/i.test(url) ? ('video' as const) : ('image' as const),
+        url,
+        mimeType: /\.(mp4|mov)$/i.test(url) ? 'video/mp4'
+          : /\.mov$/i.test(url) ? 'video/quicktime'
+          : /\.webm$/i.test(url) ? 'video/webm'
+          : /\.gif$/i.test(url) ? 'image/gif'
+          : /\.png$/i.test(url) ? 'image/png'
+          : 'image/jpeg',
+        filename: url.split('/').pop() ?? 'media',
+      }))
+
     const latePost = await step.run('publier-post', async () => {
-      return late.posts.create({
-        // ID du workspace Late (requis — sans ça, l'API retourne une erreur)
+      // ── Construction des paramètres selon le type de contenu ──────────
+      const baseParams: LateCreatePostParams = {
         profileId: connectedPlatform.lateProfileId,
-        // Late utilise `content` (et non `text`) pour le corps du post
-        content: post.text,
-        // `platforms` : chaque entrée cible un compte social (_id du LateAccount)
+        content: effectiveText,
         platforms: [{ platform: post.platform, accountId: lateAccountId }],
-        // mediaItems : médias joints au post (obligatoire pour TikTok/Instagram vidéo)
-        // On mappe les URLs Supabase Storage vers le format LateMediaItem
-        ...(post.mediaUrls.length > 0 && {
-          mediaItems: post.mediaUrls.map((url) => ({
-            // Déduire le type à partir de l'extension (mp4/mov → video, sinon image)
-            type: /\.(mp4|mov|avi|webm)$/i.test(url) ? ('video' as const) : ('image' as const),
-            url,
-            // Déduire le mimeType à partir de l'extension
-            mimeType: /\.(mp4|mov)$/i.test(url) ? 'video/mp4'
-              : /\.mov$/i.test(url) ? 'video/quicktime'
-              : /\.webm$/i.test(url) ? 'video/webm'
-              : /\.gif$/i.test(url) ? 'image/gif'
-              : /\.png$/i.test(url) ? 'image/png'
-              : 'image/jpeg',
-            // Extraire le nom de fichier depuis l'URL
-            filename: url.split('/').pop() ?? 'media',
-          })),
-        }),
-        // Late publie immédiatement — Inngest a déjà géré le timing via sleepUntil
+        ...(effectiveMediaUrls.length > 0 && { mediaItems: mapMediaUrls(effectiveMediaUrls) }),
         publishNow: true,
-      })
+      }
+
+      // Thread : ajouter les éléments de thread via `threadItems` dans Late API
+      // Late gère les threads via un champ `threadItems` au niveau du post
+      if (contentType === 'thread' && threadItems && threadItems.length > 0) {
+        // Le premier élément du thread est le `content` principal
+        // Les suivants sont dans `threadItems` (texte uniquement)
+        baseParams.content = threadItems[0]
+        ;(baseParams as Record<string, unknown>).threadItems = threadItems.slice(1).map((text) => ({
+          content: text,
+        }))
+      }
+
+      // Story / Reel : transmettre via platformSpecificData de Late API
+      // Le contentType est indiqué dans la plateforme cible
+      if (contentType === 'story' || contentType === 'reel') {
+        baseParams.platforms = [{
+          platform: post.platform,
+          accountId: lateAccountId,
+          // Late utilise `contentType` dans platformSpecificData pour stories/reels
+          ...(contentType === 'story' && { contentType: 'story' as const }),
+          ...(contentType === 'reel' && { contentType: 'reel' as const }),
+        }] as typeof baseParams.platforms
+      }
+
+      return late.posts.create(baseParams)
     })
 
     // ── Étape 5 : Vérifier le statut de publication par plateforme ───────────

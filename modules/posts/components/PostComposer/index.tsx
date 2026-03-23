@@ -55,14 +55,18 @@ import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { UploadingFile, UploadUrlResult } from '@/modules/posts/types'
 
 import { AIAssistPanel } from './AIAssistPanel'
+import { CarouselEditor } from './CarouselEditor'
+import { ContentTypePicker } from './ContentTypePicker'
 import { PostComposerContext } from './context'
 import { Editor } from './Editor'
 import { Footer } from './Footer'
 import { MediaUpload } from './MediaUpload'
+import { PlatformContentEditor } from './PlatformContentEditor'
 import { Platforms } from './Platforms'
 import { PlatformTabs } from './PlatformTabs'
 import { PostComposerSkeleton } from './PostComposerSkeleton'
 import { Schedule } from './Schedule'
+import { ThreadEditor } from './ThreadEditor'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +135,12 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
     setPlatformOverrideText,
     addPlatformOverrideMediaUrl,
     removePlatformOverrideMediaUrl,
+    contentType,
+    setContentType,
+    threadItems,
+    updateThreadItem,
+    addThreadItem,
+    removeThreadItem,
   } = useDraftStore()
 
   // ─── Panneau IA : ouvert/fermé ───────────────────────────────────────────────
@@ -525,6 +535,13 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
             text: platformText,
             mediaUrls: platformMediaUrls,
             status: 'DRAFT',
+            // Transmettre les overrides pour persistance en DB
+            // (la server action nettoie les overrides identiques au contenu de base)
+            platformOverrides: Object.keys(platformOverrides).length > 0 ? platformOverrides : null,
+            // Type de contenu (feed, story, reel, thread, carousel)
+            contentType,
+            // Éléments du thread (null si pas un thread)
+            threadItems: contentType === 'thread' ? threadItems : null,
           })
         }),
       )
@@ -581,6 +598,12 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
               text: platformText,
               mediaUrls: platformMediaUrls,
               scheduledFor,
+              // Transmettre les overrides pour persistance en DB
+              platformOverrides: Object.keys(platformOverrides).length > 0 ? platformOverrides : null,
+              // Type de contenu (feed, story, reel, thread, carousel)
+              contentType,
+              // Éléments du thread (null si pas un thread)
+              threadItems: contentType === 'thread' ? threadItems : null,
             },
             // Mise à jour uniquement si 1 seule plateforme ET post déjà en DB
             platforms.length === 1 ? (postId ?? undefined) : undefined,
@@ -625,6 +648,13 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
         addMediaUrl,
         removeMediaUrl,
         setScheduledFor,
+        // Type de contenu
+        contentType,
+        setContentType,
+        threadItems,
+        updateThreadItem,
+        addThreadItem,
+        removeThreadItem,
         // Onglets par plateforme
         activePlatformTab,
         setActivePlatformTab,
@@ -694,17 +724,22 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
  * PostComposer : éditeur de post multi-plateformes avec Compound Component Pattern.
  *
  * Sous-composants disponibles :
- * - PostComposer.PlatformTabs — onglets par plateforme (base + overrides)
- * - PostComposer.Editor     — zone de texte avec compteur de caractères
- * - PostComposer.Platforms  — sélection des plateformes connectées
- * - PostComposer.MediaUpload — upload d'images et vidéos
- * - PostComposer.Schedule   — sélection de la date de planification
- * - PostComposer.Footer     — boutons Brouillon / Planifier
- * - PostComposer.Skeleton   — skeleton de chargement
- * - PostComposer.AIAssist   — panneau latéral de rédaction IA (ouvrable via bouton ✨)
+ * - PostComposer.PlatformTabs          — onglets par plateforme (base + overrides)
+ * - PostComposer.PlatformContentEditor — panneau d'info et actions pour la personnalisation
+ * - PostComposer.Editor                — zone de texte avec compteur de caractères
+ * - PostComposer.Platforms             — sélection des plateformes connectées
+ * - PostComposer.MediaUpload           — upload d'images et vidéos
+ * - PostComposer.Schedule              — sélection de la date de planification
+ * - PostComposer.Footer                — boutons Brouillon / Planifier
+ * - PostComposer.Skeleton              — skeleton de chargement
+ * - PostComposer.AIAssist              — panneau latéral de rédaction IA (ouvrable via bouton ✨)
  */
 export const PostComposer = Object.assign(PostComposerRoot, {
   PlatformTabs,
+  PlatformContentEditor,
+  ContentTypePicker,
+  ThreadEditor,
+  CarouselEditor,
   Editor,
   Platforms,
   MediaUpload,

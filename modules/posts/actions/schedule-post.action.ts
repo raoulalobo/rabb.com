@@ -35,6 +35,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { inngest } from '@/lib/inngest/client'
 import { prisma } from '@/lib/prisma'
+import { cleanPlatformOverrides } from '@/modules/posts/schemas/platform-overrides.schema'
 import { PostCreateSchema } from '@/modules/posts/schemas/post.schema'
 import type { SavePostResult } from '@/modules/posts/types'
 
@@ -76,7 +77,14 @@ export async function schedulePost(
     return { success: false, error: 'La date de publication est requise pour planifier' }
   }
 
-  const { text, platform, mediaUrls, scheduledFor } = parsed.data
+  const { text, platform, mediaUrls, scheduledFor, platformOverrides, contentType, threadItems } = parsed.data
+
+  // Nettoyer les overrides : supprimer ceux identiques au contenu de base
+  const cleanedOverrides = cleanPlatformOverrides(
+    platformOverrides ?? null,
+    text,
+    mediaUrls ?? [],
+  )
 
   // ─── Vérification de la plateforme connectée ──────────────────────────────
   // Contrôler que l'utilisateur a bien connecté cette plateforme
@@ -122,6 +130,12 @@ export async function schedulePost(
             text,
             platform,
             mediaUrls: mediaUrls ?? [],
+            // Persister les overrides nettoyés (null = suppression des overrides)
+            platformOverrides: cleanedOverrides,
+            // Type de contenu
+            contentType: contentType ?? 'feed',
+            // Éléments du thread
+            threadItems: contentType === 'thread' && threadItems ? threadItems : null,
             scheduledFor,
             status: 'SCHEDULED',
             // Effacer l'erreur précédente si le post était en échec (retry propre)
@@ -134,6 +148,12 @@ export async function schedulePost(
             text,
             platform,
             mediaUrls: mediaUrls ?? [],
+            // Stocker les overrides nettoyés (null si aucun override effectif)
+            platformOverrides: cleanedOverrides ?? undefined,
+            // Type de contenu
+            contentType: contentType ?? 'feed',
+            // Éléments du thread
+            threadItems: contentType === 'thread' && threadItems ? threadItems : null,
             scheduledFor,
             status: 'SCHEDULED',
           },
@@ -175,6 +195,8 @@ export async function schedulePost(
         text: post.text,
         platform: post.platform,
         mediaUrls: post.mediaUrls,
+        // Prisma retourne le champ JSON comme `unknown` — caster vers PlatformOverrides | null
+        platformOverrides: (post.platformOverrides as Record<string, { text: string; mediaUrls: string[] }> | null) ?? null,
         scheduledFor: post.scheduledFor,
         publishedAt: post.publishedAt,
         status: post.status as 'SCHEDULED',

@@ -32,8 +32,9 @@ import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { cleanPlatformOverrides } from '@/modules/posts/schemas/platform-overrides.schema'
 import { PostCreateSchema, PostUpdateSchema } from '@/modules/posts/schemas/post.schema'
-import type { Post, SavePostResult } from '@/modules/posts/types'
+import type { PlatformOverrides, Post, SavePostResult } from '@/modules/posts/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,9 @@ function mapPrismaPost(record: {
   text: string
   platform: string
   mediaUrls: string[]
+  platformOverrides?: unknown
+  contentType?: string
+  threadItems?: unknown
   scheduledFor: Date | null
   publishedAt: Date | null
   status: string
@@ -65,6 +69,12 @@ function mapPrismaPost(record: {
     text: record.text,
     platform: record.platform,
     mediaUrls: record.mediaUrls,
+    // Prisma retourne le champ JSON comme `unknown` — caster vers PlatformOverrides | null
+    platformOverrides: (record.platformOverrides as PlatformOverrides | null) ?? null,
+    // Type de contenu (feed par défaut pour les posts existants avant la migration)
+    contentType: (record.contentType ?? 'feed') as Post['contentType'],
+    // Éléments du thread (JSON parsé par Prisma → string[] ou null)
+    threadItems: Array.isArray(record.threadItems) ? record.threadItems as string[] : null,
     scheduledFor: record.scheduledFor,
     publishedAt: record.publishedAt,
     status: record.status as Post['status'],
@@ -138,10 +148,17 @@ async function createPost(rawData: unknown, userId: string): Promise<SavePostRes
     }
   }
 
-  const { text, platform, mediaUrls, scheduledFor, status } = parsed.data
+  const { text, platform, mediaUrls, scheduledFor, status, platformOverrides, contentType, threadItems } = parsed.data
 
   // Détermination du statut final
   const finalStatus = scheduledFor ? 'SCHEDULED' : (status ?? 'DRAFT')
+
+  // Nettoyer les overrides : supprimer ceux identiques au contenu de base
+  const cleanedOverrides = cleanPlatformOverrides(
+    platformOverrides ?? null,
+    text,
+    mediaUrls ?? [],
+  )
 
   try {
     const post = await prisma.post.create({
@@ -150,6 +167,12 @@ async function createPost(rawData: unknown, userId: string): Promise<SavePostRes
         text,
         platform,
         mediaUrls: mediaUrls ?? [],
+        // Stocker les overrides nettoyés (null si aucun override effectif)
+        platformOverrides: cleanedOverrides ?? undefined,
+        // Type de contenu (feed par défaut)
+        contentType: contentType ?? 'feed',
+        // Éléments du thread (null si pas un thread)
+        threadItems: contentType === 'thread' && threadItems ? threadItems : undefined,
         scheduledFor: scheduledFor ?? null,
         status: finalStatus,
       },
@@ -186,7 +209,7 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
     }
   }
 
-  const { id, text, platform, mediaUrls, scheduledFor, status } = parsed.data
+  const { id, text, platform, mediaUrls, scheduledFor, status, platformOverrides, contentType, threadItems } = parsed.data
 
   // ─── Ownership check ────────────────────────────────────────────────────────
   const existingPost = await prisma.post.findUnique({
@@ -213,6 +236,11 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
   const finalStatus = scheduledFor ? 'SCHEDULED' : (status ?? existingPost.status)
 
   try {
+    // Nettoyer les overrides si texte et/ou overrides sont fournis
+    const cleanedOverrides = platformOverrides !== undefined
+      ? cleanPlatformOverrides(platformOverrides ?? null, text ?? '', mediaUrls ?? [])
+      : undefined
+
     const post = await prisma.post.update({
       where: { id },
       data: {
@@ -220,6 +248,14 @@ async function updatePost(rawData: unknown, userId: string): Promise<SavePostRes
         ...(platform !== undefined && { platform }),
         ...(mediaUrls !== undefined && { mediaUrls }),
         ...(scheduledFor !== undefined && { scheduledFor }),
+        // Persister les overrides nettoyés (undefined = pas de changement, null = suppression)
+        ...(cleanedOverrides !== undefined && { platformOverrides: cleanedOverrides }),
+        // Type de contenu
+        ...(contentType !== undefined && { contentType }),
+        // Éléments du thread
+        ...(threadItems !== undefined && {
+          threadItems: contentType === 'thread' && threadItems ? threadItems : null,
+        }),
         status: finalStatus,
         // Effacer l'erreur précédente si le post était en échec (retry propre)
         ...(existingPost.status === 'FAILED' && { failureReason: null }),

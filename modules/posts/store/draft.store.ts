@@ -28,6 +28,7 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
 import type { Platform } from '@/modules/platforms/types'
+import type { ContentType } from '@/modules/posts/schemas/content-type.schema'
 import type { Post } from '@/modules/posts/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -69,6 +70,21 @@ interface DraftStore {
    * null = nouveau post (pas encore sauvegardé).
    */
   postId: string | null
+
+  // ── Type de contenu ──────────────────────────────────────────────────────────
+
+  /**
+   * Type de contenu du post (feed, story, reel, thread, carousel).
+   * Détermine le format de publication et l'UI affichée dans le PostComposer.
+   */
+  contentType: ContentType
+
+  /**
+   * Éléments d'un thread (tableau de textes).
+   * Utilisé uniquement quand contentType = "thread".
+   * Chaque élément correspond à un post dans la chaîne.
+   */
+  threadItems: string[]
 
   // ── Overrides par plateforme ──────────────────────────────────────────────────
 
@@ -122,6 +138,23 @@ interface DraftStore {
    *   loadPost(existingPost) // postId, text, platform, mediaUrls, scheduledFor pré-remplis
    */
   loadPost: (post: Post) => void
+
+  // ── Actions type de contenu ──────────────────────────────────────────────────
+
+  /** Change le type de contenu du post */
+  setContentType: (contentType: ContentType) => void
+
+  /** Remplace le tableau complet des éléments de thread */
+  setThreadItems: (items: string[]) => void
+
+  /** Met à jour le texte d'un élément de thread à un index donné */
+  updateThreadItem: (index: number, text: string) => void
+
+  /** Ajoute un nouvel élément vide au thread */
+  addThreadItem: () => void
+
+  /** Supprime un élément du thread par index */
+  removeThreadItem: (index: number) => void
 
   // ── Actions sur les overrides ─────────────────────────────────────────────────
 
@@ -190,10 +223,12 @@ const initialState = {
   mediaUrls: [] as string[],
   scheduledFor: null,
   postId: null,
+  contentType: 'feed' as ContentType,
+  threadItems: ['', ''] as string[],
   platformOverrides: {} as Partial<Record<Platform, PlatformOverride>>,
 } satisfies Pick<
   DraftStore,
-  'text' | 'platforms' | 'mediaUrls' | 'scheduledFor' | 'postId' | 'platformOverrides'
+  'text' | 'platforms' | 'mediaUrls' | 'scheduledFor' | 'postId' | 'contentType' | 'threadItems' | 'platformOverrides'
 >
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -290,8 +325,60 @@ export const useDraftStore = create<DraftStore>()(
           // Chaque post DB = 1 plateforme → on la wrap dans un tableau pour le store
           state.platforms = [post.platform as Platform]
           state.mediaUrls = post.mediaUrls
+          // Charger le type de contenu et les éléments de thread depuis la DB
+          state.contentType = (post.contentType ?? 'feed') as ContentType
+          if (Array.isArray(post.threadItems)) {
+            state.threadItems = post.threadItems as string[]
+          }
+          // Charger les overrides depuis la DB (JSON parsé par Prisma)
+          // Caster depuis le type Post (qui a PlatformOverrides | null) vers le type store
+          if (post.platformOverrides && typeof post.platformOverrides === 'object') {
+            state.platformOverrides = post.platformOverrides as Partial<Record<Platform, PlatformOverride>>
+          }
           // Convertir en Date si c'est une string ISO (cas réhydratation depuis l'API)
           state.scheduledFor = post.scheduledFor ? new Date(post.scheduledFor) : null
+        }),
+
+      // ── Actions type de contenu ───────────────────────────────────────────────
+
+      // Change le type de contenu — réinitialise threadItems si on quitte "thread"
+      setContentType: (contentType) =>
+        set((state) => {
+          state.contentType = contentType
+          // Réinitialiser les threadItems quand on quitte le mode thread
+          if (contentType !== 'thread') {
+            state.threadItems = ['', '']
+          }
+        }),
+
+      // Remplace tout le tableau des éléments de thread
+      setThreadItems: (items) =>
+        set((state) => {
+          state.threadItems = items
+        }),
+
+      // Met à jour un élément de thread à un index donné
+      updateThreadItem: (index, text) =>
+        set((state) => {
+          if (index >= 0 && index < state.threadItems.length) {
+            state.threadItems[index] = text
+          }
+        }),
+
+      // Ajoute un nouvel élément vide (max 25)
+      addThreadItem: () =>
+        set((state) => {
+          if (state.threadItems.length < 25) {
+            state.threadItems.push('')
+          }
+        }),
+
+      // Supprime un élément par index (min 2)
+      removeThreadItem: (index) =>
+        set((state) => {
+          if (state.threadItems.length > 2 && index >= 0 && index < state.threadItems.length) {
+            state.threadItems.splice(index, 1)
+          }
         }),
 
       // ── Actions overrides ────────────────────────────────────────────────────
@@ -365,6 +452,8 @@ export const useDraftStore = create<DraftStore>()(
         mediaUrls: state.mediaUrls,
         scheduledFor: state.scheduledFor,
         postId: state.postId,
+        contentType: state.contentType,
+        threadItems: state.threadItems,
         platformOverrides: state.platformOverrides,
       }),
     },

@@ -570,6 +570,9 @@ export function CalendarContent(): React.JSX.Element {
             onAIPanelChange={setIsAIPanelOpen}
           >
             <PostComposer.PlatformTabs />
+            <PostComposer.ContentTypePicker />
+            <PostComposer.ThreadEditor />
+            <PostComposer.CarouselEditor />
             <PostComposer.Editor />
             <PostComposer.Platforms />
             <PostComposer.MediaUpload />

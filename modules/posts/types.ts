@@ -10,6 +10,8 @@
  */
 
 export type { PostCreate, PostUpdate, PostStatus } from './schemas/post.schema'
+export type { PlatformOverrides, PlatformOverrideItem } from './schemas/platform-overrides.schema'
+export type { ContentType } from './schemas/content-type.schema'
 
 // ─── Type Post (modèle complet depuis la DB) ──────────────────────────────────
 
@@ -24,6 +26,25 @@ export interface Post {
   /** Plateforme cible unique (ex: "tiktok", "instagram") */
   platform: string
   mediaUrls: string[]
+  /**
+   * Surcharges de contenu par plateforme (JSON optionnel).
+   * Stocke les contenus personnalisés quand l'utilisateur adapte le texte
+   * et/ou les médias par plateforme dans le PostComposer.
+   *
+   * Format : { "instagram": { "text": "...", "mediaUrls": [...] }, ... }
+   * null = pas de surcharges (toutes les plateformes utilisent text/mediaUrls de base).
+   */
+  platformOverrides: PlatformOverrides | null
+  /**
+   * Type de contenu du post (feed, story, reel, thread, carousel).
+   * Détermine le format de publication sur la plateforme cible.
+   */
+  contentType: ContentType
+  /**
+   * Éléments d'un thread (tableau de textes, un par post dans la chaîne).
+   * null si contentType !== "thread".
+   */
+  threadItems: string[] | null
   scheduledFor: Date | null
   publishedAt: Date | null
   status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED'
