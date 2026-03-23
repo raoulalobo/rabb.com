@@ -104,7 +104,7 @@ function computeAcceptedTypes(activePlatformTab: Platform | null): string {
  * et les médias déjà uploadés avec un bouton de suppression.
  * La limite de fichiers et les types acceptés dépendent de l'onglet actif.
  */
-export function MediaUpload(): React.JSX.Element {
+export function MediaUpload(): React.JSX.Element | null {
   const {
     activeMediaUrls,
     activePlatformTab,
@@ -116,6 +116,7 @@ export function MediaUpload(): React.JSX.Element {
     isSubmitting,
     readOnly,
     isPlatformCustomized,
+    contentType,
   } = usePostComposerContext()
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -130,6 +131,10 @@ export function MediaUpload(): React.JSX.Element {
   // dragenter sur un enfant → dragleave sur le parent → dragenter sur l'enfant.
   // Le compteur permet de distinguer la vraie sortie de zone d'un survol interne.
   const dragCounterRef = useRef(0)
+
+  // En mode carrousel, l'upload est géré par CarouselEditor — masquer ce composant
+  // Placé APRÈS tous les hooks pour respecter les Rules of Hooks (ordre constant)
+  if (contentType === 'carousel') return null
 
   // Calculer les limites et types selon l'onglet actif
   const maxFiles = computeMaxFiles(activePlatformTab, platforms)

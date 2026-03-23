@@ -14,6 +14,9 @@
 
 import { z } from 'zod'
 
+import { ContentTypeSchema, ThreadItemsSchema } from './content-type.schema'
+import { PlatformOverridesSchema } from './platform-overrides.schema'
+
 // ─── Limites par plateforme ───────────────────────────────────────────────────
 
 /**
@@ -101,6 +104,36 @@ export const PostCreateSchema = z.object({
 
   /** Statut initial du post */
   status: PostStatusEnum.default('DRAFT'),
+
+  /**
+   * Surcharges de contenu par plateforme (optionnel).
+   * Permet de personnaliser le texte et les médias pour chaque plateforme
+   * dans un même post multi-plateformes.
+   *
+   * Format : { "instagram": { "text": "...", "mediaUrls": [...] }, ... }
+   * Absent / null / {} = pas de surcharges (contenu de base utilisé partout).
+   *
+   * @example
+   *   platformOverrides: {
+   *     instagram: { text: 'Version Insta #reels', mediaUrls: [] },
+   *     twitter:   { text: 'Version courte', mediaUrls: [] },
+   *   }
+   */
+  platformOverrides: PlatformOverridesSchema.nullable().optional(),
+
+  /**
+   * Type de contenu du post (feed, story, reel, thread, carousel).
+   * Détermine le format de publication sur la plateforme cible.
+   * Par défaut "feed" (post classique dans le fil).
+   */
+  contentType: ContentTypeSchema.default('feed'),
+
+  /**
+   * Éléments d'un thread (tableau de textes, un par post dans la chaîne).
+   * Requis uniquement si contentType = "thread".
+   * Ignoré pour les autres types de contenu.
+   */
+  threadItems: ThreadItemsSchema.nullable().optional(),
 })
 
 export type PostCreate = z.infer<typeof PostCreateSchema>

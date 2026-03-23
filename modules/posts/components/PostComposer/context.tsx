@@ -26,6 +26,7 @@
 import { createContext, useContext } from 'react'
 
 import type { Platform } from '@/modules/platforms/types'
+import type { ContentType } from '@/modules/posts/schemas/content-type.schema'
 import type { UploadingFile } from '@/modules/posts/types'
 
 // ─── Interface du contexte ────────────────────────────────────────────────────
@@ -49,6 +50,20 @@ export interface PostComposerContextValue {
   addMediaUrl: (url: string) => void
   removeMediaUrl: (url: string) => void
   setScheduledFor: (date: Date | null) => void
+
+  // ── Type de contenu ───────────────────────────────────────────────────────
+  /** Type de contenu actuel (feed, story, reel, thread, carousel) */
+  contentType: ContentType
+  /** Change le type de contenu */
+  setContentType: (type: ContentType) => void
+  /** Éléments du thread (tableau de textes) */
+  threadItems: string[]
+  /** Met à jour un élément de thread à un index donné */
+  updateThreadItem: (index: number, text: string) => void
+  /** Ajoute un nouvel élément au thread */
+  addThreadItem: () => void
+  /** Supprime un élément du thread par index */
+  removeThreadItem: (index: number) => void
 
   // ── Onglets par plateforme ─────────────────────────────────────────────────
   /**
