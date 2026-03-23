@@ -271,7 +271,7 @@ export const publishScheduledPost = inngest.createFunction(
         // Le premier élément du thread est le `content` principal
         // Les suivants sont dans `threadItems` (texte uniquement)
         baseParams.content = threadItems[0]
-        ;(baseParams as Record<string, unknown>).threadItems = threadItems.slice(1).map((text) => ({
+        ;(baseParams as unknown as Record<string, unknown>).threadItems = threadItems.slice(1).map((text) => ({
           content: text,
         }))
       }
