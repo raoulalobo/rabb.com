@@ -119,9 +119,6 @@ export function MediaUpload(): React.JSX.Element | null {
     contentType,
   } = usePostComposerContext()
 
-  // En mode carrousel, l'upload est géré par CarouselEditor — masquer ce composant
-  if (contentType === 'carousel') return null
-
   const inputRef = useRef<HTMLInputElement>(null)
 
   // État visuel de survol drag & drop
@@ -134,6 +131,10 @@ export function MediaUpload(): React.JSX.Element | null {
   // dragenter sur un enfant → dragleave sur le parent → dragenter sur l'enfant.
   // Le compteur permet de distinguer la vraie sortie de zone d'un survol interne.
   const dragCounterRef = useRef(0)
+
+  // En mode carrousel, l'upload est géré par CarouselEditor — masquer ce composant
+  // Placé APRÈS tous les hooks pour respecter les Rules of Hooks (ordre constant)
+  if (contentType === 'carousel') return null
 
   // Calculer les limites et types selon l'onglet actif
   const maxFiles = computeMaxFiles(activePlatformTab, platforms)
