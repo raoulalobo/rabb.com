@@ -172,12 +172,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         </section>
 
         {/* ── Carrousel des fonctionnalités ──────────────────────────────── */}
-        <section id="features" className="pb-24 pt-8">
+        <section id="features" className="pb-12 pt-8">
           <FeatureCarousel />
         </section>
 
         {/* ── Plateformes + CTA final ─────────────────────────────────────── */}
-        <section className="py-24">
+        <section className="py-12">
           <PlatformLogos />
         </section>
       </main>
