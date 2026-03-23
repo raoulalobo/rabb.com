@@ -59,7 +59,7 @@ export function PlatformLogos(): React.JSX.Element {
         {PLATFORMS.map((platform, index) => (
           <motion.div
             key={platform.name}
-            className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-4 py-2.5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+            className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-2.5 py-2 sm:px-4 sm:py-2.5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
@@ -73,7 +73,7 @@ export function PlatformLogos(): React.JSX.Element {
               height={20}
               className="size-5"
             />
-            <span className="text-sm font-medium text-gray-700">{platform.name}</span>
+            <span className="hidden text-sm font-medium text-gray-700 sm:inline">{platform.name}</span>
           </motion.div>
         ))}
       </div>

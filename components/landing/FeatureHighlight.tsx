@@ -88,7 +88,7 @@ export function FeatureHighlights(): React.JSX.Element {
         return (
           <motion.div
             key={highlight.id}
-            className={`flex flex-col items-center gap-12 lg:flex-row ${isReversed ? 'lg:flex-row-reverse' : ''}`}
+            className={`flex flex-col items-center gap-8 lg:gap-12 lg:flex-row ${isReversed ? 'lg:flex-row-reverse' : ''}`}
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-100px' }}
