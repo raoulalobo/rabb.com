@@ -33,7 +33,7 @@ export default function SettingsPage(): React.JSX.Element {
 
       {/* ── En-tête ───────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Paramètres</h1>
+        <h1 className="text-2xl font-bold text-foreground">Paramétrages</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Gère tes réseaux sociaux et les préférences de ton compte.
         </p>

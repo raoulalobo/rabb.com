@@ -4,7 +4,7 @@
  * @description Dialog pour ajouter ou modifier un créneau de file d'attente.
  *   En mode création (editingSlot = null), pré-remplit le jour sélectionné.
  *   En mode édition (editingSlot = QueueSlot), pré-remplit tous les champs.
- *   Les créneaux sont envoyés à Zernio (source de vérité unique).
+ *   Inclut un sélecteur de plateforme (chaque créneau est lié à une plateforme).
  *
  * @example
  *   <QueueSlotEditor
@@ -37,7 +37,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DISPLAYED_PLATFORMS, PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import { addQueueSlot, updateQueueSlot } from '@/modules/queue/actions/queue.action'
+import { useQueueStore } from '@/modules/queue/store/queue.store'
 import type { QueueSlot } from '@/modules/queue/types'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -87,6 +89,7 @@ interface QueueSlotEditorProps {
 /**
  * Dialog de création/édition d'un créneau de file d'attente.
  * Appelle les server actions Zernio (addQueueSlot / updateQueueSlot).
+ * Inclut un sélecteur de plateforme obligatoire.
  */
 export function QueueSlotEditor({
   open,
@@ -97,10 +100,14 @@ export function QueueSlotEditor({
 }: QueueSlotEditorProps): React.JSX.Element {
   const [isPending, startTransition] = useTransition()
 
+  // Lire le filtre plateforme du store (pour pré-remplir en mode création)
+  const filterPlatform = useQueueStore((s) => s.filterPlatform)
+
   // ── État local du formulaire ────────────────────────────────────────────────
   const [dayOfWeek, setDayOfWeek] = useState<string>('1')
   const [hour, setHour] = useState<string>('9')
   const [minute, setMinute] = useState<string>('0')
+  const [platform, setPlatform] = useState<string>(DISPLAYED_PLATFORMS[0])
 
   // ── Synchronisation avec les props ──────────────────────────────────────────
   useEffect(() => {
@@ -111,13 +118,16 @@ export function QueueSlotEditor({
       setDayOfWeek(String(editingSlot.dayOfWeek))
       setHour(String(editingSlot.hour))
       setMinute(String(editingSlot.minute))
+      setPlatform(editingSlot.platform)
     } else {
       // Mode création : pré-remplir le jour sélectionné, heure par défaut 9h00
       setDayOfWeek(String(selectedDay ?? 1))
       setHour('9')
       setMinute('0')
+      // Pré-remplir la plateforme depuis le filtre actif (ou première plateforme)
+      setPlatform(filterPlatform ?? DISPLAYED_PLATFORMS[0])
     }
-  }, [open, editingSlot, selectedDay])
+  }, [open, editingSlot, selectedDay, filterPlatform])
 
   // ── Soumission du formulaire ────────────────────────────────────────────────
 
@@ -131,8 +141,10 @@ export function QueueSlotEditor({
         const result = await updateQueueSlot(
           editingSlot.dayOfWeek,
           editingSlot.time,
+          editingSlot.platform,
           newDayOfWeek,
           newTime,
+          platform,
         )
         if (result.success) {
           toast.success('Créneau modifié')
@@ -143,7 +155,7 @@ export function QueueSlotEditor({
         }
       } else {
         // Mode création : ajouter un nouveau slot
-        const result = await addQueueSlot(newDayOfWeek, newTime)
+        const result = await addQueueSlot(newDayOfWeek, newTime, platform)
         if (result.success) {
           toast.success('Créneau créé')
           onSuccess()
@@ -171,6 +183,32 @@ export function QueueSlotEditor({
 
         {/* ── Formulaire ─────────────────────────────────────────────────── */}
         <div className="space-y-4 py-4">
+          {/* Sélecteur de plateforme */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Plateforme</label>
+            <Select value={platform} onValueChange={setPlatform}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir une plateforme" />
+              </SelectTrigger>
+              <SelectContent>
+                {DISPLAYED_PLATFORMS.map((p) => {
+                  const config = PLATFORM_CONFIG[p]
+                  return (
+                    <SelectItem key={p} value={p}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="size-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: config.color }}
+                        />
+                        {config.label}
+                      </span>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Sélecteur de jour */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Jour</label>

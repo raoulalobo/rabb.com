@@ -3,6 +3,7 @@
  * @module queue
  * @description Clés et fetchers TanStack Query pour le module file d'attente.
  *   Les données viennent de Zernio via le proxy /api/queue.
+ *   Supporte le multi-schedule (un par plateforme).
  *
  * @example
  *   import { queueQueryKeys, fetchQueueSlots } from '@/modules/queue/queries/queue.queries'
@@ -16,29 +17,39 @@ import type { QueueSlot } from '@/modules/queue/types'
 export const queueQueryKeys = {
   /** Clé racine du module queue */
   all: () => ['queue'] as const,
-  /** Liste des créneaux */
+  /** Liste des créneaux (tous les schedules mergés) */
   slots: () => ['queue', 'slots'] as const,
 }
 
 // ─── Types réponse proxy ────────────────────────────────────────────────────
 
+/** Info résumée d'un schedule retournée par le proxy */
+export interface QueueScheduleInfo {
+  id: string
+  name: string
+  platform: string
+  timezone: string
+  active: boolean
+  slotsCount: number
+}
+
 /** Réponse normalisée de GET /api/queue */
 export interface QueueProxyResponse {
+  /** Tous les slots de tous les schedules (avec platform + scheduleId) */
   slots: QueueSlot[]
-  scheduleId: string | null
-  scheduleName?: string
-  timezone?: string
-  active?: boolean
+  /** Liste des schedules avec info résumée */
+  schedules: QueueScheduleInfo[]
+  /** Prochains créneaux calculés par Zernio */
   nextSlots: string[]
 }
 
 // ─── Fetchers ────────────────────────────────────────────────────────────────
 
 /**
- * Fetche les créneaux du schedule par défaut via le proxy /api/queue.
- * La réponse est déjà normalisée (slots avec hour/minute extraits de "HH:MM").
+ * Fetche tous les schedules et leurs slots via le proxy /api/queue.
+ * La réponse contient les slots de toutes les plateformes avec l'info plateforme.
  *
- * @returns Réponse complète avec slots + métadonnées schedule
+ * @returns Réponse complète avec slots + schedules + nextSlots
  * @throws Error si la réponse n'est pas OK
  */
 export async function fetchQueueData(): Promise<QueueProxyResponse> {

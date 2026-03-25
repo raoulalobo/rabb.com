@@ -65,7 +65,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics',   href: '/analytics',   icon: BarChart2 },
   // { label: 'Inbox', href: '/inbox', icon: Inbox },  // masqué — module non implémenté (à réactiver plus tard)
   { label: 'Profil',      href: '/profile',     icon: UserCircle },
-  { label: 'Paramètres',  href: '/settings',    icon: Settings },
+  { label: 'Paramétrages', href: '/settings',    icon: Settings },
 ]
 
 // ─── Composant ────────────────────────────────────────────────────────────────

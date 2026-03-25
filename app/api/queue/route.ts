@@ -2,13 +2,14 @@
  * @file app/api/queue/route.ts
  * @description API Route pour la file d'attente — proxy vers Zernio.
  *   Zernio est la source de vérité unique pour les schedules (queues).
+ *   Chaque plateforme a son propre schedule (convention "queue:<platform>").
  *
- *   GET /api/queue → Liste les créneaux du schedule par défaut du profil
- *   Retourne les slots normalisés + les prochains créneaux calculés.
+ *   GET /api/queue → Liste tous les schedules du profil et merge les slots
+ *   avec l'info plateforme extraite du nom du schedule.
  *
  * @example
  *   fetch('/api/queue')
- *   // → { slots: QueueSlot[], schedule: ZernioSchedule | null, nextSlots: string[] }
+ *   // → { slots: QueueSlot[], schedules: [...], nextSlots: string[] }
  */
 
 import { NextResponse } from 'next/server'
@@ -17,16 +18,24 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { late } from '@/lib/late'
 import { prisma } from '@/lib/prisma'
-import { mapZernioSlots } from '@/modules/queue/types'
-import type { ZernioQueueListResponse } from '@/modules/queue/types'
+import {
+  mapZernioSlots,
+  platformFromScheduleName,
+} from '@/modules/queue/types'
+import type {
+  ZernioQueueListAllResponse,
+  ZernioQueueListResponse,
+  ZernioSchedule,
+} from '@/modules/queue/types'
 
 // ─── GET /api/queue ──────────────────────────────────────────────────────────
 
 /**
- * Liste les créneaux du schedule par défaut via Zernio.
- * Normalise les slots Zernio (time "HH:MM" → hour + minute) pour l'UI.
+ * Liste tous les schedules du profil via Zernio (all: true).
+ * Normalise les slots de chaque schedule en ajoutant la plateforme
+ * extraite du nom du schedule ("queue:linkedin" → platform: "linkedin").
  *
- * @returns JSON { slots: QueueSlot[], scheduleId: string | null, nextSlots: string[] }
+ * @returns JSON { slots: QueueSlot[], schedules: [...], nextSlots: string[] }
  */
 export async function GET(): Promise<NextResponse> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -45,23 +54,47 @@ export async function GET(): Promise<NextResponse> {
   }
 
   try {
-    const data = await late.queue.list(user.lateWorkspaceId) as ZernioQueueListResponse
+    // Tenter de lire tous les schedules (all: true)
+    const rawData = await late.queue.list(user.lateWorkspaceId, undefined, true)
+    const data = rawData as Record<string, unknown>
 
-    // Si aucun schedule n'existe → retourner un tableau vide
-    if (!data.exists || !data.schedule) {
-      return NextResponse.json({ slots: [], scheduleId: null, nextSlots: [] })
+    // Zernio retourne `queues` (all: true), `schedule` (unique), ou `schedules`
+    let schedules: ZernioSchedule[] = []
+    if ('queues' in data && Array.isArray(data.queues)) {
+      schedules = data.queues as ZernioSchedule[]
+    } else if ('schedules' in data && Array.isArray(data.schedules)) {
+      schedules = data.schedules as ZernioSchedule[]
+    } else if ('schedule' in data && data.schedule) {
+      schedules = [data.schedule as ZernioSchedule]
     }
 
-    // Normaliser les slots Zernio pour l'UI
-    const slots = mapZernioSlots(data.schedule.slots)
+    if (schedules.length === 0) {
+      return NextResponse.json({ slots: [], schedules: [], nextSlots: [] })
+    }
+
+    // Merger les slots de tous les schedules avec l'info plateforme
+    const allSlots = schedules.flatMap((schedule) => {
+      const platform = platformFromScheduleName(schedule.name)
+      return mapZernioSlots(schedule.slots, platform, schedule._id)
+    })
+
+    // Trier par dayOfWeek puis heure
+    allSlots.sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour || a.minute - b.minute)
 
     return NextResponse.json({
-      slots,
-      scheduleId: data.schedule._id,
-      scheduleName: data.schedule.name,
-      timezone: data.schedule.timezone,
-      active: data.schedule.active,
-      nextSlots: data.nextSlots,
+      slots: allSlots,
+      schedules: schedules.map((s) => ({
+        id: s._id,
+        name: s.name,
+        platform: platformFromScheduleName(s.name),
+        timezone: s.timezone,
+        active: s.active,
+        slotsCount: s.slots.length,
+      })),
+      nextSlots: (Array.isArray(data.nextSlots)
+        ? data.nextSlots
+        : schedules.flatMap((s) => (s as unknown as Record<string, unknown>).nextSlots as string[] ?? [])
+      ) as string[],
     })
   } catch (error) {
     console.error('[GET /api/queue] Erreur Zernio :', error)

@@ -134,9 +134,26 @@ export async function createPost(data: {
     params.publishNow = true
   }
 
-  // Mode file d'attente : Zernio assigne le prochain créneau libre (avec locking)
+  // Mode file d'attente : Zernio assigne le prochain créneau libre (avec locking).
+  // On passe le queueId du schedule de la plateforme pour que Zernio utilise
+  // les bons créneaux et avance correctement au prochain slot libre.
   if (data.useQueue) {
     params.queuedFromProfile = connectedPlatform.lateProfileId
+
+    // Chercher le schedule spécifique à cette plateforme ("queue:<platform>")
+    try {
+      const { scheduleNameForPlatform } = await import('@/modules/queue/types')
+      const rawData = await late.queue.list(connectedPlatform.lateProfileId, undefined, true)
+      const queueData = rawData as Record<string, unknown>
+      const queues = (Array.isArray(queueData.queues) ? queueData.queues : []) as Array<{ _id: string; name: string }>
+      const targetName = scheduleNameForPlatform(data.platform)
+      const platformQueue = queues.find((q) => q.name === targetName)
+      if (platformQueue) {
+        params.queueId = platformQueue._id
+      }
+    } catch {
+      // Pas de schedule trouvé → Zernio utilisera le schedule par défaut
+    }
   }
 
   // ─── Appel Zernio — API-first (rien en DB locale) ────────────────────────

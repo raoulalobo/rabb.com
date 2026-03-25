@@ -113,7 +113,7 @@ const FEATURES: Feature[] = [
   {
     id: 'settings',
     icon: Settings2,
-    label: 'Paramètres',
+    label: 'Paramétrages',
     title: 'Gérez vos comptes connectés',
     description:
       'Connectez et déconnectez vos comptes sociaux en un clic via OAuth. Gérez votre profil, vos préférences et votre abonnement.',

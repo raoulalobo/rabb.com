@@ -3,7 +3,7 @@
  * @module queue
  * @description Colonne d'un jour de la semaine dans la grille de file d'attente.
  *   Affiche le nom du jour, le nombre de créneaux, et la liste des créneaux
- *   triés par heure croissante. Chaque créneau est cliquable pour l'éditer.
+ *   triés par heure croissante. Chaque créneau affiche un badge plateforme.
  *   Un bouton "+" permet d'ajouter un nouveau créneau à ce jour.
  *
  * @example
@@ -19,6 +19,8 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
+import type { LatePlatform } from '@/lib/late'
 import { removeQueueSlot } from '@/modules/queue/actions/queue.action'
 import type { QueueDay, QueueSlot } from '@/modules/queue/types'
 
@@ -39,7 +41,7 @@ interface QueueDayColumnProps {
 
 /**
  * Colonne représentant un jour de la semaine avec ses créneaux.
- * Actions rapides : supprimer un créneau (via Zernio).
+ * Chaque créneau affiche un badge coloré avec le nom de la plateforme.
  */
 export function QueueDayColumn({
   day,
@@ -56,7 +58,7 @@ export function QueueDayColumn({
   function handleDelete(slot: QueueSlot): void {
     setPendingSlotId(slot.id)
     startTransition(async () => {
-      const result = await removeQueueSlot(slot.dayOfWeek, slot.time)
+      const result = await removeQueueSlot(slot.dayOfWeek, slot.time, slot.platform)
       setPendingSlotId(null)
       if (result.success) {
         toast.success('Créneau supprimé')
@@ -94,6 +96,8 @@ export function QueueDayColumn({
         ) : (
           day.slots.map((slot) => {
             const isSlotPending = pendingSlotId === slot.id
+            // Récupérer la config de la plateforme pour la couleur du badge
+            const platformConfig = PLATFORM_CONFIG[slot.platform as LatePlatform]
 
             return (
               <div
@@ -118,6 +122,23 @@ export function QueueDayColumn({
                 <Clock className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="font-medium">{slot.time}</span>
 
+                {/* Badge plateforme */}
+                {platformConfig && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+                    style={{
+                      backgroundColor: platformConfig.bgColor,
+                      color: platformConfig.color,
+                    }}
+                  >
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ backgroundColor: platformConfig.color }}
+                    />
+                    {platformConfig.label}
+                  </span>
+                )}
+
                 {/* Spacer */}
                 <div className="flex-1" />
 
@@ -126,7 +147,6 @@ export function QueueDayColumn({
                   <Loader2 className="size-4 animate-spin text-muted-foreground" />
                 ) : (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Supprimer */}
                     <Button
                       variant="ghost"
                       size="icon"

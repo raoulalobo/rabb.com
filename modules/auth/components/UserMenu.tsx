@@ -172,7 +172,7 @@ export function UserMenu(): React.JSX.Element | null {
         <DropdownMenuItem asChild>
           <Link href="/settings" className="flex w-full items-center gap-2">
             <Settings className="size-4" />
-            <span>Paramètres</span>
+            <span>Paramétrages</span>
           </Link>
         </DropdownMenuItem>
 
