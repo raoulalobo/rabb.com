@@ -2,7 +2,7 @@
  * @file prisma/schema.prisma
  * @description Schéma Prisma pour rabb.com.
  *   Modèles : User, Session, Account, Verification (gérés par better-auth)
- *   + ConnectedPlatform, Post, NotificationPrefs, Signature (métier rabb)
+ *   + ConnectedPlatform, Post, NotificationPrefs (métier rabb)
  *
  *   Nouveau modèle simplifié (post-refonte /compose) :
  *   - Post.platform (String singulier) — 1 post = 1 plateforme
@@ -50,7 +50,6 @@ model User {
   accounts      Account[]
   platforms     ConnectedPlatform[]
   notifPrefs    NotificationPrefs?
-  signatures    Signature[]
   media         Media[]
   mediaFolders  MediaFolder[]
   mediaTags     MediaTag[]
@@ -153,37 +152,6 @@ model ConnectedPlatform {
 // Les posts sont stockés exclusivement chez Zernio (source de vérité unique).
 // Aucune table locale — lecture via GET /v1/posts, écriture via POST/PUT/DELETE /v1/posts.
 // Voir modules/posts/types.ts pour l'interface Post normalisée depuis Zernio.
-
-/**
- * Signature textuelle réutilisable pour un post.
- * Chaque signature est liée à UNE seule plateforme (1 post = 1 plateforme).
- * Plusieurs signatures par plateforme sont possibles, dont une marquée "par défaut".
- *
- * Cas d'usage : hashtags récurrents, CTA, liens bio, mentions légales.
- * La signature "par défaut" (isDefault = true) apparaît en premier dans le picker
- * du PostComposer et est suggérée lors de la composition.
- *
- * Règle d'unicité du défaut : un seul isDefault par (userId, platform).
- * Géré par la Server Action `setDefaultSignature` via transaction Prisma.
- */
-model Signature {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String                // Libellé court : "Hashtags courts", "CTA pro", etc.
-  text      String                // Contenu inséré dans le post (max 500 chars)
-  platform  String                // "instagram" | "linkedin" | etc. (1 plateforme par signature)
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Index standard : toutes les signatures d'un user
-  @@index([userId])
-  // Index composé pour la requête fréquente : signatures d'un user + plateforme
-  @@index([userId, platform])
-  @@map("signatures")
-}
 
 /**
  * Dossier virtuel pour organiser les médias de la galerie.

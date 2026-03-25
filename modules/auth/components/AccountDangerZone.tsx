@@ -198,7 +198,7 @@ export function AccountDangerZone(): React.JSX.Element {
                 <li>Votre profil et vos informations personnelles</li>
                 <li>Tous vos posts (brouillons, planifiés, publiés)</li>
                 <li>Vos plateformes connectées</li>
-                <li>Vos médias et signatures</li>
+                <li>Vos médias</li>
                 <li>Toutes vos données sans possibilité de récupération</li>
               </ul>
             </DialogDescription>

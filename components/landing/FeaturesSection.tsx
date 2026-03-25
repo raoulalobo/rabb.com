@@ -3,8 +3,8 @@
  * @module landing
  * @description Section "Fonctionnalités" de la landing page d'ogolong.
  *
- *   Présente les 5 rubriques principales du dashboard (Compose, Analytics,
- *   Galerie, Signatures, Paramètres) via des tabs interactifs animés avec
+ *   Présente les 4 rubriques principales du dashboard (Compose, Analytics,
+ *   Galerie, Paramètres) via des tabs interactifs animés avec
  *   Framer Motion :
  *   - Pill glissante sur le tab actif (layoutId)
  *   - Transition de contenu avec AnimatePresence (mode "wait")
@@ -31,7 +31,6 @@ import {
   PenLine,
   BarChart2,
   Images,
-  FileSignature,
   Settings2,
 } from 'lucide-react'
 
@@ -42,7 +41,7 @@ import { FeatureMockup } from './FeatureMockup'
 /**
  * Identifiants des tabs (correspond aux routes du dashboard).
  */
-export type FeatureId = 'compose' | 'analytics' | 'gallery' | 'signatures' | 'settings'
+export type FeatureId = 'compose' | 'analytics' | 'gallery' | 'settings'
 
 /**
  * Structure d'un tab de fonctionnalité.
@@ -109,20 +108,6 @@ const FEATURES: Feature[] = [
       'Filtres par type (image, vidéo) et par date d\'upload',
       'Réutilisation directe dans le compositeur en un clic',
       'Stockage sécurisé via Supabase Storage',
-    ],
-  },
-  {
-    id: 'signatures',
-    icon: FileSignature,
-    label: 'Hashtag',
-    title: 'Personnalisez chaque publication',
-    description:
-      'Créez des signatures réutilisables (hashtags, mentions, emojis) et attachez-les automatiquement à vos posts par plateforme.',
-    bullets: [
-      'Création de signatures avec hashtags, mentions et emojis',
-      'Association par plateforme — une signature différente par réseau',
-      'Ajout automatique ou manuel au moment de la rédaction',
-      'Gestion et mise à jour centralisées depuis la bibliothèque',
     ],
   },
   {

@@ -17,7 +17,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  FileSignature,
   Images,
   ListOrdered,
   Settings,
@@ -57,14 +56,6 @@ const FEATURES = [
     bullets: ['Dossiers et tags pour organiser', 'Drag & drop pour uploader', 'Sélection rapide dans le compositeur', 'Images et vidéos supportées'],
     icon: Images,
     accent: '#db2777',
-  },
-  {
-    id: 'signatures',
-    label: 'Hashtags & Signatures',
-    description: 'Blocs de texte réutilisables par plateforme.',
-    bullets: ['Hashtags, CTAs, mentions', 'Un clic pour insérer dans un post', 'Différents blocs par plateforme', 'Illimité'],
-    icon: FileSignature,
-    accent: '#0891b2',
   },
   {
     id: 'settings',

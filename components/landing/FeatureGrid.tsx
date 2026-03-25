@@ -19,7 +19,6 @@ import { motion } from 'framer-motion'
 import {
   BarChart2,
   CalendarDays,
-  FileSignature,
   Images,
   ListOrdered,
   Settings,
@@ -76,15 +75,6 @@ const FEATURES: Feature[] = [
     screenshot: '/screenshots/analytics.png',
     wide: true,
     style: 'dark',
-  },
-  {
-    id: 'signatures',
-    label: 'Hashtags & Signatures',
-    description: 'Blocs de texte réutilisables par plateforme : hashtags, CTAs, mentions.',
-    icon: FileSignature,
-    screenshot: '/screenshots/signatures.png',
-    wide: false,
-    style: 'light',
   },
   {
     id: 'settings',

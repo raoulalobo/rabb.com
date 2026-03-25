@@ -30,7 +30,6 @@ import {
   PenLine,
   BarChart2,
   Images,
-  FileSignature,
   Settings2,
 } from 'lucide-react'
 
@@ -76,11 +75,6 @@ const FEATURE_CONFIG: Record<
     path: '/screenshots/gallery.png',
     url: 'ogolong.com/gallery',
     icon: Images,
-  },
-  signatures: {
-    path: '/screenshots/signatures.png',
-    url: 'ogolong.com/signatures',
-    icon: FileSignature,
   },
   settings: {
     path: '/screenshots/settings.png',

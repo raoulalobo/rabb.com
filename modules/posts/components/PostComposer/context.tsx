@@ -140,20 +140,6 @@ export interface PostComposerContextValue {
   /** Retire un fichier uploadé (supprime aussi l'URL du brouillon) */
   removeUploadedFile: (fileId: string, publicUrl?: string) => void
 
-  // ── Insertion de signature ─────────────────────────────────────────────────
-  /**
-   * Appende une signature au texte de l'onglet actif.
-   * Le texte de la signature est précédé de deux sauts de ligne (séparateur naturel).
-   * Fonctionne uniquement sur un onglet plateforme (activePlatformTab !== null).
-   *
-   * @param sigText - Texte de la signature à insérer (ex: "#photo #lifestyle")
-   *
-   * @example
-   *   appendSignature('#photo #lifestyle')
-   *   // Si activeText = "Mon post", devient "Mon post\n\n#photo #lifestyle"
-   */
-  appendSignature: (sigText: string) => void
-
   // ── Panneau IA ─────────────────────────────────────────────────────────────
   /**
    * Vrai si le panneau de rédaction IA (AIAssistPanel) est ouvert.

@@ -11,7 +11,6 @@
  *   - Profil utilisateur (sans mot de passe ni tokens)
  *   - Posts (brouillons, planifiés, publiés)
  *   - Plateformes connectées
- *   - Signatures
  *   - Médias (liste avec URLs publiques)
  *   - Préférences de notifications
  *
@@ -52,7 +51,7 @@ export async function GET(): Promise<NextResponse> {
   try {
     // ── 2. Collecte des données en parallèle ────────────────────────────────
     // Toutes les requêtes sont exécutées simultanément pour minimiser la latence.
-    const [user, posts, platforms, signatures, media, notifPrefs] = await Promise.all([
+    const [user, posts, platforms, media, notifPrefs] = await Promise.all([
       // Profil utilisateur (sans champs sensibles — never expose password/tokens)
       prisma.user.findUnique({
         where: { id: userId },
@@ -84,20 +83,6 @@ export async function GET(): Promise<NextResponse> {
           isActive: true,
           connectedAt: true,
         },
-      }),
-
-      // Signatures réutilisables
-      prisma.signature.findMany({
-        where: { userId },
-        select: {
-          id: true,
-          name: true,
-          text: true,
-          platform: true,
-          isDefault: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
       }),
 
       // Médias de la galerie (liste avec URLs publiques)
@@ -146,10 +131,6 @@ export async function GET(): Promise<NextResponse> {
       connectedPlatforms: {
         count: platforms.length,
         items: platforms,
-      },
-      signatures: {
-        count: signatures.length,
-        items: signatures,
       },
       media: {
         count: media.length,

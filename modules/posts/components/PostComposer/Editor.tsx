@@ -28,7 +28,6 @@ import { Info, Sparkles } from 'lucide-react'
 import { PLATFORM_RULES } from '@/modules/platforms/config/platform-rules'
 import type { Platform } from '@/modules/platforms/types'
 import { getCharLimit } from '@/modules/posts/schemas/post.schema'
-import { SignaturePicker } from '@/modules/signatures/components/SignaturePicker'
 
 import { usePostComposerContext } from './context'
 
@@ -55,7 +54,7 @@ export function Editor({
   placeholder = 'Rédigez votre post...',
   rows = 6,
 }: EditorProps): React.JSX.Element {
-  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, readOnly, appendSignature, setAIPanelOpen } =
+  const { activeText, setActiveText, platforms, activePlatformTab, isSubmitting, readOnly, setAIPanelOpen } =
     usePostComposerContext()
 
   // ─── Limite de caractères selon l'onglet actif ──────────────────────────────
@@ -123,16 +122,7 @@ export function Editor({
       )}
 
       {/* ── Barre d'outils sous l'éditeur ───────────────────────────────────── */}
-      {/*
-       * SignaturePicker gère lui-même la visibilité (caché si platforms vide).
-       * Bouton ✨ : ouvre le panneau de rédaction IA (AIAssistPanel) — masqué en readOnly.
-       */}
-      <div className="mt-2 flex items-center justify-between">
-        <SignaturePicker
-          platforms={platforms}
-          onInsert={appendSignature}
-        />
-
+      <div className="mt-2 flex items-center justify-end">
         {/* Bouton d'ouverture du panneau IA — masqué si readOnly (post publié) */}
         {!readOnly && (
           <button

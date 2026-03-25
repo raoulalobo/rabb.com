@@ -9,13 +9,11 @@
  *
  *   Ordre de suppression (des tables feuilles vers la racine) :
  *   1. NotificationPrefs (relation 1-1, FK vers User)
- *   2. Signature (FK vers User)
- *   3. Media (FK vers User)
- *   4. ConnectedPlatform (FK vers User — référencée par Post, donc avant Post)
- *   5. Post (FK vers User + ConnectedPlatform)
- *   6. Session (FK vers User — better-auth)
- *   7. Account (FK vers User — better-auth OAuth)
- *   8. User (racine — supprimé en dernier)
+ *   2. Media (FK vers User)
+ *   3. ConnectedPlatform (FK vers User — référencée par Post, donc avant Post)
+ *   4. Session (FK vers User — better-auth)
+ *   5. Account (FK vers User — better-auth OAuth)
+ *   6. User (racine — supprimé en dernier)
  *
  *   Note : Verification (better-auth) n'est pas liée à userId directement,
  *   pas de suppression nécessaire.
@@ -86,10 +84,7 @@ export async function deleteAccount(): Promise<DeleteAccountResult> {
       // Étape 1 : Préférences de notifications (1-1 avec User)
       prisma.notificationPrefs.deleteMany({ where: { userId } }),
 
-      // Étape 2 : Signatures textuelles (FK → User)
-      prisma.signature.deleteMany({ where: { userId } }),
-
-      // Étape 3 : Médias de la galerie (FK → User)
+      // Étape 2 : Médias de la galerie (FK → User)
       prisma.media.deleteMany({ where: { userId } }),
 
       // Étape 4 : Posts stockés chez Zernio — pas de table locale à supprimer.
