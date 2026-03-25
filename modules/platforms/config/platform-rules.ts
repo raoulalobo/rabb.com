@@ -1,7 +1,7 @@
 /**
  * @file modules/platforms/config/platform-rules.ts
  * @module platforms
- * @description Règles et contraintes de chaque plateforme sociale supportée par getlate.dev.
+ * @description Règles et contraintes de chaque plateforme sociale supportée par Zernio.
  *   Ces règles sont utilisées par le PostComposer pour :
  *   - Afficher la limite de caractères selon l'onglet actif
  *   - Limiter le nombre de médias uploadés par onglet

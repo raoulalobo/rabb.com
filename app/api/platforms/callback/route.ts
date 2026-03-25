@@ -1,12 +1,12 @@
 /**
  * @file app/api/platforms/callback/route.ts
  * @description Callback OAuth après autorisation sur le réseau social.
- *   getlate.dev redirige ici avec les paramètres du compte connecté.
+ *   Zernio redirige ici avec les paramètres du compte connecté.
  *   Sauvegarde le profil en DB (ConnectedPlatform) puis redirige vers /settings.
  *
  *   URL appelée : GET /api/platforms/callback?connected=...&profileId=...&username=...
  *
- *   Paramètres getlate.dev (noms réels constatés sur le terrain) :
+ *   Paramètres Zernio (noms réels constatés sur le terrain) :
  *   - connected  : Nom de la plateforme connectée (ex: 'tiktok', 'instagram')
  *   - profileId  : ID du workspace Late (MongoDB ObjectId)
  *   - username   : Handle / nom d'affichage du compte social
@@ -15,7 +15,7 @@
  *   Filet de sécurité — lateWorkspaceId :
  *   Si connectPlatform.action.ts a créé le workspace Late mais échoué à persister
  *   son ID en DB (timeout réseau, crash serveur), ce callback reçoit quand même
- *   le profileId de getlate.dev et le sauvegarde automatiquement dans User.lateWorkspaceId
+ *   le profileId de Zernio et le sauvegarde automatiquement dans User.lateWorkspaceId
  *   si celui-ci est encore NULL. Opération idempotente : sans effet si l'ID est déjà renseigné.
  *
  * @example
@@ -31,17 +31,17 @@ import { prisma } from '@/lib/prisma'
 import { PlatformEnum } from '@/modules/platforms/schemas/platform.schema'
 
 /**
- * Handler GET du callback OAuth getlate.dev.
+ * Handler GET du callback OAuth Zernio.
  * Valide les paramètres, sauvegarde la plateforme et redirige.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url)
 
   // Log de diagnostic : affiche tous les params reçus pour identifier le vrai schéma
-  // de réponse de getlate.dev (utile lors des premiers tests OAuth)
-  console.log('[callback] params reçus de getlate.dev :', Object.fromEntries(searchParams))
+  // de réponse de Zernio (utile lors des premiers tests OAuth)
+  console.log('[callback] params reçus de Zernio :', Object.fromEntries(searchParams))
 
-  // Vérifier si getlate.dev a retourné une erreur OAuth
+  // Vérifier si Zernio a retourné une erreur OAuth
   const oauthError = searchParams.get('error')
   if (oauthError) {
     return NextResponse.redirect(
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Extraire les paramètres du callback
-  // Noms réels constatés (getlate.dev) : connected, profileId, username
+  // Noms réels constatés (Zernio) : connected, profileId, username
   const platformRaw = searchParams.get('connected')
   const lateProfileId = searchParams.get('profileId')
   const accountName = searchParams.get('username')
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // et obtenu le lateWorkspaceId, mais la sauvegarde Prisma (User.lateWorkspaceId)
   // a échoué avant de s'exécuter (erreur réseau, timeout DB, crash serveur).
   // Le workspace existe dans Late mais son ID est perdu en DB → lateWorkspaceId = NULL.
-  // getlate.dev renvoie toujours le même profileId dans ce callback → on le récupère ici.
+  // Zernio renvoie toujours le même profileId dans ce callback → on le récupère ici.
   // updateMany avec where: { lateWorkspaceId: null } est idempotent :
   // aucune mise à jour si l'ID est déjà présent (cas nominal ~100% du temps).
   await prisma.user.updateMany({

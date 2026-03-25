@@ -2,7 +2,7 @@
  * @file modules/analytics/types.ts
  * @module analytics
  * @description Types TypeScript du module analytics.
- *   Basés sur les réponses des endpoints GET /v1/analytics/* de getlate.dev.
+ *   Basés sur les réponses des endpoints GET /v1/analytics/* de Zernio.
  *   Re-exports des types Late pour éviter les imports croisés depuis lib/late.ts.
  */
 
@@ -22,6 +22,34 @@ export type {
   LatePostingFrequencyData as PostingFrequencyData,
   LatePostingFrequencyResponse as PostingFrequencyResponse,
 } from '@/lib/late'
+
+// ─── Types Post Timeline ─────────────────────────────────────────────────────
+
+/**
+ * Point de données pour un jour dans la timeline d'un post.
+ * Retourné par GET /v1/analytics/post-timeline.
+ */
+export interface PostTimelineDataPoint {
+  date: string
+  platform: string
+  platformPostId?: string
+  impressions: number
+  reach: number
+  likes: number
+  comments: number
+  shares: number
+  saves: number
+  clicks: number
+  views: number
+}
+
+/**
+ * Réponse de GET /api/analytics/post-timeline.
+ */
+export interface PostTimelineResponse {
+  postId: string
+  timeline: PostTimelineDataPoint[]
+}
 
 // ─── Types UI spécifiques au module ──────────────────────────────────────────
 

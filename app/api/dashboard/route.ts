@@ -3,18 +3,14 @@
  * @description Route Handler GET : données agrégées pour la page /dashboard.
  *
  *   Retourne en une seule requête les KPIs affichés dans les cartes du dashboard :
- *   - postsPublished : nombre de posts publiés (statut PUBLISHED en DB)
- *   - postsScheduled : nombre de posts planifiés (statut SCHEDULED en DB)
- *   - postsFailed    : nombre de posts en erreur de publication (statut FAILED en DB)
- *   - impressions    : total des impressions sur les 30 derniers jours (Late API)
- *   - engagementRate : taux d'engagement moyen sur les 30 derniers jours (Late API)
+ *   - postsPublished : nombre de posts publiés (via Zernio API)
+ *   - postsScheduled : nombre de posts planifiés (via Zernio API)
+ *   - postsFailed    : nombre de posts en erreur (via Zernio API)
+ *   - impressions    : total des impressions sur les 30 derniers jours (Zernio API)
+ *   - engagementRate : taux d'engagement moyen sur les 30 derniers jours (Zernio API)
  *
- *   Sources de données :
- *   - Prisma (Supabase) → counts posts (rapide, toujours disponible)
- *   - Late API           → impressions + ER (peut retourner 0 si aucune plateforme connectée)
- *
- *   Le fetch Late est fire-and-forget : si Late échoue, on retourne 0 pour impressions/ER
- *   sans faire échouer toute la réponse (dégradation gracieuse).
+ *   Source unique : Zernio API (posts + analytics).
+ *   Dégradation gracieuse : si Zernio est down, les compteurs retournent 0.
  *
  * @example
  *   GET /api/dashboard
@@ -38,15 +34,15 @@ export interface DashboardStatsResponse {
   postsScheduled: number
   /** Nombre de posts avec status FAILED (erreur de publication) */
   postsFailed: number
-  /** Total des impressions sur les 30 derniers jours (Late API) */
+  /** Total des impressions sur les 30 derniers jours (Zernio API) */
   impressions: number
-  /** Taux d'engagement moyen sur les 30 derniers jours, en % (Late API) */
+  /** Taux d'engagement moyen sur les 30 derniers jours, en % (Zernio API) */
   engagementRate: number
   /** failureReason des 2 derniers posts FAILED (pour l'aperçu dans FailedPostsAlert) */
   recentFailures: string[]
 }
 
-/** Réponse brute de la Late API analytics (structure minimale attendue) */
+/** Réponse brute de la Zernio API analytics (structure minimale attendue) */
 type LateRawPost = Record<string, unknown>
 type LateRawAnalytics = Record<string, number>
 
@@ -95,7 +91,7 @@ export async function GET(): Promise<NextResponse> {
     }
   }
 
-  // ── 2. Analytics Late API (dégradation gracieuse si aucune plateforme) ────
+  // ── 2. Analytics Zernio API (dégradation gracieuse si aucune plateforme) ────
   let impressions = 0
   let engagementRate = 0
 
@@ -135,9 +131,9 @@ export async function GET(): Promise<NextResponse> {
       }
     }
   } catch (err) {
-    // Late API indisponible ou aucune plateforme connectée → dégradation gracieuse
+    // Zernio API indisponible ou aucune plateforme connectée → dégradation gracieuse
     // On loggue mais on ne fait pas échouer la réponse (les counts Prisma restent valides)
-    console.warn('[/api/dashboard] Late API indisponible :', err)
+    console.warn('[/api/dashboard] Zernio API indisponible :', err)
   }
 
   return NextResponse.json({

@@ -7,7 +7,7 @@
  *
  * @example
  *   const { connect, isConnecting } = useConnectPlatform()
- *   await connect('instagram')  // Redirige vers OAuth getlate.dev
+ *   await connect('instagram')  // Redirige vers OAuth Zernio
  *
  *   const { disconnect, isDisconnecting } = useDisconnectPlatform()
  *   await disconnect('cpl_abc123')  // Supprime la plateforme
@@ -72,7 +72,7 @@ export function useConnectPlatform(): UseConnectPlatformReturn {
     }
 
     if (result.redirectUrl) {
-      // Redirection vers l'OAuth getlate.dev → le chargement reste actif jusqu'à la navigation
+      // Redirection vers l'OAuth Zernio → le chargement reste actif jusqu'à la navigation
       window.location.href = result.redirectUrl
     }
   }

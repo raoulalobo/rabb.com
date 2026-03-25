@@ -7,7 +7,7 @@
  *   Utilisé par :
  *   - PostCreateSchema / PostUpdateSchema (validation des mutations)
  *   - ContentTypePicker (sélection UI dans le PostComposer)
- *   - publish-scheduled-post.ts (transmission à getlate.dev)
+ *   - publish-scheduled-post.ts (transmission à Zernio)
  *
  * @example
  *   import { ContentTypeSchema, CONTENT_TYPE_CONFIG } from '@/modules/posts/schemas/content-type.schema'

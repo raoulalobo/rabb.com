@@ -2,7 +2,7 @@
  * @file modules/platforms/actions/disconnect-platform.action.ts
  * @module platforms
  * @description Server Action : déconnecte un réseau social.
- *   Révoque l'accès OAuth du compte social individuel chez getlate.dev et supprime la ligne en DB.
+ *   Révoque l'accès OAuth du compte social individuel chez Zernio et supprime la ligne en DB.
  *
  *   Flux :
  *   1. Validation Zod de l'ID reçu
@@ -31,7 +31,7 @@ import type { PlatformActionResult } from '@/modules/platforms/types'
 
 /**
  * Déconnecte une plateforme sociale.
- * Supprime à la fois le profil getlate.dev et l'entrée en base de données.
+ * Supprime à la fois le profil Zernio et l'entrée en base de données.
  *
  * @param connectedPlatformId - ID de la ligne ConnectedPlatform en DB
  * @returns { success } ou { success: false, error }
@@ -67,7 +67,7 @@ export async function disconnectPlatform(connectedPlatformId: unknown): Promise<
     return { success: false, error: 'Plateforme non trouvée.' }
   }
 
-  // 4. Révoquer l'accès OAuth du compte social individuel chez getlate.dev.
+  // 4. Révoquer l'accès OAuth du compte social individuel chez Zernio.
   //
   //    Architecture : ConnectedPlatform.lateProfileId = workspace Late (≠ account Late).
   //    late.profiles.delete() supprime le workspace entier → 400 si d'autres comptes

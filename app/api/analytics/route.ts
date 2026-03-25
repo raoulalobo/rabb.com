@@ -1,6 +1,6 @@
 /**
  * @file app/api/analytics/route.ts
- * @description Route Handler GET : proxy vers GET /v1/analytics de getlate.dev.
+ * @description Route Handler GET : proxy vers GET /v1/analytics de Zernio.
  *   Retourne la liste paginée des posts avec leurs analytics (likes, ER, vues…).
  *
  *   Chaque réseau social connecté a son propre `lateProfileId` dans ConnectedPlatform.
@@ -38,8 +38,8 @@ const EMPTY_RESPONSE = {
 }
 
 /**
- * Normalise un tableau de posts bruts Late API en posts frontend.
- * @param rawPosts - Posts bruts de la réponse Late API
+ * Normalise un tableau de posts bruts Zernio API en posts frontend.
+ * @param rawPosts - Posts bruts de la réponse Zernio API
  */
 function normalizePosts(rawPosts: RawPost[]) {
   return rawPosts.map((p) => {
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!user?.lateWorkspaceId) return NextResponse.json(EMPTY_RESPONSE)
   const profileIds = [user.lateWorkspaceId]
 
-  // ── Appels parallèles Late API (un par profileId) ──────────────────────────
+  // ── Appels parallèles Zernio API (un par profileId) ──────────────────────────
   try {
     const rawResults = await Promise.all(
       profileIds.map((profileId) =>
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ posts, overview, platforms, nextCursor: null })
   } catch (error) {
-    console.error('[/api/analytics] Erreur Late API :', error)
+    console.error('[/api/analytics] Erreur Zernio API :', error)
     return NextResponse.json({ error: 'Erreur lors de la récupération des analytics' }, { status: 500 })
   }
 }

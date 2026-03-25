@@ -48,13 +48,18 @@ import {
 import { CalendarGrid } from '@/modules/posts/components/CalendarGrid/CalendarGrid'
 import { FailureAlert } from '@/modules/posts/components/FailureAlert'
 import { PostComposer } from '@/modules/posts/components/PostComposer'
+import { PostTimelineChart } from '@/modules/analytics/components/PostTimelineChart'
+import { bulkDeletePosts } from '@/modules/posts/actions/bulk-delete-posts.action'
+import { bulkUpdatePosts } from '@/modules/posts/actions/bulk-update-posts.action'
 import { createPost } from '@/modules/posts/actions/create-post.action'
 import { deletePost } from '@/modules/posts/actions/delete-post.action'
 import { retryPost } from '@/modules/posts/actions/retry-post.action'
+import { useBulkSelection } from '@/modules/posts/hooks/useBulkSelection'
 import { postQueryKeys } from '@/modules/posts/queries/posts.queries'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { Post, PostStatus } from '@/modules/posts/types'
 
+import { BulkActionBar } from './BulkActionBar'
 import { CalendarFilters } from './CalendarFilters'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -78,6 +83,11 @@ export function CalendarContent({ initialStatuses = [] }: CalendarContentProps):
 
   // ── Client TanStack Query pour invalider le cache après succès ───────────────
   const queryClient = useQueryClient()
+
+  // ── Sélection multiple (actions groupées) ─────────────────────────────────
+  const { isSelectMode, selectedIds, selectedCount, toggleSelectMode, togglePost, exitSelectMode } =
+    useBulkSelection()
+  const [isBulkLoading, setIsBulkLoading] = useState(false)
 
   // ── État local des filtres (initialisé depuis URL si présent, sinon vide) ────
 
@@ -211,21 +221,25 @@ export function CalendarContent({ initialStatuses = [] }: CalendarContentProps):
    */
   const handlePostClick = useCallback(
     (post: Post): void => {
+      // En mode sélection → basculer la sélection du post (pas d'ouverture du Dialog)
+      if (isSelectMode) {
+        togglePost(post.id)
+        return
+      }
+
       // Charger le post dans le store pour afficher son contenu dans le dialog
       loadPost(post)
       setEditingPost(post)
 
       if (post.status === 'PUBLISHED') {
-        // Post déjà publié → vue lecture seule (pas de footer d'action)
         setDialogMode('view')
       } else {
-        // Draft / Scheduled / Failed → édition normale
         setDialogMode('edit')
       }
 
       setDialogOpen(true)
     },
-    [loadPost],
+    [isSelectMode, togglePost, loadPost],
   )
 
   /**
@@ -265,6 +279,79 @@ export function CalendarContent({ initialStatuses = [] }: CalendarContentProps):
       toast.error(result.error ?? 'Erreur lors de la relance')
     }
   }, [editingPost, queryClient])
+
+  // ─── Handlers bulk (actions groupées sur les posts sélectionnés) ─────────────
+
+  /** Replanifie tous les posts sélectionnés à une nouvelle date via Zernio. */
+  const handleBulkReschedule = useCallback(
+    async (newDate: Date): Promise<void> => {
+      setIsBulkLoading(true)
+      try {
+        const result = await bulkUpdatePosts(Array.from(selectedIds), { scheduledFor: newDate })
+        if (result.errors.length > 0) {
+          toast.error(result.errors[0])
+        } else {
+          toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} replanifié${result.updated > 1 ? 's' : ''}`)
+          exitSelectMode()
+          void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+        }
+      } finally {
+        setIsBulkLoading(false)
+      }
+    },
+    [selectedIds, exitSelectMode, queryClient],
+  )
+
+  /** Passe tous les posts sélectionnés en brouillon via Zernio. */
+  const handleBulkMakeDraft = useCallback(async (): Promise<void> => {
+    setIsBulkLoading(true)
+    try {
+      const result = await bulkUpdatePosts(Array.from(selectedIds), { newStatus: 'DRAFT' })
+      if (result.errors.length > 0) {
+        toast.error(result.errors[0])
+      } else {
+        toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} passé${result.updated > 1 ? 's' : ''} en brouillon`)
+        exitSelectMode()
+        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+      }
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }, [selectedIds, exitSelectMode, queryClient])
+
+  /** Ajoute tous les posts sélectionnés à la file d'attente via Zernio. */
+  const handleBulkEnqueue = useCallback(async (): Promise<void> => {
+    setIsBulkLoading(true)
+    try {
+      const result = await bulkUpdatePosts(Array.from(selectedIds), { useQueue: true })
+      if (result.errors.length > 0) {
+        toast.error(result.errors[0])
+      } else {
+        toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} ajouté${result.updated > 1 ? 's' : ''} à la file d'attente`)
+        exitSelectMode()
+        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+      }
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }, [selectedIds, exitSelectMode, queryClient])
+
+  /** Supprime tous les posts sélectionnés via Zernio. */
+  const handleBulkDelete = useCallback(async (): Promise<void> => {
+    setIsBulkLoading(true)
+    try {
+      const result = await bulkDeletePosts(Array.from(selectedIds))
+      if (result.errors.length > 0) {
+        toast.error(result.errors[0])
+      } else {
+        toast.success(`${result.deleted} post${result.deleted > 1 ? 's' : ''} supprimé${result.deleted > 1 ? 's' : ''}`)
+        exitSelectMode()
+        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
+      }
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }, [selectedIds, exitSelectMode, queryClient])
 
   // ─── Formatage des dates pour le titre du Dialog ──────────────────────────────
 
@@ -315,6 +402,8 @@ export function CalendarContent({ initialStatuses = [] }: CalendarContentProps):
           onPlatformsChange={setSelectedPlatforms}
           selectedStatuses={selectedStatuses}
           onStatusesChange={setSelectedStatuses}
+          isSelectMode={isSelectMode}
+          onToggleSelectMode={toggleSelectMode}
         />
       </div>
 
@@ -322,9 +411,25 @@ export function CalendarContent({ initialStatuses = [] }: CalendarContentProps):
       <CalendarGrid
         interactive={false}
         filterPosts={filterPosts}
-        onDayClick={handleDayClick}
+        onDayClick={isSelectMode ? undefined : handleDayClick}
         onPostClick={handlePostClick}
+        isSelectMode={isSelectMode}
+        selectedIds={selectedIds}
+        onToggleSelect={togglePost}
       />
+
+      {/* ── Barre d'actions groupées (visible si sélection active) ──────── */}
+      {selectedCount > 0 && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onEnqueue={handleBulkEnqueue}
+          onReschedule={handleBulkReschedule}
+          onMakeDraft={handleBulkMakeDraft}
+          onDelete={handleBulkDelete}
+          onCancel={exitSelectMode}
+          isLoading={isBulkLoading}
+        />
+      )}
 
       {/* ── Dialog PostComposer (création ou édition) ─────────────────────── */}
       {/*
@@ -397,6 +502,13 @@ export function CalendarContent({ initialStatuses = [] }: CalendarContentProps):
             <PostComposer.MediaUpload />
             <PostComposer.Schedule />
             {dialogMode !== 'view' && <PostComposer.Footer />}
+
+            {/* ── Graphique de performance (posts PUBLISHED uniquement) ── */}
+            {dialogMode === 'view' && editingPost && (
+              <div className="mt-4 border-t pt-4">
+                <PostTimelineChart postId={editingPost.id} publishedAt={editingPost.publishedAt} />
+              </div>
+            )}
           </PostComposer>
         </DialogContent>
       </Dialog>

@@ -182,12 +182,12 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     // Log complet de l'erreur réelle pour diagnostiquer la cause exacte
     console.error('[connectPlatform] erreur:', error)
 
-    // Plateforme encore en beta chez getlate.dev (ex: Snapchat).
+    // Plateforme encore en beta chez Zernio (ex: Snapchat).
     // → Informer l'utilisateur clairement plutôt que d'afficher un message générique.
     if (error instanceof LateApiError && error.code === 'PLATFORM_BETA_RESTRICTED') {
       return {
         success: false,
-        error: `${validPlatform.charAt(0).toUpperCase() + validPlatform.slice(1)} n'est pas encore disponible. La connexion sera activée dès que getlate.dev ouvrira l'intégration au public.`,
+        error: `${validPlatform.charAt(0).toUpperCase() + validPlatform.slice(1)} n'est pas encore disponible. La connexion sera activée dès que Zernio ouvrira l'intégration au public.`,
       }
     }
 
@@ -202,7 +202,7 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     if (error instanceof LateApiError) {
       return {
         success: false,
-        error: `Erreur getlate.dev (${error.status}) : ${error.message}`,
+        error: `Erreur Zernio (${error.status}) : ${error.message}`,
       }
     }
     const message = error instanceof Error ? error.message : String(error)

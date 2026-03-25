@@ -1130,6 +1130,45 @@ class LateClient {
       ).toString()
       return this.request<LatePostingFrequencyResponse>(`/v1/analytics/posting-frequency?${query}`)
     },
+
+    /**
+     * Évolution jour par jour des métriques d'un post spécifique.
+     * Retourne un tableau chronologique avec impressions, likes, comments, etc.
+     * Nécessite l'add-on Analytics.
+     *
+     * @param params.postId   - ID du post (Zernio, externe, ou platformPostId)
+     * @param params.fromDate - Date de début ISO 8601 (défaut : 90 jours)
+     * @param params.toDate   - Date de fin ISO 8601 (défaut : aujourd'hui)
+     *
+     * @example
+     *   const { timeline } = await late.analytics.getPostTimeline({ postId: '69b43106...' })
+     *   // timeline: [{ date: "2026-03-13", impressions: 1200, likes: 45, ... }, ...]
+     */
+    getPostTimeline: (params: { postId: string; fromDate?: string; toDate?: string }) => {
+      const query = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()
+      return this.request<{
+        postId: string
+        timeline: Array<{
+          date: string
+          platform: string
+          platformPostId?: string
+          impressions: number
+          reach: number
+          likes: number
+          comments: number
+          shares: number
+          saves: number
+          clicks: number
+          views: number
+        }>
+      }>(`/v1/analytics/post-timeline?${query}`)
+    },
   }
 
   // ─── Inbox ───────────────────────────────────────────────────────────────────

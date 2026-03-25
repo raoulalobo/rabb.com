@@ -175,7 +175,7 @@ export default function PrivacyPage(): React.JSX.Element {
         items={[
           'Vercel Inc. (hébergement applicatif) — San Francisco, CA, USA. Transfert encadré par les Clauses Contractuelles Types (CCT) de l\'Union européenne.',
           'Supabase Inc. (base de données PostgreSQL et stockage fichiers) — Région Europe (EU West). Les données restent dans l\'Union européenne.',
-          'Getlate.dev (API de publication sur réseaux sociaux) — voir la politique de confidentialité de getlate.dev pour les données transmises lors des publications.',
+          'Zernio (API de publication sur réseaux sociaux) — voir la politique de confidentialité de Zernio pour les données transmises lors des publications.',
         ]}
       />
 

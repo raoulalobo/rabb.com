@@ -36,7 +36,7 @@ export interface PlatformConfig {
 }
 
 /**
- * Configuration de toutes les plateformes getlate.dev.
+ * Configuration de toutes les plateformes Zernio.
  * Les 4 premières sont les plateformes prioritaires (mises en avant dans l'UI).
  */
 export const PLATFORM_CONFIG: Record<LatePlatform, PlatformConfig> = {
@@ -201,7 +201,7 @@ export const DISPLAYED_PLATFORMS: LatePlatform[] = [
 ]
 
 /**
- * Toutes les plateformes getlate.dev (prioritaires + secondaires).
+ * Toutes les plateformes Zernio (prioritaires + secondaires).
  * Ordonnées : prioritaires d'abord.
  */
 export const ALL_PLATFORMS: LatePlatform[] = [

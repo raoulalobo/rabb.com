@@ -14,7 +14,7 @@ import { z } from 'zod'
 // ─── Enum des plateformes ──────────────────────────────────────────────────────
 
 /**
- * Toutes les plateformes supportées par getlate.dev.
+ * Toutes les plateformes supportées par Zernio.
  * L'ordre reflète la priorité UI (Instagram → TikTok → YouTube → Facebook en premier).
  */
 export const PlatformEnum = z.enum([
@@ -57,7 +57,7 @@ export const ConnectedPlatformSchema = z.object({
   id: z.string(),
   userId: z.string(),
   platform: PlatformEnum,
-  /** ID du profil getlate.dev correspondant */
+  /** ID du profil Zernio correspondant */
   lateProfileId: z.string(),
   accountName: z.string(),
   avatarUrl: z.string().url().optional(),

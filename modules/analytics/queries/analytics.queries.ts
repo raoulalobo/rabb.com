@@ -20,6 +20,7 @@ import type {
   DailyMetricsResponse,
   FollowerStatsResponse,
   PostingFrequencyResponse,
+  PostTimelineResponse,
 } from '@/modules/analytics/types'
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
@@ -55,6 +56,10 @@ export const analyticsKeys = {
   /** Fréquence de publication vs engagement */
   postingFrequency: (params: { platform?: string } = {}) =>
     ['analytics', 'posting-frequency', params] as const,
+
+  /** Évolution jour par jour d'un post spécifique */
+  postTimeline: (postId: string) =>
+    ['analytics', 'post-timeline', postId] as const,
 }
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
@@ -82,7 +87,7 @@ export async function fetchAnalyticsPosts(params: {
 }): Promise<AnalyticsListResponse> {
   const query = buildQuery(params)
   const res = await fetch(`/api/analytics${query ? `?${query}` : ''}`, {
-    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    // Abandonne la requête après 10s — évite le hang si Zernio API ne répond pas
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Impossible de charger les analytics posts')
@@ -100,7 +105,7 @@ export async function fetchDailyMetrics(params: {
 } = {}): Promise<DailyMetricsResponse> {
   const query = buildQuery(params)
   const res = await fetch(`/api/analytics/daily-metrics${query ? `?${query}` : ''}`, {
-    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    // Abandonne la requête après 10s — évite le hang si Zernio API ne répond pas
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Impossible de charger les métriques quotidiennes')
@@ -118,7 +123,7 @@ export async function fetchFollowerStats(params: {
 } = {}): Promise<FollowerStatsResponse> {
   const query = buildQuery(params)
   const res = await fetch(`/api/accounts/follower-stats${query ? `?${query}` : ''}`, {
-    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    // Abandonne la requête après 10s — évite le hang si Zernio API ne répond pas
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Impossible de charger les stats followers')
@@ -134,7 +139,7 @@ export async function fetchBestTime(params: {
 } = {}): Promise<BestTimeResponse> {
   const query = buildQuery(params)
   const res = await fetch(`/api/analytics/best-time${query ? `?${query}` : ''}`, {
-    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    // Abandonne la requête après 10s — évite le hang si Zernio API ne répond pas
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Impossible de charger les meilleurs créneaux')
@@ -150,7 +155,7 @@ export async function fetchContentDecay(params: {
 } = {}): Promise<ContentDecayResponse> {
   const query = buildQuery(params)
   const res = await fetch(`/api/analytics/content-decay${query ? `?${query}` : ''}`, {
-    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    // Abandonne la requête après 10s — évite le hang si Zernio API ne répond pas
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Impossible de charger le content decay')
@@ -166,9 +171,25 @@ export async function fetchPostingFrequency(params: {
 } = {}): Promise<PostingFrequencyResponse> {
   const query = buildQuery(params)
   const res = await fetch(`/api/analytics/posting-frequency${query ? `?${query}` : ''}`, {
-    // Abandonne la requête après 10s — évite le hang si Late API ne répond pas
+    // Abandonne la requête après 10s — évite le hang si Zernio API ne répond pas
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error('Impossible de charger la fréquence de publication')
   return res.json() as Promise<PostingFrequencyResponse>
+}
+
+/**
+ * Récupère l'évolution jour par jour des métriques d'un post.
+ * Utilisé par PostTimelineChart.
+ *
+ * @param postId - ID du post Zernio
+ */
+export async function fetchPostTimeline(postId: string, fromDate?: string): Promise<PostTimelineResponse> {
+  const params = new URLSearchParams({ postId })
+  if (fromDate) params.set('fromDate', fromDate)
+  const res = await fetch(`/api/analytics/post-timeline?${params.toString()}`, {
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error('Impossible de charger la timeline du post')
+  return res.json() as Promise<PostTimelineResponse>
 }

@@ -29,7 +29,7 @@
 
 'use client'
 
-import { CalendarIcon, FileText, Loader2, PenLine, Trash2, X } from 'lucide-react'
+import { CalendarIcon, FileText, ListOrdered, Loader2, PenLine, Trash2, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 
 import {
@@ -63,7 +63,7 @@ interface BulkActionBarProps {
    * @param textMode  - Mode d'application du texte
    * @param mediaUrls - URLs des médias à appliquer (tableau vide = ne pas toucher)
    */
-  onEditContent: (
+  onEditContent?: (
     text: string | undefined,
     textMode: 'replace' | 'append',
     mediaUrls: string[],
@@ -74,6 +74,8 @@ interface BulkActionBarProps {
    * @param newDate - Nouvelle date de planification
    */
   onReschedule: (newDate: Date) => Promise<void>
+  /** Callback pour ajouter les posts sélectionnés à la file d'attente */
+  onEnqueue?: () => Promise<void>
   /** Callback pour passer tous les posts sélectionnés en DRAFT */
   onMakeDraft: () => Promise<void>
   /** Callback pour supprimer tous les posts sélectionnés */
@@ -102,6 +104,7 @@ interface BulkActionBarProps {
 export function BulkActionBar({
   selectedCount,
   onEditContent,
+  onEnqueue,
   onReschedule,
   onMakeDraft,
   onDelete,
@@ -186,7 +189,7 @@ export function BulkActionBar({
    */
   async function handleEditSubmit(): Promise<void> {
     const text = editText.trim() || undefined
-    await onEditContent(text, textMode, uploadedUrls)
+    await onEditContent?.(text, textMode, uploadedUrls)
     // Réinitialiser le formulaire
     setEditText('')
     setTextMode('replace')
@@ -274,6 +277,24 @@ export function BulkActionBar({
           <CalendarIcon className="size-3.5" />
           <span className="hidden sm:inline">Replanifier</span>
         </Button>
+
+        {/* ── Bouton File d'attente ──────────────────────────────────────── */}
+        {onEnqueue && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEnqueue}
+            disabled={isLoading}
+            className="gap-1.5 px-2 sm:px-3"
+          >
+            {isLoading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <ListOrdered className="size-3.5" />
+            )}
+            <span className="hidden sm:inline">File d&apos;attente</span>
+          </Button>
+        )}
 
         {/* ── Bouton Brouillon (AlertDialog) ───────────────────────────────── */}
         <AlertDialog>

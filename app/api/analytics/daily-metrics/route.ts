@@ -37,7 +37,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const profileIds = [user.lateWorkspaceId]
 
   try {
-    // Appels parallèles Late API
+    // Appels parallèles Zernio API
     const rawResults = await Promise.all(
       profileIds.map((profileId) =>
         // On passe platform à Late (filtre best-effort) même si Late peut l'ignorer

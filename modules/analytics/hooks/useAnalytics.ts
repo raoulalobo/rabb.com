@@ -120,7 +120,7 @@ export function useAnalytics(): UseAnalyticsReturn {
         queryFn: () => fetchFollowerStats({ from, platform: platformParam }),
         staleTime: 60 * 60 * 1000,
         placeholderData: keepPreviousData,
-        // retry: 0 — pas de relance si Late API ne répond pas (timeout 10s côté fetcher)
+        // retry: 0 — pas de relance si Zernio API ne répond pas (timeout 10s côté fetcher)
         retry: 0,
       },
       // 3 — Best time (pas de filtre date — basé sur tout l'historique)
@@ -129,7 +129,7 @@ export function useAnalytics(): UseAnalyticsReturn {
         queryFn: () => fetchBestTime({ platform: platformParam }),
         staleTime: 24 * 60 * 60 * 1000,
         placeholderData: keepPreviousData,
-        // retry: 0 — échec immédiat si Late API ne répond pas → BestTimeHeatmap affiche état vide
+        // retry: 0 — échec immédiat si Zernio API ne répond pas → BestTimeHeatmap affiche état vide
         retry: 0,
       },
       // 4 — Content decay
