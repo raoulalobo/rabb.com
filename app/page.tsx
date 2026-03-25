@@ -139,9 +139,6 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 <span aria-hidden="true" className="ml-1">&rarr;</span>
               </Link>
             </Button>
-            <Button variant="outline" size="lg" className="h-12 rounded-xl px-8 text-base" asChild>
-              <Link href="#features">Voir les fonctionnalités</Link>
-            </Button>
           </div>
 
           {/* Badges plateformes */}
