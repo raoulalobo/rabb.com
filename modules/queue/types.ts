@@ -2,64 +2,75 @@
  * @file modules/queue/types.ts
  * @module queue
  * @description Types TypeScript du module file d'attente (queue).
- *   Re-exporte les types inférés depuis les schémas Zod.
- *   Types additionnels pour la grille de créneaux et l'état UI.
+ *   Les schedules sont stockés chez Zernio (source de vérité unique).
+ *   L'interface QueueSlot est normalisée depuis la structure Zernio
+ *   pour consommation par le QueueGrid.
  *
  * @example
- *   import type { QueueSlot, QueueDay } from '@/modules/queue/types'
+ *   import type { QueueSlot, QueueDay, ZernioSchedule } from '@/modules/queue/types'
  */
 
-export type { QueueSlotCreate, QueueSlotUpdate } from './schemas/queue.schema'
-
-// ─── Type QueueSlot (modèle complet depuis la DB) ───────────────────────────
+// ─── Types Zernio bruts ─────────────────────────────────────────────────────
 
 /**
- * Créneau horaire récurrent tel que retourné par la base de données.
- * Correspond au modèle Prisma QueueSlot.
+ * Slot brut tel que stocké chez Zernio dans un schedule.
+ * Format compact : dayOfWeek (0-6) + time "HH:MM".
+ */
+export interface ZernioQueueSlot {
+  dayOfWeek: number
+  time: string // "HH:MM" (24h)
+}
+
+/**
+ * Schedule (queue) brut tel que retourné par l'API Zernio.
+ * Un schedule contient N slots récurrents.
+ */
+export interface ZernioSchedule {
+  _id: string
+  profileId: string
+  name: string
+  timezone: string
+  slots: ZernioQueueSlot[]
+  active: boolean
+  isDefault: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+/**
+ * Réponse de GET /v1/queue/slots.
+ */
+export interface ZernioQueueListResponse {
+  exists: boolean
+  schedule: ZernioSchedule | null
+  nextSlots: string[]
+}
+
+// ─── Types normalisés pour l'UI ─────────────────────────────────────────────
+
+/**
+ * Créneau horaire récurrent normalisé pour l'UI.
+ * Créé par `mapZernioSlots()` à partir de la réponse Zernio.
  *
- * @example
- *   const slot: QueueSlot = {
- *     id: 'clxxx',
- *     userId: 'user_123',
- *     dayOfWeek: 1,      // Lundi
- *     hour: 9,           // 9h
- *     minute: 0,         // 00 min
- *     platform: null,    // Toutes plateformes
- *     active: true,
- *     createdAt: new Date(),
- *     updatedAt: new Date(),
- *   }
+ * L'`id` est synthétique (dayOfWeek-HH:MM) car Zernio ne donne pas
+ * d'ID individuel aux slots — seul le schedule a un _id.
  */
 export interface QueueSlot {
+  /** ID synthétique pour la clé React : "dayOfWeek-HH:MM" (ex: "1-09:00") */
   id: string
-  userId: string
   /** Jour de la semaine : 0 = dimanche, 1 = lundi, ..., 6 = samedi */
   dayOfWeek: number
   /** Heure (0-23) */
   hour: number
   /** Minute (0-59) */
   minute: number
-  /** Plateforme ciblée (null = toutes) */
-  platform: string | null
-  /** Créneau actif ou désactivé */
-  active: boolean
-  createdAt: Date
-  updatedAt: Date
+  /** Time au format "HH:MM" (conservé pour les appels Zernio) */
+  time: string
 }
-
-// ─── Types UI ────────────────────────────────────────────────────────────────
 
 /**
  * Représentation d'un jour de la semaine avec ses créneaux.
  * Utilisé par QueueGrid pour afficher la grille 7 jours.
- *
- * @example
- *   const lundi: QueueDay = {
- *     dayOfWeek: 1,
- *     label: 'Lundi',
- *     shortLabel: 'Lun',
- *     slots: [slot1, slot2],
- *   }
  */
 export interface QueueDay {
   /** Index du jour : 0 = dimanche, ..., 6 = samedi */
@@ -77,14 +88,34 @@ export interface QueueDay {
  */
 export interface QueueActionResult {
   success: boolean
-  slot?: QueueSlot
   error?: string
 }
 
+// ─── Mapper Zernio → QueueSlot ──────────────────────────────────────────────
+
 /**
- * Résultat de la suppression d'un créneau.
+ * Convertit les slots bruts Zernio en QueueSlot[] normalisés.
+ * Parse le time "HH:MM" en hour + minute séparés.
+ * Génère un ID synthétique "dayOfWeek-HH:MM" pour chaque slot.
+ *
+ * @param zernioSlots - Slots bruts du schedule Zernio
+ * @returns QueueSlot[] triés par dayOfWeek puis par heure
+ *
+ * @example
+ *   mapZernioSlots([{ dayOfWeek: 1, time: "09:00" }])
+ *   // → [{ id: "1-09:00", dayOfWeek: 1, hour: 9, minute: 0, time: "09:00" }]
  */
-export interface QueueDeleteResult {
-  success: boolean
-  error?: string
+export function mapZernioSlots(zernioSlots: ZernioQueueSlot[]): QueueSlot[] {
+  return zernioSlots
+    .map((s) => {
+      const [hourStr, minuteStr] = s.time.split(':')
+      return {
+        id: `${s.dayOfWeek}-${s.time}`,
+        dayOfWeek: s.dayOfWeek,
+        hour: parseInt(hourStr ?? '0', 10),
+        minute: parseInt(minuteStr ?? '0', 10),
+        time: s.time,
+      }
+    })
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.hour - b.hour || a.minute - b.minute)
 }

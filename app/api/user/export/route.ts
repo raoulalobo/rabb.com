@@ -69,24 +69,9 @@ export async function GET(): Promise<NextResponse> {
         },
       }),
 
-      // Tous les posts de l'utilisateur (brouillons inclus)
-      prisma.post.findMany({
-        where: { userId },
-        select: {
-          id: true,
-          text: true,
-          mediaUrls: true,
-          platform: true,
-          status: true,
-          scheduledFor: true,
-          publishedAt: true,
-          platformPostUrl: true,
-          failureReason: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
+      // Posts stockés chez Zernio (source de vérité unique) — non inclus dans l'export DB locale.
+      // L'utilisateur peut exporter ses posts depuis le dashboard Zernio.
+      Promise.resolve([]),
 
       // Plateformes sociales connectées
       prisma.connectedPlatform.findMany({

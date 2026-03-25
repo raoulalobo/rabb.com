@@ -32,7 +32,7 @@ const PUBLIC_PATHS = ['/', '/login', '/register', '/reset-password']
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
 
-  // Les routes API gèrent leur propre authentification (auth, inngest, etc.)
+  // Les routes API gèrent leur propre authentification (auth, webhooks, etc.)
   // On ne vérifie pas la session ici pour éviter de bloquer les webhooks externes.
   if (pathname.startsWith('/api/')) {
     return NextResponse.next()

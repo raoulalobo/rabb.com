@@ -64,10 +64,15 @@ const STATUS_CONFIG: Record<
     activeClass: 'border-red-400 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
     inactiveClass: 'border-border bg-background text-muted-foreground hover:bg-accent/50 hover:text-foreground',
   },
+  PARTIAL: {
+    label: 'Partiel',
+    activeClass: 'border-orange-400 bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+    inactiveClass: 'border-border bg-background text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+  },
 }
 
 /** Ordre d'affichage des statuts dans le popover */
-const STATUS_ORDER: PostStatus[] = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
+const STATUS_ORDER: PostStatus[] = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'PARTIAL', 'FAILED']
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -195,6 +200,7 @@ export function CalendarFilters({
                       status === 'SCHEDULED' && 'bg-blue-500',
                       status === 'PUBLISHED' && 'bg-green-500',
                       status === 'FAILED' && 'bg-red-500',
+                      status === 'PARTIAL' && 'bg-orange-500',
                     ]
                       .filter(Boolean)
                       .join(' ')}

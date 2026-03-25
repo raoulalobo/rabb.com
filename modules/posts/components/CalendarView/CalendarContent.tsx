@@ -35,7 +35,6 @@
 import { useCallback, useMemo, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { cn } from '@/lib/utils'
@@ -49,48 +48,36 @@ import {
 import { CalendarGrid } from '@/modules/posts/components/CalendarGrid/CalendarGrid'
 import { FailureAlert } from '@/modules/posts/components/FailureAlert'
 import { PostComposer } from '@/modules/posts/components/PostComposer'
-import { bulkDeletePosts } from '@/modules/posts/actions/bulk-delete-posts.action'
-import { bulkEditContent } from '@/modules/posts/actions/bulk-edit-content.action'
-import { bulkUpdatePosts } from '@/modules/posts/actions/bulk-update-posts.action'
-import { schedulePost } from '@/modules/posts/actions/schedule-post.action'
-import { useBulkSelection } from '@/modules/posts/hooks/useBulkSelection'
+import { createPost } from '@/modules/posts/actions/create-post.action'
+import { deletePost } from '@/modules/posts/actions/delete-post.action'
+import { retryPost } from '@/modules/posts/actions/retry-post.action'
 import { postQueryKeys } from '@/modules/posts/queries/posts.queries'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { Post, PostStatus } from '@/modules/posts/types'
 
-import { BulkActionBar } from './BulkActionBar'
 import { CalendarFilters } from './CalendarFilters'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
+// ─── Props ─────────────────────────────────────────────────────────────────────
+
+interface CalendarContentProps {
+  /** Statuts pré-sélectionnés depuis l'URL (ex: /calendar?status=FAILED) */
+  initialStatuses?: PostStatus[]
+}
+
 /**
  * Orchestrateur de la page Calendrier.
  * Gère le Dialog PostComposer ouvert depuis la grille calendrier.
+ *
+ * @param initialStatuses - Statuts pré-sélectionnés (passés depuis le Server Component page.tsx)
  */
-export function CalendarContent(): React.JSX.Element {
+export function CalendarContent({ initialStatuses = [] }: CalendarContentProps): React.JSX.Element {
   // ── Accès au store brouillon pour reset + pré-remplissage ────────────────────
   const { reset, setScheduledFor, loadPost } = useDraftStore()
 
   // ── Client TanStack Query pour invalider le cache après succès ───────────────
   const queryClient = useQueryClient()
-
-  // ── Lecture des paramètres URL pour le pré-filtrage initial ─────────────────
-  // Exemple : /calendar?status=FAILED → pré-sélectionne le filtre FAILED au montage.
-  // Utilisé notamment depuis le lien "Voir et corriger" du dashboard.
-  const searchParams = useSearchParams()
-
-  /**
-   * Extrait et valide le(s) statut(s) passés dans l'URL (?status=FAILED ou ?status=SCHEDULED,...).
-   * Seuls les statuts connus (DRAFT, SCHEDULED, PUBLISHED, FAILED) sont acceptés.
-   * Exemple : ?status=FAILED → ['FAILED']
-   */
-  const initialStatuses = useMemo<PostStatus[]>(() => {
-    // Valeurs autorisées (correspondant à l'enum Prisma PostStatus)
-    const VALID: PostStatus[] = ['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED']
-    // Récupère toutes les valeurs du paramètre "status" (peut être répété)
-    const raw = searchParams.getAll('status')
-    return raw.filter((s): s is PostStatus => VALID.includes(s as PostStatus))
-  }, [searchParams])
 
   // ── État local des filtres (initialisé depuis URL si présent, sinon vide) ────
 
@@ -136,13 +123,6 @@ export function CalendarContent(): React.JSX.Element {
     },
     [selectedPlatforms, selectedStatuses],
   )
-
-  // ── État de chargement pour les opérations bulk ──────────────────────────────
-  const [isBulkLoading, setIsBulkLoading] = useState(false)
-
-  // ── Hook de sélection multiple ────────────────────────────────────────────────
-  const { isSelectMode, selectedIds, selectedCount, toggleSelectMode, togglePost, exitSelectMode } =
-    useBulkSelection()
 
   // ── État local du Dialog ─────────────────────────────────────────────────────
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -231,12 +211,6 @@ export function CalendarContent(): React.JSX.Element {
    */
   const handlePostClick = useCallback(
     (post: Post): void => {
-      // En mode sélection → basculer la sélection du post (pas d'ouverture du Dialog)
-      if (isSelectMode) {
-        togglePost(post.id)
-        return
-      }
-
       // Charger le post dans le store pour afficher son contenu dans le dialog
       loadPost(post)
       setEditingPost(post)
@@ -251,7 +225,7 @@ export function CalendarContent(): React.JSX.Element {
 
       setDialogOpen(true)
     },
-    [isSelectMode, togglePost, loadPost],
+    [loadPost],
   )
 
   /**
@@ -273,148 +247,24 @@ export function CalendarContent(): React.JSX.Element {
   }, [])
 
   /**
-   * Replanifie un post FAILED : appelle schedulePost() avec les données du post
-   * et une date scheduledFor à now + 5 minutes (délai minimum raisonnable).
+   * Relance un post FAILED via l'API Zernio (retry des plateformes échouées).
    * Ferme le Dialog et invalide le cache calendrier après succès.
    */
   const handleRetry = useCallback(async (): Promise<void> => {
     if (!editingPost) return
 
-    // Planifier dans 5 minutes
-    const retryDate = new Date(Date.now() + 5 * 60 * 1000)
-
-    const result = await schedulePost(
-      {
-        text: editingPost.text,
-        platform: editingPost.platform,
-        mediaUrls: editingPost.mediaUrls,
-        scheduledFor: retryDate,
-      },
-      editingPost.id,
-    )
+    const result = await retryPost(editingPost.id)
 
     if (result.success) {
-      toast.success('Post replanifié dans 5 minutes')
+      toast.success('Post relancé avec succès')
       setDialogOpen(false)
       setEditingPost(null)
       setDialogMode('create')
       void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
     } else {
-      toast.error(result.error ?? 'Erreur lors de la replanification')
+      toast.error(result.error ?? 'Erreur lors de la relance')
     }
   }, [editingPost, queryClient])
-
-  // ─── Handlers bulk (actions groupées sur les posts sélectionnés) ─────────────
-
-  /**
-   * Applique une édition de contenu (texte + médias) à tous les posts sélectionnés.
-   * Invalide le cache calendrier après succès.
-   *
-   * @param text      - Texte à appliquer (undefined = ne pas toucher)
-   * @param textMode  - Mode 'replace' ou 'append'
-   * @param mediaUrls - URLs des médias à appliquer
-   */
-  const handleBulkEditContent = useCallback(
-    async (
-      text: string | undefined,
-      textMode: 'replace' | 'append',
-      mediaUrls: string[],
-    ): Promise<void> => {
-      setIsBulkLoading(true)
-      try {
-        const result = await bulkEditContent({
-          postIds: Array.from(selectedIds),
-          text,
-          textMode,
-          mediaUrls,
-        })
-        if (result.errors.length > 0) {
-          toast.error(result.errors[0])
-        } else {
-          const skippedMsg = result.skipped > 0
-            ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
-            : ''
-          toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} modifié${result.updated > 1 ? 's' : ''}${skippedMsg}`)
-          exitSelectMode()
-          void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
-        }
-      } finally {
-        setIsBulkLoading(false)
-      }
-    },
-    [selectedIds, exitSelectMode, queryClient],
-  )
-
-  /**
-   * Replanifie tous les posts sélectionnés à une nouvelle date.
-   *
-   * @param newDate - Nouvelle date de planification
-   */
-  const handleBulkReschedule = useCallback(
-    async (newDate: Date): Promise<void> => {
-      setIsBulkLoading(true)
-      try {
-        const result = await bulkUpdatePosts(Array.from(selectedIds), { scheduledFor: newDate })
-        if (result.errors.length > 0) {
-          toast.error(result.errors[0])
-        } else {
-          const skippedMsg = result.skipped > 0
-            ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
-            : ''
-          toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} replanifié${result.updated > 1 ? 's' : ''}${skippedMsg}`)
-          exitSelectMode()
-          void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
-        }
-      } finally {
-        setIsBulkLoading(false)
-      }
-    },
-    [selectedIds, exitSelectMode, queryClient],
-  )
-
-  /**
-   * Passe tous les posts sélectionnés en DRAFT.
-   */
-  const handleBulkMakeDraft = useCallback(async (): Promise<void> => {
-    setIsBulkLoading(true)
-    try {
-      const result = await bulkUpdatePosts(Array.from(selectedIds), { newStatus: 'DRAFT' })
-      if (result.errors.length > 0) {
-        toast.error(result.errors[0])
-      } else {
-        const skippedMsg = result.skipped > 0
-          ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
-          : ''
-        toast.success(`${result.updated} post${result.updated > 1 ? 's' : ''} passé${result.updated > 1 ? 's' : ''} en brouillon${skippedMsg}`)
-        exitSelectMode()
-        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
-      }
-    } finally {
-      setIsBulkLoading(false)
-    }
-  }, [selectedIds, exitSelectMode, queryClient])
-
-  /**
-   * Supprime tous les posts sélectionnés.
-   */
-  const handleBulkDelete = useCallback(async (): Promise<void> => {
-    setIsBulkLoading(true)
-    try {
-      const result = await bulkDeletePosts(Array.from(selectedIds))
-      if (result.errors.length > 0) {
-        toast.error(result.errors[0])
-      } else {
-        const skippedMsg = result.skipped > 0
-          ? `, ${result.skipped} ignoré${result.skipped > 1 ? 's' : ''} (publiés)`
-          : ''
-        toast.success(`${result.deleted} post${result.deleted > 1 ? 's' : ''} supprimé${result.deleted > 1 ? 's' : ''}${skippedMsg}`)
-        exitSelectMode()
-        void queryClient.invalidateQueries({ queryKey: postQueryKeys.calendars() })
-      }
-    } finally {
-      setIsBulkLoading(false)
-    }
-  }, [selectedIds, exitSelectMode, queryClient])
 
   // ─── Formatage des dates pour le titre du Dialog ──────────────────────────────
 
@@ -465,47 +315,16 @@ export function CalendarContent(): React.JSX.Element {
           onPlatformsChange={setSelectedPlatforms}
           selectedStatuses={selectedStatuses}
           onStatusesChange={setSelectedStatuses}
-          isSelectMode={isSelectMode}
-          onToggleSelectMode={toggleSelectMode}
         />
       </div>
 
       {/* ── Grille calendrier cliquable ──────────────────────────────────── */}
-      {/*
-       * interactive=false : pas de Popover d'aperçu sur les chips
-       * filterPosts       : filtre client-side mémoïsé (plateformes + statuts)
-       * onDayClick        : undefined en mode sélection (bloque la création de posts)
-       * onPostClick       : chips existants → édition OU sélection selon isSelectMode
-       * isSelectMode      : active le mode sélection multiple dans la grille
-       * selectedIds       : Set des IDs sélectionnés propagé aux chips
-       * onToggleSelect    : callback de bascule de sélection d'un chip
-       */}
       <CalendarGrid
         interactive={false}
         filterPosts={filterPosts}
-        onDayClick={isSelectMode ? undefined : handleDayClick}
+        onDayClick={handleDayClick}
         onPostClick={handlePostClick}
-        isSelectMode={isSelectMode}
-        selectedIds={selectedIds}
-        onToggleSelect={togglePost}
       />
-
-      {/* ── Barre d'actions groupées (visible si sélection active) ──────── */}
-      {/*
-       * Flottante en bas de l'écran (fixed bottom-6).
-       * Affichée uniquement quand au moins 1 post est sélectionné.
-       */}
-      {selectedCount > 0 && (
-        <BulkActionBar
-          selectedCount={selectedCount}
-          onEditContent={handleBulkEditContent}
-          onReschedule={handleBulkReschedule}
-          onMakeDraft={handleBulkMakeDraft}
-          onDelete={handleBulkDelete}
-          onCancel={exitSelectMode}
-          isLoading={isBulkLoading}
-        />
-      )}
 
       {/* ── Dialog PostComposer (création ou édition) ─────────────────────── */}
       {/*

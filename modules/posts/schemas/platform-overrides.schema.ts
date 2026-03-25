@@ -10,9 +10,7 @@
  *
  *   Utilisé par :
  *   - PostCreateSchema / PostUpdateSchema (validation des mutations)
- *   - save-post.action.ts (Server Action)
- *   - schedule-post.action.ts (Server Action)
- *   - publish-scheduled-post.ts (fonction Inngest)
+ *   - create-post.action.ts (Server Action → Zernio API)
  *
  * @example
  *   import { PlatformOverridesSchema } from '@/modules/posts/schemas/platform-overrides.schema'

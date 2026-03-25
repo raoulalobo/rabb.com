@@ -58,23 +58,42 @@ export async function GET(): Promise<NextResponse> {
   }
   const userId = session.user.id
 
-  // ── 1. Comptages Prisma (rapides, toujours disponibles) ───────────────────
-  // On lance les trois counts en parallèle pour minimiser la latence DB.
-  const [postsPublished, postsScheduled, postsFailed, recentFailedPosts] = await Promise.all([
-    prisma.post.count({ where: { userId, status: 'PUBLISHED' } }),
-    prisma.post.count({ where: { userId, status: 'SCHEDULED' } }),
-    prisma.post.count({ where: { userId, status: 'FAILED' } }),
-    // Récupère les 2 derniers posts FAILED avec leur failureReason pour l'aperçu dashboard
-    prisma.post.findMany({
-      where: { userId, status: 'FAILED', failureReason: { not: null } },
-      select: { failureReason: true },
-      orderBy: { updatedAt: 'desc' },
-      take: 2,
-    }),
-  ])
+  // ── 1. Comptages posts via Zernio (source de vérité unique) ────────────────
+  // Récupérer le profileId pour filtrer par workspace
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { lateWorkspaceId: true },
+  })
+  const profileId = user?.lateWorkspaceId
 
-  // Extraire les failureReason (filtrées non-null par la requête Prisma)
-  const recentFailures = recentFailedPosts.map((p) => p.failureReason as string)
+  // Compter les posts par statut via Zernio (3 appels en parallèle)
+  let postsPublished = 0
+  let postsScheduled = 0
+  let postsFailed = 0
+  let recentFailures: string[] = []
+
+  if (profileId) {
+    try {
+      const [publishedRes, scheduledRes, failedRes] = await Promise.all([
+        late.posts.list(new URLSearchParams({ profileId, status: 'published', limit: '1' })),
+        late.posts.list(new URLSearchParams({ profileId, status: 'scheduled', limit: '1' })),
+        late.posts.list(new URLSearchParams({ profileId, status: 'failed', limit: '2' })),
+      ]) as [
+        { pagination: { total: number }; posts: Array<{ platforms?: Array<{ errorMessage?: string }> }> },
+        { pagination: { total: number } },
+        { pagination: { total: number }; posts: Array<{ platforms?: Array<{ errorMessage?: string }> }> },
+      ]
+      postsPublished = publishedRes.pagination.total
+      postsScheduled = scheduledRes.pagination.total
+      postsFailed = failedRes.pagination.total
+      // Extraire les errorMessage des 2 derniers posts failed
+      recentFailures = failedRes.posts
+        .map((p) => p.platforms?.[0]?.errorMessage)
+        .filter((msg): msg is string => !!msg)
+    } catch (error) {
+      console.error('[dashboard] Erreur comptage posts Zernio :', error)
+    }
+  }
 
   // ── 2. Analytics Late API (dégradation gracieuse si aucune plateforme) ────
   let impressions = 0

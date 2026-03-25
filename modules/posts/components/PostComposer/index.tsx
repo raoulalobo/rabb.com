@@ -49,8 +49,7 @@ import { toast } from 'sonner'
 import { getPlatformViolations } from '@/modules/platforms/config/platform-rules'
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import type { Platform } from '@/modules/platforms/types'
-import { savePost } from '@/modules/posts/actions/save-post.action'
-import { schedulePost } from '@/modules/posts/actions/schedule-post.action'
+import { createPost } from '@/modules/posts/actions/create-post.action'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { UploadingFile, UploadUrlResult } from '@/modules/posts/types'
 
@@ -528,25 +527,17 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
           const platformText = platformOverrides[platform]?.text ?? text
           const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
 
-          return savePost({
-            // Mise à jour uniquement si 1 seule plateforme ET post déjà en DB
-            ...(platforms.length === 1 && postId ? { id: postId } : {}),
-            platform,         // champ singulier attendu par PostCreateSchema
+          return createPost({
+            platform,
             text: platformText,
             mediaUrls: platformMediaUrls,
-            status: 'DRAFT',
-            // Transmettre les overrides pour persistance en DB
-            // (la server action nettoie les overrides identiques au contenu de base)
-            platformOverrides: Object.keys(platformOverrides).length > 0 ? platformOverrides : null,
-            // Type de contenu (feed, story, reel, thread, carousel)
-            contentType,
-            // Éléments du thread (null si pas un thread)
-            threadItems: contentType === 'thread' ? threadItems : null,
+            // customContent si un override existe pour cette plateforme
+            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
           })
         }),
       )
 
-      const firstError = results.find((r) => !r.success)
+      const firstError = results.find((r: { success: boolean; error?: string }) => !r.success)
       if (firstError) {
         toast.error(firstError.error ?? 'Erreur lors de la sauvegarde')
         return
@@ -592,26 +583,18 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
           const platformText = platformOverrides[platform]?.text ?? text
           const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
 
-          return schedulePost(
-            {
-              platform,           // champ singulier attendu par PostCreateSchema
-              text: platformText,
-              mediaUrls: platformMediaUrls,
-              scheduledFor,
-              // Transmettre les overrides pour persistance en DB
-              platformOverrides: Object.keys(platformOverrides).length > 0 ? platformOverrides : null,
-              // Type de contenu (feed, story, reel, thread, carousel)
-              contentType,
-              // Éléments du thread (null si pas un thread)
-              threadItems: contentType === 'thread' ? threadItems : null,
-            },
-            // Mise à jour uniquement si 1 seule plateforme ET post déjà en DB
-            platforms.length === 1 ? (postId ?? undefined) : undefined,
-          )
+          return createPost({
+            platform,
+            text: platformText,
+            mediaUrls: platformMediaUrls,
+            scheduledFor,
+            // customContent si un override existe pour cette plateforme
+            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+          })
         }),
       )
 
-      const firstError = results.find((r) => !r.success)
+      const firstError = results.find((r: { success: boolean; error?: string }) => !r.success)
       if (firstError) {
         toast.error(firstError.error ?? 'Erreur lors de la planification')
         return
@@ -630,6 +613,89 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
       onSuccess?.()
     })
   }, [text, platforms, mediaUrls, platformOverrides, scheduledFor, postId, reset, onSuccess])
+
+  /**
+   * Ajoute le post à la file d'attente Zernio.
+   * Zernio assigne automatiquement le prochain créneau libre (avec locking).
+   * Utilise le paramètre `queuedFromProfile` au lieu de `scheduledFor`.
+   */
+  const handleEnqueuePost = useCallback((): void => {
+    if (platforms.length === 0) {
+      toast.error('Sélectionne au moins une plateforme')
+      return
+    }
+
+    startTransition(async () => {
+      const results = await Promise.all(
+        platforms.map((platform) => {
+          const platformText = platformOverrides[platform]?.text ?? text
+          const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
+
+          return createPost({
+            platform,
+            text: platformText,
+            mediaUrls: platformMediaUrls,
+            useQueue: true,
+            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+          })
+        }),
+      )
+
+      const firstError = results.find((r: { success: boolean; error?: string }) => !r.success)
+      if (firstError) {
+        toast.error(firstError.error ?? 'Erreur lors de l\'ajout à la file d\'attente')
+        return
+      }
+
+      // Afficher la date du créneau assigné si disponible
+      const firstPost = results.find((r) => r.success && r.post)
+      const assignedDate = firstPost?.post?.scheduledFor
+      const dateLabel = assignedDate
+        ? ` pour le ${new Date(assignedDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`
+        : ''
+
+      toast.success(`Post${platforms.length > 1 ? 's' : ''} ajouté${platforms.length > 1 ? 's' : ''} à la file d'attente${dateLabel}`)
+      reset()
+      onSuccess?.()
+    })
+  }, [text, platforms, mediaUrls, platformOverrides, reset, onSuccess])
+
+  /**
+   * Publie le post immédiatement via Zernio (publishNow: true).
+   */
+  const handlePublishPost = useCallback((): void => {
+    if (platforms.length === 0) {
+      toast.error('Sélectionne au moins une plateforme')
+      return
+    }
+
+    startTransition(async () => {
+      const results = await Promise.all(
+        platforms.map((platform) => {
+          const platformText = platformOverrides[platform]?.text ?? text
+          const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
+
+          return createPost({
+            platform,
+            text: platformText,
+            mediaUrls: platformMediaUrls,
+            publishNow: true,
+            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+          })
+        }),
+      )
+
+      const firstError = results.find((r: { success: boolean; error?: string }) => !r.success)
+      if (firstError) {
+        toast.error(firstError.error ?? 'Erreur lors de la publication')
+        return
+      }
+
+      toast.success(`Post${platforms.length > 1 ? 's' : ''} publié${platforms.length > 1 ? 's' : ''} avec succès`)
+      reset()
+      onSuccess?.()
+    })
+  }, [text, platforms, mediaUrls, platformOverrides, reset, onSuccess])
 
   // ─── Rendu ──────────────────────────────────────────────────────────────────
 
@@ -682,6 +748,8 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
         isSubmitting,
         saveDraft,
         schedulePost: handleSchedulePost,
+        enqueuePost: handleEnqueuePost,
+        publishPost: handlePublishPost,
       }}
     >
       {/*

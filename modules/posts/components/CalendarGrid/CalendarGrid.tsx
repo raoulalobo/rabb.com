@@ -759,6 +759,7 @@ function CalendarCell({
   const scheduledCount = effectivePosts.filter((p) => p.status === 'SCHEDULED').length
   const publishedCount = effectivePosts.filter((p) => p.status === 'PUBLISHED').length
   const draftCount     = effectivePosts.filter((p) => p.status === 'DRAFT').length
+  const partialCount   = effectivePosts.filter((p) => p.status === 'PARTIAL').length
 
   // ═══════════════════════════════════════════════════════════════════════════
   // VERSION MOBILE (< md) : ultra-compact — date + points colorés par statut
@@ -800,6 +801,8 @@ function CalendarCell({
           {publishedCount > 0 && <span className="size-1.5 rounded-full bg-green-500" />}
           {/* DRAFT → gris */}
           {draftCount     > 0 && <span className="size-1.5 rounded-full bg-gray-400" />}
+          {/* PARTIAL → orange */}
+          {partialCount    > 0 && <span className="size-1.5 rounded-full bg-orange-500" />}
         </div>
       )}
     </div>
@@ -904,6 +907,14 @@ function CalendarCell({
                     className="flex min-w-[14px] items-center justify-center rounded-full px-1 text-[9px] font-medium leading-tight bg-muted text-muted-foreground"
                   >
                     {draftCount}
+                  </span>
+                )}
+                {partialCount > 0 && (
+                  <span
+                    title={`${partialCount} post${partialCount > 1 ? 's' : ''} partiel${partialCount > 1 ? 's' : ''}`}
+                    className="flex min-w-[14px] items-center justify-center rounded-full px-1 text-[9px] font-medium leading-tight bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400"
+                  >
+                    {partialCount}
                   </span>
                 )}
               </div>

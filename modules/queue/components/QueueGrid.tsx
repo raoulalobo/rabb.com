@@ -68,9 +68,9 @@ export function QueueGrid(): React.JSX.Element {
     return <QueueGridSkeleton />
   }
 
-  // ── Comptage total des créneaux actifs ──────────────────────────────────────
+  // ── Comptage total des créneaux ─────────────────────────────────────────────
   const totalActive = days.reduce(
-    (acc, day) => acc + day.slots.filter((s) => s.active).length,
+    (acc, day) => acc + day.slots.length,
     0,
   )
 

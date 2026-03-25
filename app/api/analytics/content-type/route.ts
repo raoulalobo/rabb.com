@@ -55,40 +55,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const from = searchParams.get('from')
   const platformFilter = searchParams.get('platform') ?? undefined
 
-  // ── Requête Prisma : groupBy contentType ────────────────────────────────────
-  try {
-    const where: Record<string, unknown> = {
-      userId: session.user.id,
-    }
-
-    // Filtre temporel (posts créés après `from`)
-    if (from) {
-      where.createdAt = { gte: new Date(from) }
-    }
-
-    // Filtre plateforme
-    if (platformFilter) {
-      where.platform = platformFilter
-    }
-
-    // Agrégation par contentType — Prisma groupBy
-    const groups = await prisma.post.groupBy({
-      by: ['contentType'],
-      where,
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-    })
-
-    // Transformer en format frontend avec labels français
-    const breakdown: ContentTypeStats[] = groups.map((g) => ({
-      type: g.contentType,
-      label: CONTENT_TYPE_LABELS[g.contentType] ?? g.contentType,
-      postCount: g._count.id,
-    }))
-
-    return NextResponse.json({ breakdown })
-  } catch (error) {
-    console.error('[/api/analytics/content-type] Erreur :', error)
-    return NextResponse.json({ error: 'Erreur lors du calcul du breakdown' }, { status: 500 })
-  }
+  // ── TODO: Migrer vers les données Zernio ───────────────────────────────────
+  // L'ancienne logique utilisait prisma.post.groupBy — la table posts a été supprimée.
+  // Les données de contentType ne sont pas disponibles côté Zernio nativement.
+  // Retourner un tableau vide en attendant une implémentation basée sur l'API Zernio.
+  const breakdown: ContentTypeStats[] = []
+  return NextResponse.json({ breakdown })
 }

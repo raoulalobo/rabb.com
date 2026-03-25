@@ -1,11 +1,11 @@
 /**
  * @file lib/late.ts
- * @description Client HTTP singleton pour l'API getlate.dev.
- *   Toutes les interactions avec getlate.dev passent par ce fichier.
- *   Ne jamais appeler l'API getlate.dev directement depuis les composants.
+ * @description Client HTTP singleton pour l'API Zernio (ex Zernio).
+ *   Toutes les interactions avec Zernio passent par ce fichier.
+ *   Ne jamais appeler l'API Zernio directement depuis les composants.
  *
  *   Authentification : LATE_API_KEY dans l'en-tête Authorization (Bearer).
- *   Base URL : https://getlate.dev/api (configurable via LATE_API_URL).
+ *   Base URL : https://zernio.com/api (configurable via LATE_API_URL).
  *
  * @example
  *   import { late } from '@/lib/late'
@@ -14,9 +14,9 @@
  *   const post = await late.posts.create({ content: '...', platforms: [{ platform: 'instagram', accountId: '...' }] })
  */
 
-// ─── Types de l'API getlate.dev ────────────────────────────────────────────────
+// ─── Types de l'API Zernio ─────────────────────────────────────────────────────
 
-/** Plateformes supportées par getlate.dev */
+/** Plateformes supportées par Zernio */
 export type LatePlatform =
   | 'instagram'
   | 'tiktok'
@@ -132,9 +132,9 @@ export interface LatePostPlatformResult {
   errorSource?: string
 }
 
-/** Post publié ou planifié via getlate.dev */
+/** Post publié ou planifié via Zernio */
 export interface LatePost {
-  /** ID MongoDB du post dans getlate.dev (utilisé comme latePostId en DB) */
+  /** ID MongoDB du post dans Zernio (utilisé comme latePostId en DB) */
   _id: string
   /** Alias de _id — certains endpoints retournent `id` */
   id?: string
@@ -256,16 +256,34 @@ export interface LateCreatePostParams {
    */
   mediaItems?: LateMediaItem[]
   /**
-   * Date de publication planifiée (ISO 8601 UTC).
-   * Exclusif avec `publishNow`.
+   * Date de publication planifiée (ISO 8601, sans Z).
+   * Format : "2026-03-25T14:00:00". Exclusif avec `publishNow`.
+   * Requiert `timezone` pour l'interprétation correcte de l'heure.
    */
   scheduledFor?: string
   /**
-   * Si `true`, Late publie immédiatement dès réception de la requête.
-   * À utiliser avec Inngest : Inngest a déjà attendu via `step.sleepUntil()`.
-   * Exclusif avec `scheduledFor`.
+   * Fuseau horaire IANA (ex: "Europe/Paris", "America/New_York").
+   * Obligatoire quand `scheduledFor` est défini — Zernio interprète
+   * la date dans ce fuseau pour publier à l'heure locale de l'utilisateur.
+   */
+  timezone?: string
+  /**
+   * Si `true`, Zernio publie immédiatement dès réception de la requête.
+   * Exclusif avec `scheduledFor` et `queuedFromProfile`.
    */
   publishNow?: boolean
+  /**
+   * ID du profil pour planifier via la file d'attente (queue).
+   * Zernio assigne automatiquement le prochain créneau libre avec locking.
+   * Exclusif avec `scheduledFor` — ne PAS appeler next-slot puis scheduledFor.
+   */
+  queuedFromProfile?: string
+  /**
+   * ID du schedule (queue) spécifique à utiliser.
+   * Optionnel — si absent, Zernio utilise la queue par défaut du profil.
+   * Utilisé uniquement avec `queuedFromProfile`.
+   */
+  queueId?: string
 }
 
 /**
@@ -479,7 +497,7 @@ export interface LateInboxMessage {
 // ─── Client HTTP ───────────────────────────────────────────────────────────────
 
 /**
- * Erreur retournée par l'API getlate.dev.
+ * Erreur retournée par l'API Zernio.
  * Encapsule le code HTTP, le message d'erreur, et le code fonctionnel optionnel.
  *
  * @example
@@ -491,7 +509,7 @@ export class LateApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    /** Code fonctionnel renvoyé par getlate.dev (ex: 'PLATFORM_BETA_RESTRICTED') */
+    /** Code fonctionnel renvoyé par Zernio (ex: 'PLATFORM_BETA_RESTRICTED') */
     public readonly code?: string,
   ) {
     super(message)
@@ -500,7 +518,7 @@ export class LateApiError extends Error {
 }
 
 /**
- * Client HTTP bas niveau pour l'API getlate.dev.
+ * Client HTTP bas niveau pour l'API Zernio (ex Zernio).
  * Gère l'authentification, le parsing JSON et les erreurs.
  */
 class LateClient {
@@ -508,17 +526,17 @@ class LateClient {
   private readonly apiKey: string
 
   constructor() {
-    // Base URL de l'API getlate.dev.
-    // Docs : https://docs.getlate.dev → base = https://getlate.dev/api, chemins en /v1/...
-    // Exemple : https://getlate.dev/api/v1/posts (confirmé par la doc officielle)
+    // Base URL de l'API Zernio.
+    // Docs : https://docs.zernio.com → base = https://zernio.com/api, chemins en /v1/...
+    // Exemple : https://zernio.com/api/v1/posts
     // Si LATE_API_URL est défini dans les variables d'environnement,
-    // il DOIT valoir "https://getlate.dev/api" (sans slash final).
-    this.baseUrl = process.env.LATE_API_URL ?? 'https://getlate.dev/api'
+    // il DOIT valoir "https://zernio.com/api" (sans slash final).
+    this.baseUrl = process.env.LATE_API_URL ?? 'https://zernio.com/api'
     this.apiKey = process.env.LATE_API_KEY ?? ''
   }
 
   /**
-   * Effectue une requête HTTP vers l'API getlate.dev.
+   * Effectue une requête HTTP vers l'API Zernio.
    * Ajoute automatiquement l'en-tête Authorization et Content-Type.
    *
    * @param path - Chemin de l'endpoint (ex: '/v1/profiles')
@@ -540,13 +558,13 @@ class LateClient {
 
     if (!response.ok) {
       // Logger l'URL COMPLÈTE (pas seulement le path) pour diagnostiquer les 405/404
-      let message = `Erreur API getlate.dev : ${response.status}`
+      let message = `Erreur API Zernio : ${response.status}`
       let code: string | undefined
       let rawBody = ''
       try {
         rawBody = await response.text()
         console.error(`[LateClient] ${response.status} ${init?.method ?? 'GET'} ${fullUrl} →`, rawBody)
-        // getlate.dev utilise "error" (pas "message") + "code" fonctionnel optionnel
+        // Zernio utilise "error" (pas "message") + "code" fonctionnel optionnel
         // ex: { "error": "Snapchat is in beta", "code": "PLATFORM_BETA_RESTRICTED" }
         const parsed = JSON.parse(rawBody) as { message?: string; error?: string; code?: string }
         if (parsed.error) message = parsed.error
@@ -568,11 +586,11 @@ class LateClient {
   // ─── Connexion OAuth (initiation du flux) ───────────────────────────────────
 
   /**
-   * Ressource "connect" : initiation du flux OAuth getlate.dev.
+   * Ressource "connect" : initiation du flux OAuth Zernio.
    * Utiliser cette ressource pour connecter un compte social.
    *
    * Endpoint : GET /v1/connect/{platform}?profileId=...&redirect_url=...
-   * Docs : https://docs.getlate.dev/api-reference/connect
+   * Docs : https://docs.Zernio/api-reference/connect
    */
   readonly connect = {
     /**
@@ -604,7 +622,7 @@ class LateClient {
      */
     getUrl: (platform: LatePlatform, profileId: string, redirectUrl: string) =>
       // Endpoint : GET /v1/connect/{platform}?profileId=...&redirect_url=...
-      // Docs : https://docs.getlate.dev/api-reference/connect
+      // Docs : https://docs.Zernio/api-reference/connect
       this.request<LateConnectResponse>(
         `/v1/connect/${platform}?profileId=${profileId}&redirect_url=${encodeURIComponent(redirectUrl)}`,
       ),
@@ -752,13 +770,13 @@ class LateClient {
    */
   readonly posts = {
     /**
-     * Crée et publie (ou planifie) un post via getlate.dev.
+     * Crée et publie (ou planifie) un post via Zernio.
      *
      * Champs requis : `profileId` + `platforms` + `mediaItems` (si TikTok/Instagram).
      * Réponse enveloppée → unwrap automatique vers `LatePost`.
      *
      * @param params - Données du post (profileId, content, platforms, mediaItems…)
-     * @returns Post créé avec son ID getlate.dev
+     * @returns Post créé avec son ID Zernio
      *
      * @example
      *   const post = await late.posts.create({
@@ -769,6 +787,19 @@ class LateClient {
      *     publishNow: true,
      *   })
      */
+    /**
+     * Liste les posts avec filtres et pagination.
+     * Proxy vers GET /v1/posts avec les query params fournis.
+     *
+     * @param params - URLSearchParams (limit, status, platform, from, to, page)
+     * @returns Réponse brute Zernio { posts, pagination }
+     *
+     * @example
+     *   const data = await late.posts.list(new URLSearchParams({ limit: '50', status: 'published' }))
+     */
+    list: (params: URLSearchParams) =>
+      this.request<unknown>(`/v1/posts?${params.toString()}`),
+
     create: (params: LateCreatePostParams) =>
       // L'API retourne { post: LatePost, message: string } — unwrap vers LatePost
       this.request<LateCreatePostResponse>('/v1/posts', {
@@ -778,28 +809,175 @@ class LateClient {
 
     /**
      * Récupère un post par son ID.
+     * Réponse enveloppée → unwrap automatique vers LatePost.
      *
-     * @param postId - ID du post getlate.dev
+     * @param postId - ID du post Zernio
      */
     get: (postId: string) =>
-      this.request<LatePost>(`/v1/posts/${postId}`),
+      this.request<{ post: LatePost }>(`/v1/posts/${postId}`).then((res) => res.post),
 
     /**
-     * Supprime un post planifié (non encore publié).
+     * Met à jour un post existant (contenu, date, médias, plateformes).
+     * Accepte les mêmes champs que create (content, scheduledFor, timezone, etc.).
      *
-     * @param postId - ID du post à annuler
+     * @param postId - ID du post Zernio à modifier
+     * @param params - Champs à mettre à jour (partiels)
+     * @returns Post mis à jour
+     */
+    update: (postId: string, params: Partial<LateCreatePostParams>) =>
+      this.request<LateCreatePostResponse>(`/v1/posts/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify(params),
+      }).then((res) => res.post),
+
+    /**
+     * Supprime un post (brouillon, planifié ou échoué).
+     *
+     * @param postId - ID du post à supprimer
      */
     delete: (postId: string) =>
       this.request<void>(`/v1/posts/${postId}`, { method: 'DELETE' }),
 
     /**
+     * Relance la publication d'un post échoué.
+     * Seules les plateformes en échec sont retentées — les publiées sont ignorées.
+     *
+     * @param postId - ID du post Zernio à relancer
+     * @returns Post avec les nouveaux statuts par plateforme
+     */
+    retry: (postId: string) =>
+      this.request<LateCreatePostResponse>(`/v1/posts/${postId}/retry`, {
+        method: 'POST',
+      }).then((res) => res.post),
+
+    /**
      * Récupère les statistiques d'un post publié.
      *
-     * @param postId - ID du post getlate.dev
+     * @param postId - ID du post Zernio
      * @returns Statistiques par plateforme
      */
     stats: (postId: string) =>
       this.request<LatePostStats[]>(`/v1/posts/${postId}/stats`),
+  }
+
+  // ─── Queue ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Ressource "queue" : gestion des schedules (créneaux récurrents).
+   * Un schedule contient N slots (dayOfWeek + time "HH:MM").
+   * Zernio gère le locking automatique lors de l'assignation de posts.
+   */
+  readonly queue = {
+    /**
+     * Liste les schedules d'un profil.
+     * Sans paramètre `all`, retourne le schedule par défaut.
+     *
+     * @param profileId - ID du profil Zernio
+     * @param queueId - ID d'un schedule spécifique (optionnel)
+     * @param all - true pour lister tous les schedules
+     * @returns { exists, schedule, nextSlots[] }
+     */
+    list: (profileId: string, queueId?: string, all?: boolean) => {
+      const params = new URLSearchParams({ profileId })
+      if (queueId) params.set('queueId', queueId)
+      if (all) params.set('all', 'true')
+      return this.request<unknown>(`/v1/queue/slots?${params.toString()}`)
+    },
+
+    /**
+     * Crée un nouveau schedule pour un profil.
+     * Le premier schedule devient le défaut automatiquement.
+     *
+     * @param data - { profileId, name, timezone, slots[], active? }
+     * @returns { success, schedule, nextSlots[] }
+     */
+    create: (data: {
+      profileId: string
+      name: string
+      timezone: string
+      slots: Array<{ dayOfWeek: number; time: string }>
+      active?: boolean
+    }) =>
+      this.request<unknown>('/v1/queue/slots', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    /**
+     * Met à jour un schedule existant (remplace tous les slots).
+     * Avec reshuffleExisting: true, replanifie les posts déjà en queue.
+     *
+     * @param data - { profileId, queueId?, name?, timezone, slots[], reshuffleExisting? }
+     * @returns { success, schedule, nextSlots[], reshuffledCount }
+     */
+    update: (data: {
+      profileId: string
+      queueId?: string
+      name?: string
+      timezone: string
+      slots: Array<{ dayOfWeek: number; time: string }>
+      active?: boolean
+      reshuffleExisting?: boolean
+    }) =>
+      this.request<unknown>('/v1/queue/slots', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
+     * Supprime un schedule.
+     * Si le schedule par défaut est supprimé, un autre devient le défaut.
+     *
+     * @param profileId - ID du profil
+     * @param queueId - ID du schedule à supprimer
+     */
+    delete: (profileId: string, queueId: string) => {
+      const params = new URLSearchParams({ profileId, queueId })
+      return this.request<{ success: boolean; deleted: boolean }>(
+        `/v1/queue/slots?${params.toString()}`,
+        { method: 'DELETE' },
+      )
+    },
+
+    /**
+     * Retourne le prochain créneau libre pour un profil.
+     * Utile pour l'affichage de preview — ne PAS utiliser la date retournée
+     * dans scheduledFor (bypass le locking). Utiliser queuedFromProfile à la place.
+     *
+     * @param profileId - ID du profil
+     * @param queueId - ID du schedule (optionnel, défaut = schedule par défaut)
+     * @returns { profileId, nextSlot, timezone, queueId, queueName }
+     */
+    nextSlot: (profileId: string, queueId?: string) => {
+      const params = new URLSearchParams({ profileId })
+      if (queueId) params.set('queueId', queueId)
+      return this.request<{
+        profileId: string
+        nextSlot: string
+        timezone: string
+        queueId: string
+        queueName: string
+      }>(`/v1/queue/next-slot?${params.toString()}`)
+    },
+
+    /**
+     * Retourne les N prochains créneaux pour un profil (preview).
+     *
+     * @param profileId - ID du profil
+     * @param count - Nombre de créneaux (1-100, défaut 20)
+     * @param queueId - ID du schedule (optionnel)
+     * @returns { profileId, count, slots[] }
+     */
+    preview: (profileId: string, count?: number, queueId?: string) => {
+      const params = new URLSearchParams({ profileId })
+      if (count) params.set('count', String(count))
+      if (queueId) params.set('queueId', queueId)
+      return this.request<{
+        profileId: string
+        count: number
+        slots: string[]
+      }>(`/v1/queue/preview?${params.toString()}`)
+    },
   }
 
   // ─── Analytics ───────────────────────────────────────────────────────────────
@@ -811,9 +989,9 @@ class LateClient {
   readonly analytics = {
     /**
      * [Legacy] Récupère les statistiques d'un profil sur une période.
-     * Conservé pour compatibilité avec les fonctions Inngest existantes.
+     * Conservé pour compatibilité avec le module analytics.
      *
-     * @param profileId - ID du profil getlate.dev
+     * @param profileId - ID du profil Zernio
      * @param params.from - Date de début (ISO 8601)
      * @param params.to - Date de fin (ISO 8601)
      */
@@ -963,7 +1141,7 @@ class LateClient {
     /**
      * Liste les messages non lus d'un profil.
      *
-     * @param profileId - ID du profil getlate.dev
+     * @param profileId - ID du profil Zernio
      * @returns Liste des messages inbox
      */
     list: (profileId: string) =>
@@ -986,7 +1164,7 @@ class LateClient {
 // ─── Singleton ─────────────────────────────────────────────────────────────────
 
 /**
- * Instance singleton du client getlate.dev.
+ * Instance singleton du client Zernio.
  * Utiliser directement dans les Server Actions et Route Handlers.
  *
  * @example

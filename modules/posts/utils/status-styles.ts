@@ -10,6 +10,7 @@
  *   - DRAFT     → gris neutre  (brouillon non soumis)
  *   - SCHEDULED → bleu         (planifié, en attente de publication)
  *   - PUBLISHED → vert         (publié avec succès)
+ *   - PARTIAL   → orange       (certaines plateformes OK, d'autres KO)
  *   - FAILED    → rouge        (échec de publication)
  *
  * @example
@@ -35,6 +36,7 @@ export const STATUS_LABELS: Record<Post['status'], string> = {
   DRAFT:     'Brouillon',
   SCHEDULED: 'Planifié',
   PUBLISHED: 'Publié',
+  PARTIAL:   'Partiel',
   FAILED:    'Échoué',
 }
 
@@ -54,6 +56,7 @@ export const STATUS_BADGE_CLASSES: Record<Post['status'], string> = {
   DRAFT:     'bg-muted/80 text-muted-foreground border-0',
   SCHEDULED: 'bg-blue-100 text-blue-700 border-0 dark:bg-blue-900/40 dark:text-blue-300',
   PUBLISHED: 'bg-green-100 text-green-700 border-0 dark:bg-green-900/40 dark:text-green-300',
+  PARTIAL:   'bg-orange-100 text-orange-700 border-0 dark:bg-orange-900/40 dark:text-orange-300',
   FAILED:    'bg-red-100 text-red-700 border-0 dark:bg-red-900/40 dark:text-red-300',
 }
 
@@ -72,5 +75,6 @@ export const STATUS_CHIP_CLASSES: Record<Post['status'], string> = {
   DRAFT:     'bg-muted/80 text-muted-foreground',
   SCHEDULED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   PUBLISHED: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  PARTIAL:   'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   FAILED:    'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }

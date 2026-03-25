@@ -182,6 +182,10 @@ export interface PostComposerContextValue {
   saveDraft: () => void
   /** Sauvegarde le post avec planification (async interne via useTransition) */
   schedulePost: () => void
+  /** Ajoute le post à la file d'attente — Zernio assigne le prochain créneau libre */
+  enqueuePost: () => void
+  /** Publie le post immédiatement (publishNow: true) */
+  publishPost: () => void
 }
 
 // ─── Création du contexte ─────────────────────────────────────────────────────

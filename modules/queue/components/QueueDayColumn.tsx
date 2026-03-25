@@ -12,14 +12,14 @@
 
 'use client'
 
-import { Clock, Loader2, Plus, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
+import { Clock, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { deleteQueueSlot, updateQueueSlot } from '@/modules/queue/actions/queue.action'
+import { removeQueueSlot } from '@/modules/queue/actions/queue.action'
 import type { QueueDay, QueueSlot } from '@/modules/queue/types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,32 +35,11 @@ interface QueueDayColumnProps {
   onMutationSuccess: () => void
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Formate une heure et minute en chaîne lisible (ex: "09:00", "14:30").
- *
- * @param hour - Heure (0-23)
- * @param minute - Minute (0-59)
- * @returns Chaîne formatée "HH:MM"
- *
- * @example
- *   formatTime(9, 0)   // → "09:00"
- *   formatTime(14, 30) // → "14:30"
- */
-function formatTime(hour: number, minute: number): string {
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-}
-
 // ─── Composant ───────────────────────────────────────────────────────────────
 
 /**
  * Colonne représentant un jour de la semaine avec ses créneaux.
- * Affiche un en-tête (nom du jour + count) et la liste des créneaux
- * avec des actions rapides (toggle actif, supprimer).
- *
- * @param props - Props du composant
- * @returns Colonne de jour avec créneaux
+ * Actions rapides : supprimer un créneau (via Zernio).
  */
 export function QueueDayColumn({
   day,
@@ -69,34 +48,15 @@ export function QueueDayColumn({
   onMutationSuccess,
 }: QueueDayColumnProps): React.JSX.Element {
   const [isPending, startTransition] = useTransition()
-  // ID du créneau en cours d'action (toggle ou delete) — pour le feedback visuel
   const [pendingSlotId, setPendingSlotId] = useState<string | null>(null)
 
   /**
-   * Toggle l'état actif/inactif d'un créneau sans ouvrir le dialog.
-   * Affiche un spinner sur le créneau pendant l'action.
+   * Supprime un créneau via l'API Zernio (read-modify-write sur le schedule).
    */
-  function handleToggleActive(slot: QueueSlot): void {
+  function handleDelete(slot: QueueSlot): void {
     setPendingSlotId(slot.id)
     startTransition(async () => {
-      const result = await updateQueueSlot({ id: slot.id, active: !slot.active })
-      setPendingSlotId(null)
-      if (result.success) {
-        toast.success(slot.active ? 'Créneau désactivé' : 'Créneau activé')
-        onMutationSuccess()
-      } else {
-        toast.error(result.error ?? 'Erreur lors de la mise à jour')
-      }
-    })
-  }
-
-  /**
-   * Supprime un créneau. Affiche un spinner pendant l'action.
-   */
-  function handleDelete(slotId: string): void {
-    setPendingSlotId(slotId)
-    startTransition(async () => {
-      const result = await deleteQueueSlot(slotId)
+      const result = await removeQueueSlot(slot.dayOfWeek, slot.time)
       setPendingSlotId(null)
       if (result.success) {
         toast.success('Créneau supprimé')
@@ -107,8 +67,7 @@ export function QueueDayColumn({
     })
   }
 
-  // Nombre de créneaux actifs pour le badge
-  const activeCount = day.slots.filter((s) => s.active).length
+  const slotCount = day.slots.length
 
   return (
     <Card className="flex flex-col">
@@ -118,9 +77,9 @@ export function QueueDayColumn({
           <CardTitle className="text-sm font-semibold">
             {day.label}
           </CardTitle>
-          {activeCount > 0 && (
+          {slotCount > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {activeCount} créneau{activeCount > 1 ? 'x' : ''}
+              {slotCount} créneau{slotCount > 1 ? 'x' : ''}
             </Badge>
           )}
         </div>
@@ -129,7 +88,6 @@ export function QueueDayColumn({
       {/* ── Liste des créneaux ───────────────────────────────────────────── */}
       <CardContent className="flex-1 space-y-2">
         {day.slots.length === 0 ? (
-          // État vide : aucun créneau pour ce jour
           <p className="text-center text-xs text-muted-foreground py-4">
             Aucun créneau
           </p>
@@ -138,78 +96,52 @@ export function QueueDayColumn({
             const isSlotPending = pendingSlotId === slot.id
 
             return (
-            <div
-              key={slot.id}
-              className={`
-                group flex items-center gap-2 rounded-md border p-2 text-sm
-                transition-all cursor-pointer hover:bg-accent/50
-                ${!slot.active ? 'opacity-50' : ''}
-                ${isSlotPending ? 'pointer-events-none opacity-60 animate-pulse' : ''}
-                ${isPending && !isSlotPending ? 'pointer-events-none' : ''}
-              `}
-              onClick={() => onEditSlot(slot)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  onEditSlot(slot)
-                }
-              }}
-            >
-              {/* Icône horloge + heure */}
-              <Clock className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="font-medium">{formatTime(slot.hour, slot.minute)}</span>
+              <div
+                key={slot.id}
+                className={`
+                  group flex items-center gap-2 rounded-md border p-2 text-sm
+                  transition-all cursor-pointer hover:bg-accent/50
+                  ${isSlotPending ? 'pointer-events-none opacity-60 animate-pulse' : ''}
+                  ${isPending && !isSlotPending ? 'pointer-events-none' : ''}
+                `}
+                onClick={() => onEditSlot(slot)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onEditSlot(slot)
+                  }
+                }}
+              >
+                {/* Icône horloge + heure */}
+                <Clock className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="font-medium">{slot.time}</span>
 
-              {/* Badge plateforme (si spécifique) */}
-              {slot.platform && (
-                <Badge variant="outline" className="text-xs capitalize">
-                  {slot.platform}
-                </Badge>
-              )}
+                {/* Spacer */}
+                <div className="flex-1" />
 
-              {/* Spacer */}
-              <div className="flex-1" />
-
-              {/* Actions rapides — spinner si en cours, sinon toggle + delete au hover */}
-              {isSlotPending ? (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              ) : (
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {/* Toggle actif/inactif */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-6"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleToggleActive(slot)
-                    }}
-                    title={slot.active ? 'Désactiver' : 'Activer'}
-                  >
-                    {slot.active ? (
-                      <ToggleRight className="size-3.5 text-green-500" />
-                    ) : (
-                      <ToggleLeft className="size-3.5 text-muted-foreground" />
-                    )}
-                  </Button>
-
-                  {/* Supprimer */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-6 text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(slot.id)
-                    }}
-                    title="Supprimer"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              )}
-            </div>
+                {/* Actions rapides au hover */}
+                {isSlotPending ? (
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Supprimer */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 text-destructive hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(slot)
+                      }}
+                      title="Supprimer"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             )
           })
         )}

@@ -62,8 +62,9 @@ export function getCharLimit(platform: string): number {
  * SCHEDULED : planifié pour publication future
  * PUBLISHED : publié avec succès
  * FAILED : publication échouée
+ * PARTIAL : certaines plateformes OK, d'autres KO (multi-plateformes)
  */
-export const PostStatusEnum = z.enum(['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED'])
+export const PostStatusEnum = z.enum(['DRAFT', 'SCHEDULED', 'PUBLISHED', 'FAILED', 'PARTIAL'])
 export type PostStatus = z.infer<typeof PostStatusEnum>
 
 /**
@@ -265,7 +266,7 @@ export type ProposedEdit = z.infer<typeof ProposedEditSchema>
 
 /**
  * Tableau de modifications confirmées envoyées à la Server Action bulk-apply-edits.
- * Déclenche la persistance en DB + events Inngest.
+ * Déclenche la mise à jour via l'API Zernio.
  *
  * @example
  *   BulkApplyEditsSchema.parse({ edits: [{ postId: 'abc', text: '...', mediaUrls: [], scheduledFor: null }] })

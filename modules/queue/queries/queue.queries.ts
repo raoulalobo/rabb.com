@@ -2,59 +2,59 @@
  * @file modules/queue/queries/queue.queries.ts
  * @module queue
  * @description Clés et fetchers TanStack Query pour le module file d'attente.
- *   Centralise la définition des queryKeys pour la cohérence du cache.
+ *   Les données viennent de Zernio via le proxy /api/queue.
  *
  * @example
  *   import { queueQueryKeys, fetchQueueSlots } from '@/modules/queue/queries/queue.queries'
- *   useQuery({ queryKey: queueQueryKeys.all(), queryFn: fetchQueueSlots })
+ *   useQuery({ queryKey: queueQueryKeys.slots(), queryFn: fetchQueueSlots })
  */
 
 import type { QueueSlot } from '@/modules/queue/types'
 
 // ─── Clés de cache TanStack Query ────────────────────────────────────────────
 
-/**
- * Hiérarchie de clés pour le module queue.
- * Structure : ['queue'] → ['queue', 'slots']
- *
- * Permet l'invalidation sélective :
- * - Tous les créneaux : invalidate(['queue'])
- * - Liste des créneaux : invalidate(['queue', 'slots'])
- */
 export const queueQueryKeys = {
   /** Clé racine du module queue */
   all: () => ['queue'] as const,
-
-  /** Liste de tous les créneaux de l'utilisateur */
+  /** Liste des créneaux */
   slots: () => ['queue', 'slots'] as const,
+}
+
+// ─── Types réponse proxy ────────────────────────────────────────────────────
+
+/** Réponse normalisée de GET /api/queue */
+export interface QueueProxyResponse {
+  slots: QueueSlot[]
+  scheduleId: string | null
+  scheduleName?: string
+  timezone?: string
+  active?: boolean
+  nextSlots: string[]
 }
 
 // ─── Fetchers ────────────────────────────────────────────────────────────────
 
 /**
- * Fetche tous les créneaux de file d'attente de l'utilisateur connecté.
- * Appelle GET /api/queue.
+ * Fetche les créneaux du schedule par défaut via le proxy /api/queue.
+ * La réponse est déjà normalisée (slots avec hour/minute extraits de "HH:MM").
  *
- * @returns Liste des créneaux triés par jour et heure
+ * @returns Réponse complète avec slots + métadonnées schedule
  * @throws Error si la réponse n'est pas OK
- *
- * @example
- *   const slots = await fetchQueueSlots()
- *   // → [{ id: 'clxxx', dayOfWeek: 1, hour: 9, minute: 0, ... }, ...]
  */
-export async function fetchQueueSlots(): Promise<QueueSlot[]> {
+export async function fetchQueueData(): Promise<QueueProxyResponse> {
   const res = await fetch('/api/queue')
 
   if (!res.ok) {
     throw new Error(`Erreur chargement créneaux : ${res.status} ${res.statusText}`)
   }
 
-  const data = (await res.json()) as { slots: QueueSlot[] }
+  return res.json() as Promise<QueueProxyResponse>
+}
 
-  // Désérialiser les dates JSON (string → Date)
-  return data.slots.map((slot) => ({
-    ...slot,
-    createdAt: new Date(slot.createdAt as unknown as string),
-    updatedAt: new Date(slot.updatedAt as unknown as string),
-  }))
+/**
+ * Fetche uniquement les slots (raccourci pour le hook useQueueSlots).
+ */
+export async function fetchQueueSlots(): Promise<QueueSlot[]> {
+  const data = await fetchQueueData()
+  return data.slots
 }

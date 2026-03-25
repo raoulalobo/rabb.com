@@ -2,17 +2,17 @@
  * @file modules/posts/utils/failure-advice.ts
  * @module posts
  * @description Utilitaire pur d'analyse des raisons d'échec de publication.
- *   Analyse la chaîne `failureReason` stockée en DB par Inngest (publish-scheduled-post.ts)
+ *   Analyse la chaîne `failureReason` retournée par Zernio (errorMessage)
  *   par pattern-matching et retourne un conseil actionnable pour l'utilisateur.
  *
- *   Catégories détectées (basées sur les messages réels de publish-scheduled-post.ts) :
- *   - duplicate_text     : "Ce contenu a déjà été publié" (même texte republié)
+ *   Catégories détectées :
+ *   - duplicate_text     : "Duplicate content detected" (même texte republié)
  *   - duplicate_media    : "Le fichier média" / "hash du fichier" (même vidéo/image)
- *   - token_expired      : "Token expired" / "token expiré" / "déconnecté de Late"
- *   - account_disconnected : "déconnecté de Late" (token révoqué ou expiré)
+ *   - token_expired      : "Token expired" / "token expiré"
+ *   - account_disconnected : "déconnecté" (token révoqué ou expiré)
  *   - missing_profile    : "Aucun profil" connecté pour la plateforme
  *   - content_error      : "user_content" / "frame_rate" (contenu rejeté par la plateforme)
- *   - timeout            : "tâche Inngest" / "watchdog" (publication n'a pas abouti à temps)
+ *   - timeout            : timeout de publication
  *   - unknown            : tout autre motif non reconnu
  *
  * @example
@@ -80,9 +80,7 @@ interface DetectionRule {
  * Règles de détection ordonnées par priorité.
  * La première correspondance est retournée — les patterns les plus spécifiques sont en premier.
  *
- * Basé sur les messages générés par :
- * - lib/inngest/functions/publish-scheduled-post.ts (lignes 117, 205, 296, 351, 362)
- * - lib/inngest/functions/post-watchdog.ts (timeout watchdog)
+ * Basé sur les messages d'erreur retournés par l'API Zernio (errorMessage).
  */
 const DETECTION_RULES: DetectionRule[] = [
   // ── Doublon texte (Cas A : même texte déjà publié) ──────────────────────────
@@ -170,10 +168,9 @@ const DETECTION_RULES: DetectionRule[] = [
     },
   },
 
-  // ── Timeout / Watchdog (la publication n'a pas abouti à temps) ──────────────
-  // Message réel : "tâche Inngest" / "watchdog : post encore SCHEDULED"
+  // ── Timeout (la publication n'a pas abouti à temps) ──────────────────────────
   {
-    pattern: /tâche inngest|watchdog/i,
+    pattern: /timeout|timed out|watchdog/i,
     advice: {
       category: 'timeout',
       summary: 'Timeout de publication',
@@ -191,7 +188,7 @@ const DETECTION_RULES: DetectionRule[] = [
  * Effectue un pattern-matching séquentiel sur les règles de détection.
  * Retourne un conseil générique si aucun pattern ne matche.
  *
- * @param failureReason - Chaîne stockée en DB par Inngest (peut être vide ou null)
+ * @param failureReason - Message d'erreur Zernio (errorMessage, peut être vide ou null)
  * @returns FailureAdvice avec summary, advice, et éventuellement un lien d'action
  *
  * @example

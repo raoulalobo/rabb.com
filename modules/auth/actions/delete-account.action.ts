@@ -92,11 +92,11 @@ export async function deleteAccount(): Promise<DeleteAccountResult> {
       // Étape 3 : Médias de la galerie (FK → User)
       prisma.media.deleteMany({ where: { userId } }),
 
-      // Étape 4 : Posts (FK → User + ConnectedPlatform)
-      // Doit être supprimé avant ConnectedPlatform car Post.connectedPlatformId → ConnectedPlatform
-      prisma.post.deleteMany({ where: { userId } }),
+      // Étape 4 : Posts stockés chez Zernio — pas de table locale à supprimer.
+      // Les posts Zernio restent (liés au workspace, pas au user local).
+      // TODO: Appeler l'API Zernio pour supprimer les posts du workspace si souhaité.
 
-      // Étape 5 : Plateformes connectées (FK → User, référencée par Post — déjà supprimés)
+      // Étape 5 : Plateformes connectées (FK → User)
       prisma.connectedPlatform.deleteMany({ where: { userId } }),
 
       // Étape 6 : Sessions better-auth (FK → User)

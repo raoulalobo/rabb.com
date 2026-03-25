@@ -24,7 +24,7 @@
  *   <CalendarPostChip post={post} interactive />
  */
 
-import { Calendar, CheckCircle2, Clock3, FileText, ImageIcon, XCircle } from 'lucide-react'
+import { AlertTriangle, Calendar, CheckCircle2, Clock3, FileText, ImageIcon, XCircle } from 'lucide-react'
 import Image from 'next/image'
 
 import { Badge } from '@/components/ui/badge'
@@ -45,10 +45,11 @@ import type { Post } from '@/modules/posts/types'
  * Utilisé dans le chip pour l'indicateur visuel à droite.
  */
 const STATUS_ICON_CONFIG = {
-  PUBLISHED: { Icon: CheckCircle2, className: 'text-green-600' },
-  SCHEDULED: { Icon: Clock3,       className: 'text-blue-600'  },
-  DRAFT:     { Icon: FileText,     className: 'text-gray-400'  },
-  FAILED:    { Icon: XCircle,      className: 'text-red-500'   },
+  PUBLISHED: { Icon: CheckCircle2,   className: 'text-green-600'  },
+  SCHEDULED: { Icon: Clock3,         className: 'text-blue-600'   },
+  DRAFT:     { Icon: FileText,       className: 'text-gray-400'   },
+  PARTIAL:   { Icon: AlertTriangle,  className: 'text-orange-500' },
+  FAILED:    { Icon: XCircle,        className: 'text-red-500'    },
 } as const
 
 // ─── Helper ───────────────────────────────────────────────────────────────────

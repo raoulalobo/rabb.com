@@ -4,12 +4,7 @@
  * @description Dialog pour ajouter ou modifier un créneau de file d'attente.
  *   En mode création (editingSlot = null), pré-remplit le jour sélectionné.
  *   En mode édition (editingSlot = QueueSlot), pré-remplit tous les champs.
- *   Valide les données avec Zod avant soumission.
- *
- *   Interactions :
- *   - Formulaire avec sélecteurs d'heure, minute et plateforme
- *   - Soumission via Server Action (createQueueSlot / updateQueueSlot)
- *   - Invalidation du cache TanStack Query après succès
+ *   Les créneaux sont envoyés à Zernio (source de vérité unique).
  *
  * @example
  *   <QueueSlotEditor
@@ -42,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createQueueSlot, updateQueueSlot } from '@/modules/queue/actions/queue.action'
+import { addQueueSlot, updateQueueSlot } from '@/modules/queue/actions/queue.action'
 import type { QueueSlot } from '@/modules/queue/types'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -72,19 +67,6 @@ const MINUTE_OPTIONS = [
   { value: '45', label: '45' },
 ]
 
-/** Plateformes disponibles pour le filtre (null = toutes) */
-const PLATFORM_OPTIONS = [
-  { value: 'all', label: 'Toutes les plateformes' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'tiktok', label: 'TikTok' },
-  { value: 'youtube', label: 'YouTube' },
-  { value: 'facebook', label: 'Facebook' },
-  { value: 'twitter', label: 'Twitter / X' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'threads', label: 'Threads' },
-  { value: 'bluesky', label: 'Bluesky' },
-]
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface QueueSlotEditorProps {
@@ -104,10 +86,7 @@ interface QueueSlotEditorProps {
 
 /**
  * Dialog de création/édition d'un créneau de file d'attente.
- * Gère les deux modes (création et édition) avec un formulaire unifié.
- *
- * @param props - Props du composant
- * @returns Dialog avec formulaire de créneau
+ * Appelle les server actions Zernio (addQueueSlot / updateQueueSlot).
  */
 export function QueueSlotEditor({
   open,
@@ -122,10 +101,8 @@ export function QueueSlotEditor({
   const [dayOfWeek, setDayOfWeek] = useState<string>('1')
   const [hour, setHour] = useState<string>('9')
   const [minute, setMinute] = useState<string>('0')
-  const [platform, setPlatform] = useState<string>('all')
 
   // ── Synchronisation avec les props ──────────────────────────────────────────
-  // Quand le dialog s'ouvre, pré-remplir les champs selon le mode
   useEffect(() => {
     if (!open) return
 
@@ -134,34 +111,29 @@ export function QueueSlotEditor({
       setDayOfWeek(String(editingSlot.dayOfWeek))
       setHour(String(editingSlot.hour))
       setMinute(String(editingSlot.minute))
-      setPlatform(editingSlot.platform ?? 'all')
     } else {
       // Mode création : pré-remplir le jour sélectionné, heure par défaut 9h00
       setDayOfWeek(String(selectedDay ?? 1))
       setHour('9')
       setMinute('0')
-      setPlatform('all')
     }
   }, [open, editingSlot, selectedDay])
 
   // ── Soumission du formulaire ────────────────────────────────────────────────
 
-  /**
-   * Soumet le formulaire de création ou d'édition.
-   * Appelle la Server Action appropriée et gère les retours.
-   */
   function handleSubmit(): void {
-    const data = {
-      dayOfWeek: Number(dayOfWeek),
-      hour: Number(hour),
-      minute: Number(minute),
-      platform: platform === 'all' ? null : platform,
-    }
+    const newDayOfWeek = Number(dayOfWeek)
+    const newTime = `${String(Number(hour)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`
 
     startTransition(async () => {
       if (editingSlot) {
-        // Mode édition
-        const result = await updateQueueSlot({ ...data, id: editingSlot.id })
+        // Mode édition : remplacer l'ancien slot par le nouveau
+        const result = await updateQueueSlot(
+          editingSlot.dayOfWeek,
+          editingSlot.time,
+          newDayOfWeek,
+          newTime,
+        )
         if (result.success) {
           toast.success('Créneau modifié')
           onSuccess()
@@ -170,8 +142,8 @@ export function QueueSlotEditor({
           toast.error(result.error ?? 'Erreur lors de la modification')
         }
       } else {
-        // Mode création
-        const result = await createQueueSlot(data)
+        // Mode création : ajouter un nouveau slot
+        const result = await addQueueSlot(newDayOfWeek, newTime)
         if (result.success) {
           toast.success('Créneau créé')
           onSuccess()
@@ -183,7 +155,6 @@ export function QueueSlotEditor({
     })
   }
 
-  // ── Titre dynamique selon le mode ───────────────────────────────────────────
   const isEditing = editingSlot !== null
   const title = isEditing ? 'Modifier le créneau' : 'Nouveau créneau'
   const description = isEditing
@@ -250,26 +221,6 @@ export function QueueSlotEditor({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          {/* Sélecteur de plateforme */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Plateforme</label>
-            <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir une plateforme" />
-              </SelectTrigger>
-              <SelectContent>
-                {PLATFORM_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Optionnel — laissez &quot;Toutes les plateformes&quot; pour un créneau universel.
-            </p>
           </div>
         </div>
 

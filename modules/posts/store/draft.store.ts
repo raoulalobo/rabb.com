@@ -319,21 +319,30 @@ export const useDraftStore = create<DraftStore>()(
         set((state) => {
           // Réinitialisation complète avant chargement
           Object.assign(state, initialState)
-          // Identifiant DB pour déclencher un PATCH au lieu d'un POST dans save-post.action.ts
+          // Identifiant Zernio pour déclencher un update au lieu d'un create
           state.postId = post.id
           state.text = post.text
-          // Chaque post DB = 1 plateforme → on la wrap dans un tableau pour le store
+          // Chaque post Zernio = 1 plateforme (platforms[0]) → on la wrap dans un tableau pour le store
           state.platforms = [post.platform as Platform]
           state.mediaUrls = post.mediaUrls
-          // Charger le type de contenu et les éléments de thread depuis la DB
-          state.contentType = (post.contentType ?? 'feed') as ContentType
-          if (Array.isArray(post.threadItems)) {
-            state.threadItems = post.threadItems as string[]
+          // Charger le type de contenu depuis platformSpecificData (Zernio)
+          const rawContentType = post.platformSpecificData?.contentType
+          state.contentType = (typeof rawContentType === 'string' ? rawContentType : 'feed') as ContentType
+          // Charger les éléments de thread depuis platformSpecificData
+          const rawThreadItems = post.platformSpecificData?.threadItems
+          if (Array.isArray(rawThreadItems)) {
+            state.threadItems = (rawThreadItems as Array<{ content?: string }>).map(
+              (item) => (typeof item === 'string' ? item : item.content ?? ''),
+            )
           }
-          // Charger les overrides depuis la DB (JSON parsé par Prisma)
-          // Caster depuis le type Post (qui a PlatformOverrides | null) vers le type store
-          if (post.platformOverrides && typeof post.platformOverrides === 'object') {
-            state.platformOverrides = post.platformOverrides as Partial<Record<Platform, PlatformOverride>>
+          // Charger le contenu custom par plateforme (customContent/customMedia)
+          if (post.customContent) {
+            state.platformOverrides = {
+              [post.platform as Platform]: {
+                text: post.customContent,
+                mediaUrls: post.customMedia?.map((m) => m.url) ?? [],
+              },
+            } as Partial<Record<Platform, PlatformOverride>>
           }
           // Convertir en Date si c'est une string ISO (cas réhydratation depuis l'API)
           state.scheduledFor = post.scheduledFor ? new Date(post.scheduledFor) : null

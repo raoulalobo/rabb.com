@@ -1,40 +1,32 @@
 /**
  * @file app/api/queue/route.ts
- * @description API Route pour la file d'attente (liste + création de créneaux).
+ * @description API Route pour la file d'attente — proxy vers Zernio.
+ *   Zernio est la source de vérité unique pour les schedules (queues).
  *
- *   GET  /api/queue → Liste tous les créneaux de l'utilisateur connecté
- *   POST /api/queue → Crée un nouveau créneau (corps validé par Zod)
- *
- *   Authentification requise via better-auth.
- *   Les créneaux sont triés par dayOfWeek ASC, hour ASC, minute ASC.
+ *   GET /api/queue → Liste les créneaux du schedule par défaut du profil
+ *   Retourne les slots normalisés + les prochains créneaux calculés.
  *
  * @example
- *   // GET — récupérer tous les créneaux
  *   fetch('/api/queue')
- *   // → { slots: [{ id, dayOfWeek, hour, minute, platform, active, ... }] }
- *
- *   // POST — créer un créneau lundi 9h00
- *   fetch('/api/queue', {
- *     method: 'POST',
- *     body: JSON.stringify({ dayOfWeek: 1, hour: 9, minute: 0 }),
- *   })
- *   // → { slot: { id, dayOfWeek: 1, hour: 9, minute: 0, ... } }
+ *   // → { slots: QueueSlot[], schedule: ZernioSchedule | null, nextSlots: string[] }
  */
 
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
+import { late } from '@/lib/late'
 import { prisma } from '@/lib/prisma'
-import { QueueSlotCreateSchema } from '@/modules/queue/schemas/queue.schema'
+import { mapZernioSlots } from '@/modules/queue/types'
+import type { ZernioQueueListResponse } from '@/modules/queue/types'
 
 // ─── GET /api/queue ──────────────────────────────────────────────────────────
 
 /**
- * Liste tous les créneaux de file d'attente de l'utilisateur connecté.
- * Triés par jour de la semaine puis par heure croissante.
+ * Liste les créneaux du schedule par défaut via Zernio.
+ * Normalise les slots Zernio (time "HH:MM" → hour + minute) pour l'UI.
  *
- * @returns JSON { slots: QueueSlot[] }
+ * @returns JSON { slots: QueueSlot[], scheduleId: string | null, nextSlots: string[] }
  */
 export async function GET(): Promise<NextResponse> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -42,71 +34,38 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  try {
-    const slots = await prisma.queueSlot.findMany({
-      where: { userId: session.user.id },
-      orderBy: [
-        { dayOfWeek: 'asc' },
-        { hour: 'asc' },
-        { minute: 'asc' },
-      ],
-    })
+  // Récupérer le profileId Zernio de l'utilisateur
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { lateWorkspaceId: true },
+  })
 
-    return NextResponse.json({ slots })
-  } catch (error) {
-    console.error('[GET /api/queue] Erreur :', error)
-    return NextResponse.json(
-      { error: 'Erreur lors du chargement des créneaux' },
-      { status: 500 },
-    )
-  }
-}
-
-// ─── POST /api/queue ─────────────────────────────────────────────────────────
-
-/**
- * Crée un nouveau créneau de file d'attente.
- * Le corps de la requête est validé par QueueSlotCreateSchema (Zod).
- *
- * @returns JSON { slot: QueueSlot } si créé, { error: string } si échec
- */
-export async function POST(request: Request): Promise<NextResponse> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) {
-    return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  if (!user?.lateWorkspaceId) {
+    return NextResponse.json({ error: 'Profil Zernio non configuré' }, { status: 400 })
   }
 
   try {
-    const body = await request.json()
+    const data = await late.queue.list(user.lateWorkspaceId) as ZernioQueueListResponse
 
-    // Validation Zod
-    const parsed = QueueSlotCreateSchema.safeParse(body)
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? 'Données invalides' },
-        { status: 400 },
-      )
+    // Si aucun schedule n'existe → retourner un tableau vide
+    if (!data.exists || !data.schedule) {
+      return NextResponse.json({ slots: [], scheduleId: null, nextSlots: [] })
     }
 
-    const { dayOfWeek, hour, minute, platform, active } = parsed.data
+    // Normaliser les slots Zernio pour l'UI
+    const slots = mapZernioSlots(data.schedule.slots)
 
-    const slot = await prisma.queueSlot.create({
-      data: {
-        userId: session.user.id,
-        dayOfWeek,
-        hour,
-        minute,
-        platform: platform ?? null,
-        active: active ?? true,
-      },
+    return NextResponse.json({
+      slots,
+      scheduleId: data.schedule._id,
+      scheduleName: data.schedule.name,
+      timezone: data.schedule.timezone,
+      active: data.schedule.active,
+      nextSlots: data.nextSlots,
     })
-
-    return NextResponse.json({ slot }, { status: 201 })
   } catch (error) {
-    console.error('[POST /api/queue] Erreur :', error)
-    return NextResponse.json(
-      { error: 'Erreur lors de la création du créneau' },
-      { status: 500 },
-    )
+    console.error('[GET /api/queue] Erreur Zernio :', error)
+    const message = error instanceof Error ? error.message : 'Erreur inconnue'
+    return NextResponse.json({ error: message }, { status: 502 })
   }
 }
