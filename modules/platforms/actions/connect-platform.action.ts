@@ -173,8 +173,64 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
     }
 
     // 5. Obtenir l'URL OAuth avec la plateforme + le profileId du workspace
-    // lateWorkspaceId est garanti non-null ici (assigné dans le bloc if précédent ou en DB)
-    const { authUrl } = await late.connect.getUrl(validPlatform, lateWorkspaceId!, callbackUrl)
+    //    lateWorkspaceId est garanti non-null ici (assigné dans le bloc if ou en DB).
+    //    Si Zernio retourne 404 "Profile not found", le workspace est périmé
+    //    (supprimé côté Zernio mais l'ID reste en DB) → auto-recovery : on recrée.
+    let authUrl: string
+    try {
+      const result = await late.connect.getUrl(validPlatform, lateWorkspaceId!, callbackUrl)
+      authUrl = result.authUrl
+    } catch (getUrlError) {
+      // 404 = workspace périmé (supprimé côté Zernio mais l'ID reste en DB)
+      // → Auto-recovery sécurisée : on vérifie d'abord qu'aucun compte social
+      //   n'est lié à l'ancien workspace avant de le recréer.
+      if (getUrlError instanceof LateApiError && getUrlError.status === 404) {
+        console.warn('[connectPlatform] Workspace périmé (404) — tentative de recovery...')
+
+        // Garde de sécurité : vérifier s'il y a des comptes connectés liés à l'ancien workspace.
+        // Si oui → recréer le workspace casserait les liens existants (posts, accounts Zernio).
+        // → On refuse et on demande une intervention manuelle.
+        const existingPlatforms = await prisma.connectedPlatform.count({
+          where: { userId: session.user.id, lateProfileId: lateWorkspaceId! },
+        })
+
+        if (existingPlatforms > 0) {
+          console.error('[connectPlatform] Workspace périmé AVEC comptes connectés — recovery impossible')
+          return {
+            success: false,
+            error: `Ton profil Zernio a expiré mais ${existingPlatforms} réseau${existingPlatforms > 1 ? 'x' : ''} y ${existingPlatforms > 1 ? 'sont' : 'est'} encore lié${existingPlatforms > 1 ? 's' : ''}. Contacte le support (privacy@ogolong.com) pour récupérer tes données.`,
+          }
+        }
+
+        // Aucun compte lié → recréation sûre
+        console.log('[connectPlatform] Aucun compte lié → recréation du workspace...')
+
+        // Supprimer l'ancien ID périmé en DB
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { lateWorkspaceId: null },
+        })
+
+        // Recréer un workspace chez Zernio
+        const profileName = user?.name ?? session.user.email ?? 'ogolong user'
+        const newWorkspace = await late.profiles.create({ name: profileName })
+        lateWorkspaceId = newWorkspace._id
+        console.log('[connectPlatform] Nouveau workspace créé:', lateWorkspaceId)
+
+        // Sauvegarder le nouveau ID en DB
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: { lateWorkspaceId },
+        })
+
+        // Réessayer avec le nouveau workspace
+        const retryResult = await late.connect.getUrl(validPlatform, lateWorkspaceId, callbackUrl)
+        authUrl = retryResult.authUrl
+      } else {
+        throw getUrlError
+      }
+    }
+
     console.log('[connectPlatform] authUrl reçu:', authUrl)
 
     return { success: true, redirectUrl: authUrl }
