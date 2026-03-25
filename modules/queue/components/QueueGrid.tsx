@@ -19,6 +19,7 @@
 'use client'
 
 import { useQueryClient } from '@tanstack/react-query'
+import Image from 'next/image'
 import { CalendarClock } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -89,7 +90,7 @@ export function QueueGrid(): React.JSX.Element {
             Toutes
           </button>
 
-          {/* Un onglet par plateforme détectée */}
+          {/* Un onglet par plateforme détectée — icône SVG réelle */}
           {platforms.map((p) => {
             const config = PLATFORM_CONFIG[p as LatePlatform]
             const isActive = filterPlatform === p
@@ -108,9 +109,12 @@ export function QueueGrid(): React.JSX.Element {
                 style={isActive && config ? { backgroundColor: config.color } : undefined}
               >
                 {config && (
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ backgroundColor: isActive ? '#fff' : config.color }}
+                  <Image
+                    src={config.iconPath}
+                    alt={config.label}
+                    width={14}
+                    height={14}
+                    className={cn('size-3.5', isActive && 'brightness-0 invert')}
                   />
                 )}
                 {config?.label ?? p}

@@ -13,6 +13,7 @@
 'use client'
 
 import { Clock, Loader2, Plus, Trash2 } from 'lucide-react'
+import Image from 'next/image'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
@@ -122,21 +123,16 @@ export function QueueDayColumn({
                 <Clock className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="font-medium">{slot.time}</span>
 
-                {/* Badge plateforme */}
+                {/* Icône plateforme */}
                 {platformConfig && (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
-                    style={{
-                      backgroundColor: platformConfig.bgColor,
-                      color: platformConfig.color,
-                    }}
-                  >
-                    <span
-                      className="size-1.5 rounded-full"
-                      style={{ backgroundColor: platformConfig.color }}
-                    />
-                    {platformConfig.label}
-                  </span>
+                  <Image
+                    src={platformConfig.iconPath}
+                    alt={platformConfig.label}
+                    width={14}
+                    height={14}
+                    className="size-3.5 shrink-0"
+                    title={platformConfig.label}
+                  />
                 )}
 
                 {/* Spacer */}

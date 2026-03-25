@@ -18,6 +18,7 @@
 
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect, useTransition } from 'react'
 import { toast } from 'sonner'
 
@@ -196,9 +197,12 @@ export function QueueSlotEditor({
                   return (
                     <SelectItem key={p} value={p}>
                       <span className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: config.color }}
+                        <Image
+                          src={config.iconPath}
+                          alt={config.label}
+                          width={16}
+                          height={16}
+                          className="size-4 shrink-0"
                         />
                         {config.label}
                       </span>
