@@ -85,8 +85,12 @@ export function FeatureCarousel(): React.JSX.Element {
     if (!container) return
     const slide = container.children[index] as HTMLElement | undefined
     if (!slide) return
-    // scrollIntoView fonctionne nativement avec scroll-snap (pas de conflit d'offset)
-    slide.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    // scrollTo horizontal uniquement — évite le scroll vertical de la page
+    // quand le carrousel est partiellement sous le viewport (ex. user sur le hero)
+    container.scrollTo({
+      left: slide.offsetLeft - container.offsetWidth / 2 + slide.offsetWidth / 2,
+      behavior: 'smooth',
+    })
     // Mettre à jour l'index immédiatement (pas attendre l'IntersectionObserver)
     setActiveIndex(index)
   }, [])
