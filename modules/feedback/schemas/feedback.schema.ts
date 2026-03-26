@@ -21,7 +21,7 @@ import { z } from 'zod'
  */
 export const FeedbackSchema = z.object({
   category: z.enum(['general', 'bug', 'feature', 'autre'], {
-    required_error: 'Veuillez sélectionner une catégorie',
+    error: 'Veuillez sélectionner une catégorie',
   }),
   message: z
     .string()
