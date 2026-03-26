@@ -120,8 +120,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     data: { lateWorkspaceId: lateProfileId },
   })
 
-  // Redirection vers settings avec indicateur de succès (pour toast)
-  return NextResponse.redirect(
-    new URL(`/settings?success=platform_connected&platform=${platform}`, origin),
-  )
+  // Avancer l'onboarding de 0 → 1 si c'est le premier réseau connecté.
+  // updateMany avec where: { onboardingStep: 0 } est idempotent : pas d'effet si déjà avancé.
+  await prisma.user.updateMany({
+    where: {
+      id: session.user.id,
+      onboardingStep: 0,
+    },
+    data: { onboardingStep: 1 },
+  })
+
+  // Si l'utilisateur est en onboarding (étape 0 → 1), rediriger vers /dashboard
+  // pour afficher l'étape 2 (créer un post). Sinon, rediriger vers /settings.
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { onboardingStep: true },
+  })
+
+  const redirectPath = user?.onboardingStep === 1
+    ? `/dashboard`
+    : `/settings?success=platform_connected&platform=${platform}`
+
+  return NextResponse.redirect(new URL(redirectPath, origin))
 }

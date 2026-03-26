@@ -42,6 +42,8 @@ model User {
   // ID du workspace Late (profil conteneur qui regroupe les comptes sociaux connectés).
   // Créé automatiquement lors du premier clic "Connecter" sur /settings.
   lateWorkspaceId String?
+  /** Étape d'onboarding : 0=connecter réseau, 1=premier post, 2=terminé */
+  onboardingStep  Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
