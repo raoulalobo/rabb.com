@@ -27,6 +27,7 @@ import {
   LayoutDashboard,
   Link2,
   ListOrdered,
+  MessageSquarePlus,
   Settings,
   UserCircle,
 } from 'lucide-react'
@@ -65,6 +66,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics',   href: '/analytics',   icon: BarChart2 },
   // { label: 'Inbox', href: '/inbox', icon: Inbox },  // masqué — module non implémenté (à réactiver plus tard)
   { label: 'Profil',      href: '/profile',     icon: UserCircle },
+  // Feedback : formulaire pour laisser des remarques, bugs ou suggestions
+  { label: 'Feedback',    href: '/feedback',    icon: MessageSquarePlus },
   { label: 'Paramétrages', href: '/settings',    icon: Settings },
 ]
 

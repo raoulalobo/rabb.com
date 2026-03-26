@@ -58,6 +58,7 @@ model User {
   bioPage       BioPage?
   webhookEvents WebhookEvent[]
   notifications Notification[]
+  feedbacks     Feedback[]
   // Queue slots stockés chez Zernio (source de vérité unique)
 
   @@map("users")
@@ -469,3 +470,23 @@ model Notification {
 // ─── Queue Slots ────────────────────────────────────────────────────────────────
 // Les créneaux de file d'attente sont stockés chez Zernio (source de vérité unique).
 // Voir modules/queue/types.ts pour l'interface QueueSlot normalisée.
+
+// ─── Modèle Feedback ────────────────────────────────────────────────────────────
+
+/**
+ * Feedback envoyé par un utilisateur connecté.
+ * Catégories : general (par défaut), bug, feature, autre.
+ * Relation N-1 avec User — un utilisateur peut envoyer plusieurs feedbacks.
+ */
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String
+  category  String   @default("general")  // "general" | "bug" | "feature" | "autre"
+  message   String                        // Contenu du feedback (10–2000 chars)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("feedback")
+}
