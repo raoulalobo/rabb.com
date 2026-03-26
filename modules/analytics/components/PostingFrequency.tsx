@@ -11,23 +11,14 @@
 
 'use client'
 
+import type { LatePlatform } from '@/lib/late'
 import type { PostingFrequencyResponse } from '@/modules/analytics/types'
+import { PlatformIcon } from '@/modules/platforms/components/PlatformIcon'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface PostingFrequencyProps {
   data: PostingFrequencyResponse | undefined
-}
-
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const PLATFORM_ICONS: Record<string, string> = {
-  tiktok: '🎵',
-  instagram: '📸',
-  youtube: '▶️',
-  facebook: '📘',
-  twitter: '🐦',
-  linkedin: '💼',
 }
 
 function getPlatformLabel(platform: string): string {
@@ -70,9 +61,7 @@ export function PostingFrequency({ data }: PostingFrequencyProps): React.JSX.Ele
         >
           {/* Plateforme */}
           <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {PLATFORM_ICONS[item.platform.toLowerCase()] ?? '📱'}
-            </span>
+            <PlatformIcon platform={item.platform.toLowerCase() as LatePlatform} className="size-5" />
             <span className="font-medium">{getPlatformLabel(item.platform)}</span>
           </div>
 

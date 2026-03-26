@@ -11,24 +11,11 @@
 
 'use client'
 
+import type { LatePlatform } from '@/lib/late'
 import type { PlatformStats } from '@/modules/analytics/types'
+import { PlatformIcon } from '@/modules/platforms/components/PlatformIcon'
 
-// ─── Emojis/labels plateformes ────────────────────────────────────────────────
-
-const PLATFORM_ICONS: Record<string, string> = {
-  tiktok: '🎵',
-  instagram: '📸',
-  youtube: '▶️',
-  facebook: '📘',
-  twitter: '🐦',
-  linkedin: '💼',
-  bluesky: '🦋',
-  threads: '🧵',
-}
-
-function getPlatformIcon(platform: string): string {
-  return PLATFORM_ICONS[platform.toLowerCase()] ?? '📱'
-}
+// ─── Labels plateformes ──────────────────────────────────────────────────────
 
 function getPlatformLabel(platform: string): string {
   const labels: Record<string, string> = {
@@ -79,7 +66,7 @@ export function PlatformBreakdown({ platforms }: PlatformBreakdownProps): React.
         >
           {/* Plateforme + postCount */}
           <div className="flex items-center gap-3">
-            <span className="text-xl">{getPlatformIcon(p.platform)}</span>
+            <PlatformIcon platform={p.platform as LatePlatform} className="size-5" />
             <div>
               <div className="font-medium">{getPlatformLabel(p.platform)}</div>
               <div className="text-xs text-muted-foreground">

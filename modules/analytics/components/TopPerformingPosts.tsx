@@ -20,23 +20,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { LatePlatform } from '@/lib/late'
 import type { AnalyticsPost } from '@/modules/analytics/types'
+import { PlatformIcon } from '@/modules/platforms/components/PlatformIcon'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface TopPerformingPostsProps {
   posts: AnalyticsPost[] | undefined
-}
-
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const PLATFORM_ICONS: Record<string, string> = {
-  tiktok: '🎵',
-  instagram: '📸',
-  youtube: '▶️',
-  facebook: '📘',
-  twitter: '🐦',
-  linkedin: '💼',
 }
 
 const RANK_COLORS = ['#f59e0b', '#94a3b8', '#b45309', '#64748b', '#64748b']
@@ -115,9 +106,7 @@ export function TopPerformingPosts({ posts }: TopPerformingPostsProps): React.JS
             </span>
 
             {/* Icône plateforme */}
-            <span className="mt-0.5 text-sm">
-              {PLATFORM_ICONS[post.platform?.toLowerCase()] ?? '📱'}
-            </span>
+            <PlatformIcon platform={post.platform?.toLowerCase() as LatePlatform} className="mt-0.5 size-4" />
 
             {/* Contenu */}
             <div className="min-w-0 flex-1">

@@ -17,25 +17,15 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import type { AnalyticsPost } from '@/modules/analytics/types'
-import type { AnalyticsFiltersState } from '@/modules/analytics/types'
+import type { LatePlatform } from '@/lib/late'
+import type { AnalyticsPost, AnalyticsFiltersState } from '@/modules/analytics/types'
+import { PlatformIcon } from '@/modules/platforms/components/PlatformIcon'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface PostDetailsGridProps {
   posts: AnalyticsPost[] | undefined
   sortBy: AnalyticsFiltersState['sortBy']
-}
-
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const PLATFORM_ICONS: Record<string, string> = {
-  tiktok: '🎵',
-  instagram: '📸',
-  youtube: '▶️',
-  facebook: '📘',
-  twitter: '🐦',
-  linkedin: '💼',
 }
 
 // ─── Composant carte individuelle ─────────────────────────────────────────────
@@ -87,7 +77,7 @@ function PostCard({ post }: PostCardProps): React.JSX.Element {
 
       {/* Ligne plateforme + ID court */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{PLATFORM_ICONS[post.platform?.toLowerCase()] ?? '📱'}</span>
+        <PlatformIcon platform={post.platform?.toLowerCase() as LatePlatform} className="size-4" />
         <span>·</span>
         <span className="truncate">id: {post.id.slice(0, 8)}…</span>
       </div>
