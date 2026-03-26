@@ -24,7 +24,7 @@ export type { ContentType } from './schemas/content-type.schema'
  * - partial   : certaines plateformes OK, d'autres KO (multi-plateformes)
  * - failed    : échec de publication
  */
-export type ZernioPostStatus = 'draft' | 'scheduled' | 'published' | 'partial' | 'failed'
+export type ZernioPostStatus = 'draft' | 'scheduled' | 'queued' | 'published' | 'partial' | 'failed'
 
 /**
  * Média tel que retourné par l'API Zernio dans `mediaItems[]`.
@@ -132,9 +132,11 @@ export interface Post {
  * Mappe le statut Zernio (lowercase) vers le statut UI (UPPERCASE).
  */
 function mapStatus(status: ZernioPostStatus): Post['status'] {
-  const mapping: Record<ZernioPostStatus, Post['status']> = {
+  // Record<string, ...> pour accepter des statuts Zernio non encore typés (ex: "queued")
+  const mapping: Record<string, Post['status']> = {
     draft: 'DRAFT',
     scheduled: 'SCHEDULED',
+    queued: 'SCHEDULED', // Zernio peut retourner "queued" pour les posts en file d'attente
     published: 'PUBLISHED',
     partial: 'PARTIAL',
     failed: 'FAILED',

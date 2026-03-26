@@ -143,14 +143,28 @@ async function processQueueSequential(
     }
 
     try {
-      // Formater la date ISO → format Zernio (sans Z, sans millisecondes)
-      // slotDate vient de preview : "2026-04-01T14:30:00.000Z"
-      // Zernio attend : "2026-04-01T14:30:00"
-      const scheduledFor = slotDate.replace(/\.\d{3}Z$/, '').replace(/Z$/, '')
+      // Convertir la date UTC retournée par preview en heure locale Europe/Paris.
+      // preview retourne "2026-04-01T12:30:00.000Z" (UTC).
+      // Zernio attend "2026-04-01T14:30:00" (heure Paris) + timezone: "Europe/Paris".
+      // Sans conversion, l'heure UTC serait interprétée comme heure Paris → décalage.
+      const utcDate = new Date(slotDate)
+      const formatter = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      // sv-SE produit "YYYY-MM-DD HH:mm:ss" → on remplace l'espace par T
+      const scheduledFor = formatter.format(utcDate).replace(' ', 'T')
 
       await late.posts.update(postId, {
         scheduledFor,
         timezone: 'Europe/Paris',
+        status: 'scheduled',
       } as never)
       updated++
     } catch (err) {
