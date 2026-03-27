@@ -135,6 +135,8 @@ export function QueueSlotEditor({
   function handleSubmit(): void {
     const newDayOfWeek = Number(dayOfWeek)
     const newTime = `${String(Number(hour)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`
+    // Timezone détecté au moment de l'action — reflète la position réelle de l'utilisateur
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
     startTransition(async () => {
       if (editingSlot) {
@@ -146,6 +148,7 @@ export function QueueSlotEditor({
           newDayOfWeek,
           newTime,
           platform,
+          timezone,
         )
         if (result.success) {
           toast.success('Créneau modifié')
@@ -156,7 +159,7 @@ export function QueueSlotEditor({
         }
       } else {
         // Mode création : ajouter un nouveau slot
-        const result = await addQueueSlot(newDayOfWeek, newTime, platform)
+        const result = await addQueueSlot(newDayOfWeek, newTime, platform, timezone)
         if (result.success) {
           toast.success('Créneau créé')
           onSuccess()

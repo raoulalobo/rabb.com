@@ -58,8 +58,10 @@ export function QueueDayColumn({
    */
   function handleDelete(slot: QueueSlot): void {
     setPendingSlotId(slot.id)
+    // Timezone détecté au moment de l'action — reflète la position réelle de l'utilisateur
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     startTransition(async () => {
-      const result = await removeQueueSlot(slot.dayOfWeek, slot.time, slot.platform)
+      const result = await removeQueueSlot(slot.dayOfWeek, slot.time, slot.platform, timezone)
       setPendingSlotId(null)
       if (result.success) {
         toast.success('Créneau supprimé')

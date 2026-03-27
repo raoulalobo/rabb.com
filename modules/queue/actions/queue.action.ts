@@ -102,6 +102,7 @@ export async function addQueueSlot(
   dayOfWeek: number,
   time: string,
   platform: string,
+  timezone: string,
 ): Promise<QueueActionResult> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) return { success: false, error: 'Non authentifié' }
@@ -118,7 +119,7 @@ export async function addQueueSlot(
       await late.queue.create({
         profileId,
         name: scheduleName,
-        timezone: 'Europe/Paris',
+        timezone,
         slots: [{ dayOfWeek, time }],
       })
     } else {
@@ -127,7 +128,7 @@ export async function addQueueSlot(
       await late.queue.update({
         profileId,
         queueId: current.scheduleId,
-        timezone: 'Europe/Paris',
+        timezone,
         slots: newSlots,
       })
     }
@@ -155,6 +156,7 @@ export async function removeQueueSlot(
   dayOfWeek: number,
   time: string,
   platform: string,
+  timezone: string,
 ): Promise<QueueActionResult> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) return { success: false, error: 'Non authentifié' }
@@ -177,7 +179,7 @@ export async function removeQueueSlot(
       await late.queue.update({
         profileId,
         queueId: current.scheduleId,
-        timezone: 'Europe/Paris',
+        timezone,
         slots: newSlots,
       })
     }
@@ -211,6 +213,7 @@ export async function updateQueueSlot(
   newDayOfWeek: number,
   newTime: string,
   newPlatform: string,
+  timezone: string,
 ): Promise<QueueActionResult> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) return { success: false, error: 'Non authentifié' }
@@ -231,7 +234,7 @@ export async function updateQueueSlot(
       await late.queue.update({
         profileId,
         queueId: current.scheduleId,
-        timezone: 'Europe/Paris',
+        timezone,
         slots: newSlots,
       })
     } else {
@@ -248,7 +251,7 @@ export async function updateQueueSlot(
           await late.queue.update({
             profileId,
             queueId: oldSchedule.scheduleId,
-            timezone: 'Europe/Paris',
+            timezone,
             slots: remainingSlots,
           })
         }
@@ -260,7 +263,7 @@ export async function updateQueueSlot(
         await late.queue.create({
           profileId,
           name: scheduleNameForPlatform(newPlatform),
-          timezone: 'Europe/Paris',
+          timezone,
           slots: [{ dayOfWeek: newDayOfWeek, time: newTime }],
         })
       } else {
@@ -268,7 +271,7 @@ export async function updateQueueSlot(
         await late.queue.update({
           profileId,
           queueId: newSchedule.scheduleId,
-          timezone: 'Europe/Paris',
+          timezone,
           slots: newSlots,
         })
       }
