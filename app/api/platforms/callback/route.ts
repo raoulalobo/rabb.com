@@ -104,19 +104,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     },
   })
 
-  // Filet de sécurité : sync automatique du lateWorkspaceId si absent.
-  // Scénario couvert : connectPlatform.action.ts a appelé late.profiles.create()
-  // et obtenu le lateWorkspaceId, mais la sauvegarde Prisma (User.lateWorkspaceId)
-  // a échoué avant de s'exécuter (erreur réseau, timeout DB, crash serveur).
-  // Le workspace existe dans Late mais son ID est perdu en DB → lateWorkspaceId = NULL.
-  // Zernio renvoie toujours le même profileId dans ce callback → on le récupère ici.
-  // updateMany avec where: { lateWorkspaceId: null } est idempotent :
-  // aucune mise à jour si l'ID est déjà présent (cas nominal ~100% du temps).
+  // Sauvegarder le lateWorkspaceId en DB maintenant que l'OAuth est confirmé.
+  // C'est ici (et uniquement ici) que l'ID est persisté, jamais dans connectPlatform().
+  //
+  // Pourquoi ici seulement : un utilisateur qui abandonne le flux OAuth ne génère
+  // pas de callback → son lateWorkspaceId n'est jamais sauvegardé → onboardingStep
+  // reste à 0 → l'onboarding s'affiche correctement à la prochaine visite.
+  //
+  // updateMany est idempotent : si le même profileId est déjà en DB (reconnexion
+  // d'un réseau ou ajout d'une 2e plateforme), la mise à jour ne change rien.
   await prisma.user.updateMany({
-    where: {
-      id: session.user.id,
-      lateWorkspaceId: null, // uniquement si non encore enregistré
-    },
+    where: { id: session.user.id },
     data: { lateWorkspaceId: lateProfileId },
   })
 

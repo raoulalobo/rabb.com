@@ -121,26 +121,17 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
         console.log('[connectPlatform] Profil Late récupéré avec succès:', lateWorkspaceId)
       }
 
-      // Persister l'ID EN PRIORITÉ avant tout autre appel réseau.
-      // ⚠️ Si cette sauvegarde échoue, le workspace Late existe mais son ID est perdu.
-      // → Le log ci-dessous permet la récupération manuelle via Supabase SQL Editor :
-      //   UPDATE "User" SET "lateWorkspaceId" = '<id>' WHERE id = '<userId>'
-      try {
-        await prisma.user.update({
-          where: { id: session.user.id },
-          data: { lateWorkspaceId },
-        })
-      } catch (prismaError) {
-        // Log critique : le workspace Late existe mais n'est pas enregistré en DB.
-        // → Récupérer manuellement via :
-        //   UPDATE "User" SET "lateWorkspaceId" = '<lateWorkspaceId>' WHERE id = '<userId>'
-        console.error(
-          `[connectPlatform] ⚠️ CRITIQUE : workspace Late récupéré (${lateWorkspaceId}) mais` +
-          ` NON SAUVEGARDÉ en DB pour userId=${session.user.id}. Erreur Prisma :`,
-          prismaError,
-        )
-        throw prismaError
-      }
+      // ⚠️ On ne sauvegarde PAS encore lateWorkspaceId en DB ici.
+      // L'ID sera persisté uniquement dans le callback OAuth (/api/platforms/callback),
+      // c'est-à-dire uniquement si l'utilisateur complète le flux OAuth avec succès.
+      //
+      // Pourquoi : si l'utilisateur abandonne ou si l'OAuth échoue, aucun workspace
+      // ne sera stocké en DB → onboardingStep reste à 0 → l'onboarding s'affiche correctement.
+      //
+      // Si l'utilisateur réessaie plus tard, connectPlatform() retombera dans ce bloc
+      // (lateWorkspaceId absent de la DB), tentera une création → Zernio répondra
+      // "already exists" → le bloc de récupération ci-dessus retrouvera le workspace existant.
+      console.log('[connectPlatform] Workspace Late créé/récupéré, sauvegarde différée au callback:', lateWorkspaceId)
     } else {
       console.log('[connectPlatform] Workspace Late existant (DB):', lateWorkspaceId)
     }
