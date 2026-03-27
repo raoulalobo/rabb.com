@@ -25,7 +25,7 @@ import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
 import { LateApiError, late } from '@/lib/late'
-import { prisma } from '@/lib/prisma'
+import { isPgPoolSaturatedError, prisma } from '@/lib/prisma'
 import { DisconnectPlatformSchema } from '@/modules/platforms/schemas/platform.schema'
 import type { PlatformActionResult } from '@/modules/platforms/types'
 
@@ -98,7 +98,20 @@ export async function disconnectPlatform(connectedPlatformId: unknown): Promise<
   }
 
   // 5. Supprimer la ligne en DB
-  await prisma.connectedPlatform.delete({ where: { id: validId } })
+  //    Protégé contre les erreurs de pool PgBouncer saturé : sans ce try/catch,
+  //    une DriverAdapterError remonterait directement au runtime Next.js sans message friendly.
+  try {
+    await prisma.connectedPlatform.delete({ where: { id: validId } })
+  } catch (dbError) {
+    console.error('[disconnectPlatform] Erreur suppression DB :', dbError)
+    if (isPgPoolSaturatedError(dbError)) {
+      return {
+        success: false,
+        error: 'Le service est momentanément surchargé. Réessaie dans quelques secondes.',
+      }
+    }
+    return { success: false, error: 'Impossible de supprimer la plateforme. Réessaie.' }
+  }
 
   // Invalider le cache de la page settings pour refléter les changements
   revalidatePath('/settings')

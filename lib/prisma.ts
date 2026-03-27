@@ -57,6 +57,38 @@ function isStaleConnectionError(err: unknown): boolean {
 }
 
 /**
+ * Délai en millisecondes avant de rejouer une requête bloquée par un pool PgBouncer saturé.
+ * 150ms laisse le temps à PgBouncer de libérer un slot sans délai perceptible pour l'utilisateur.
+ */
+const POOL_SATURATED_RETRY_DELAY_MS = 150
+
+/**
+ * Détermine si une erreur provient d'un pool PgBouncer saturé (nombre max de clients atteint).
+ * Ce type d'erreur est levé par @prisma/adapter-pg sous la forme d'un DriverAdapterError
+ * quand PgBouncer refuse une nouvelle connexion en session mode.
+ *
+ * Exportée pour permettre aux Server Actions et Route Handlers de retourner un message
+ * utilisateur friendly si le retry automatique de l'extension Prisma échoue lui aussi.
+ *
+ * @param err - L'erreur attrapée dans le bloc catch
+ * @returns true si l'erreur indique un pool saturé, false sinon
+ *
+ * @example
+ *   isPgPoolSaturatedError(new Error('MaxClientsInSessionMode: max clients reached')) // → true
+ *   isPgPoolSaturatedError(new Error('Invalid query'))                                  // → false
+ */
+export function isPgPoolSaturatedError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  return (
+    err.message.includes('MaxClientsInSessionMode') ||
+    // Variante générique PgBouncer (transaction mode ou message tronqué)
+    (err.message.includes('max clients reached') && !err.message.includes('Server has closed')) ||
+    // DriverAdapterError wrappé par Prisma 7 contenant la mention du mode session
+    (err.message.includes('DriverAdapterError') && err.message.includes('Session mode'))
+  )
+}
+
+/**
  * Crée une nouvelle instance PrismaClient avec l'adapter pg et une extension retry.
  *
  * @returns Instance PrismaClient étendue, prête à l'emploi
@@ -108,6 +140,12 @@ function createPrismaClient(): PrismaClient {
             if (isStaleConnectionError(err)) {
               // 2e tentative : pg a retiré la connexion morte du pool,
               // cette requête obtient une connexion fraîche.
+              return await query(args)
+            }
+            if (isPgPoolSaturatedError(err)) {
+              // Pool saturé : attendre que PgBouncer libère un slot avant de réessayer.
+              // 150ms suffisent généralement pour qu'une connexion active se libère.
+              await new Promise<void>((resolve) => setTimeout(resolve, POOL_SATURATED_RETRY_DELAY_MS))
               return await query(args)
             }
             // Toute autre erreur est relancée telle quelle

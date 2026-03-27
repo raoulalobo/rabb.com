@@ -28,7 +28,7 @@ import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
 import { LateApiError, late } from '@/lib/late'
-import { prisma } from '@/lib/prisma'
+import { isPgPoolSaturatedError, prisma } from '@/lib/prisma'
 import { ConnectPlatformSchema } from '@/modules/platforms/schemas/platform.schema'
 import type { PlatformActionResult } from '@/modules/platforms/types'
 
@@ -250,6 +250,15 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
       return {
         success: false,
         error: `Erreur Zernio (${error.status}) : ${error.message}`,
+      }
+    }
+    // Pool PgBouncer saturé (MaxClientsInSessionMode) : erreur transitoire,
+    // le retry automatique de l'extension Prisma a échoué deux fois de suite.
+    // → message friendly sans exposer le détail technique.
+    if (isPgPoolSaturatedError(error)) {
+      return {
+        success: false,
+        error: 'Le service est momentanément surchargé. Réessaie dans quelques secondes.',
       }
     }
     const message = error instanceof Error ? error.message : String(error)

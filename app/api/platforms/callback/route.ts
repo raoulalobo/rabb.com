@@ -78,64 +78,79 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL('/login', origin))
   }
 
-  // Upsert : créer ou mettre à jour la plateforme connectée
-  // (permet la reconnexion après déconnexion ou changement de compte)
-  await prisma.connectedPlatform.upsert({
-    where: {
-      // Contrainte unique composite définie dans schema.prisma
-      userId_platform_lateProfileId: {
+  // Bloc DB : upsert plateforme + sauvegarde workspace + avancement onboarding.
+  // Protégé dans un try/catch : une erreur DB (ex: pool PgBouncer saturé) causerait
+  // sinon une réponse 500 non contrôlée au lieu d'une redirection propre.
+  let onboardingStep: number | undefined
+  try {
+    // Upsert : créer ou mettre à jour la plateforme connectée
+    // (permet la reconnexion après déconnexion ou changement de compte)
+    await prisma.connectedPlatform.upsert({
+      where: {
+        // Contrainte unique composite définie dans schema.prisma
+        userId_platform_lateProfileId: {
+          userId: session.user.id,
+          platform,
+          lateProfileId,
+        },
+      },
+      create: {
         userId: session.user.id,
         platform,
         lateProfileId,
+        accountName,
+        avatarUrl,
+        isActive: true,
       },
-    },
-    create: {
-      userId: session.user.id,
-      platform,
-      lateProfileId,
-      accountName,
-      avatarUrl,
-      isActive: true,
-    },
-    update: {
-      accountName,
-      avatarUrl,
-      isActive: true,
-    },
-  })
+      update: {
+        accountName,
+        avatarUrl,
+        isActive: true,
+      },
+    })
 
-  // Sauvegarder le lateWorkspaceId en DB maintenant que l'OAuth est confirmé.
-  // C'est ici (et uniquement ici) que l'ID est persisté, jamais dans connectPlatform().
-  //
-  // Pourquoi ici seulement : un utilisateur qui abandonne le flux OAuth ne génère
-  // pas de callback → son lateWorkspaceId n'est jamais sauvegardé → onboardingStep
-  // reste à 0 → l'onboarding s'affiche correctement à la prochaine visite.
-  //
-  // updateMany est idempotent : si le même profileId est déjà en DB (reconnexion
-  // d'un réseau ou ajout d'une 2e plateforme), la mise à jour ne change rien.
-  await prisma.user.updateMany({
-    where: { id: session.user.id },
-    data: { lateWorkspaceId: lateProfileId },
-  })
+    // Sauvegarder le lateWorkspaceId en DB maintenant que l'OAuth est confirmé.
+    // C'est ici (et uniquement ici) que l'ID est persisté, jamais dans connectPlatform().
+    //
+    // Pourquoi ici seulement : un utilisateur qui abandonne le flux OAuth ne génère
+    // pas de callback → son lateWorkspaceId n'est jamais sauvegardé → onboardingStep
+    // reste à 0 → l'onboarding s'affiche correctement à la prochaine visite.
+    //
+    // updateMany est idempotent : si le même profileId est déjà en DB (reconnexion
+    // d'un réseau ou ajout d'une 2e plateforme), la mise à jour ne change rien.
+    await prisma.user.updateMany({
+      where: { id: session.user.id },
+      data: { lateWorkspaceId: lateProfileId },
+    })
 
-  // Avancer l'onboarding de 0 → 1 si c'est le premier réseau connecté.
-  // updateMany avec where: { onboardingStep: 0 } est idempotent : pas d'effet si déjà avancé.
-  await prisma.user.updateMany({
-    where: {
-      id: session.user.id,
-      onboardingStep: 0,
-    },
-    data: { onboardingStep: 1 },
-  })
+    // Avancer l'onboarding de 0 → 1 si c'est le premier réseau connecté.
+    // updateMany avec where: { onboardingStep: 0 } est idempotent : pas d'effet si déjà avancé.
+    await prisma.user.updateMany({
+      where: {
+        id: session.user.id,
+        onboardingStep: 0,
+      },
+      data: { onboardingStep: 1 },
+    })
+
+    // Récupérer l'étape d'onboarding pour choisir la redirection finale
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { onboardingStep: true },
+    })
+    onboardingStep = user?.onboardingStep
+  } catch (dbError) {
+    // Erreur DB (pool saturé, connexion morte, etc.) → redirection d'erreur propre.
+    // On ne laisse pas remonter une 500 non contrôlée après un flux OAuth réussi.
+    console.error('[callback] Erreur DB lors de la sauvegarde de la plateforme :', dbError)
+    return NextResponse.redirect(
+      new URL('/settings?error=platform_callback_db', origin),
+    )
+  }
 
   // Si l'utilisateur est en onboarding (étape 0 → 1), rediriger vers /dashboard
   // pour afficher l'étape 2 (créer un post). Sinon, rediriger vers /settings.
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { onboardingStep: true },
-  })
-
-  const redirectPath = user?.onboardingStep === 1
+  const redirectPath = onboardingStep === 1
     ? `/dashboard`
     : `/settings?success=platform_connected&platform=${platform}`
 
