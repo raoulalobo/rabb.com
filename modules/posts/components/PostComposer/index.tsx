@@ -50,6 +50,7 @@ import { getPlatformViolations } from '@/modules/platforms/config/platform-rules
 import { PLATFORM_CONFIG } from '@/modules/platforms/constants'
 import type { Platform } from '@/modules/platforms/types'
 import { createPost } from '@/modules/posts/actions/create-post.action'
+import { updatePost } from '@/modules/posts/actions/update-post.action'
 import { useDraftStore } from '@/modules/posts/store/draft.store'
 import type { UploadingFile, UploadUrlResult } from '@/modules/posts/types'
 
@@ -504,13 +505,19 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
           const platformText = platformOverrides[platform]?.text ?? text
           const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
 
-          return createPost({
-            platform,
-            text: platformText,
-            mediaUrls: platformMediaUrls,
-            // customContent si un override existe pour cette plateforme
-            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
-          })
+          // Si un postId existe et une seule plateforme → mise à jour, sinon création
+          return postId && platforms.length === 1
+            ? updatePost(postId, {
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+              })
+            : createPost({
+                platform,
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                // customContent si un override existe pour cette plateforme
+                ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+              })
         }),
       )
 
@@ -520,8 +527,8 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
         return
       }
 
-      // Mémoriser le postId uniquement pour une sélection mono-plateforme
-      if (platforms.length === 1 && results[0]?.post) {
+      // Mémoriser le postId uniquement pour une sélection mono-plateforme (création)
+      if (!postId && platforms.length === 1 && results[0]?.post) {
         setPostId(results[0].post.id)
       }
 
@@ -560,14 +567,21 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
           const platformText = platformOverrides[platform]?.text ?? text
           const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
 
-          return createPost({
-            platform,
-            text: platformText,
-            mediaUrls: platformMediaUrls,
-            scheduledFor,
-            // customContent si un override existe pour cette plateforme
-            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
-          })
+          // Si un postId existe et une seule plateforme → mise à jour, sinon création
+          return postId && platforms.length === 1
+            ? updatePost(postId, {
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                scheduledFor,
+              })
+            : createPost({
+                platform,
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                scheduledFor,
+                // customContent si un override existe pour cette plateforme
+                ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+              })
         }),
       )
 
@@ -594,7 +608,10 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
   /**
    * Ajoute le post à la file d'attente Zernio.
    * Zernio assigne automatiquement le prochain créneau libre (avec locking).
-   * Utilise le paramètre `queuedFromProfile` au lieu de `scheduledFor`.
+   *
+   * Cas particulier :
+   * - 1 plateforme + postId → updatePost(useQueue: true, platform) — 1 requête Prisma légère
+   * - N plateformes → N createPost(useQueue: true) indépendants, postId ignoré
    */
   const handleEnqueuePost = useCallback((): void => {
     if (platforms.length === 0) {
@@ -608,13 +625,21 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
           const platformText = platformOverrides[platform]?.text ?? text
           const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
 
-          return createPost({
-            platform,
-            text: platformText,
-            mediaUrls: platformMediaUrls,
-            useQueue: true,
-            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
-          })
+          // Si un postId existe et une seule plateforme → mise à jour vers la file
+          return postId && platforms.length === 1
+            ? updatePost(postId, {
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                useQueue: true,
+                platform,
+              })
+            : createPost({
+                platform,
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                useQueue: true,
+                ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+              })
         }),
       )
 
@@ -639,6 +664,10 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
 
   /**
    * Publie le post immédiatement via Zernio (publishNow: true).
+   *
+   * Cas particulier :
+   * - 1 plateforme + postId → updatePost(publishNow: true) — testé et confirmé côté API
+   * - N plateformes → N createPost(publishNow: true) indépendants, postId ignoré
    */
   const handlePublishPost = useCallback((): void => {
     if (platforms.length === 0) {
@@ -652,13 +681,20 @@ function PostComposerRoot({ children, className, onSuccess, readOnly = false, on
           const platformText = platformOverrides[platform]?.text ?? text
           const platformMediaUrls = platformOverrides[platform]?.mediaUrls ?? mediaUrls
 
-          return createPost({
-            platform,
-            text: platformText,
-            mediaUrls: platformMediaUrls,
-            publishNow: true,
-            ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
-          })
+          // Si un postId existe et une seule plateforme → mise à jour + publication immédiate
+          return postId && platforms.length === 1
+            ? updatePost(postId, {
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                publishNow: true,
+              })
+            : createPost({
+                platform,
+                text: platformText,
+                mediaUrls: platformMediaUrls,
+                publishNow: true,
+                ...(platformOverrides[platform]?.text && { customContent: platformOverrides[platform].text }),
+              })
         }),
       )
 

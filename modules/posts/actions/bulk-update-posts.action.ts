@@ -182,7 +182,7 @@ async function processQueueSequential(
  * Met à jour plusieurs posts chez Zernio.
  * Stratégie d'exécution adaptative selon le type d'opération :
  * - useQueue    → parallèle entre plateformes, séquentiel par plateforme
- * - reschedule  → tout parallèle
+ * - reschedule  → tout parallèle + détachement queue
  * - draft       → tout parallèle
  *
  * @param postIds - IDs Zernio des posts à modifier
@@ -231,8 +231,9 @@ export async function bulkUpdatePosts(
       errors.push(...r.errors)
     }
     skipped = postIds.length - updated
+
   } else {
-    // ── Replanifier ou brouillon : tout parallèle (pas de locking) ────────────
+    // ── Replanifier ou brouillon : tout parallèle ────────────────────────────
     const updateParams: Record<string, unknown> = {}
 
     if (data.scheduledFor) {
@@ -240,6 +241,12 @@ export async function bulkUpdatePosts(
       const pad = (n: number): string => String(n).padStart(2, '0')
       updateParams.scheduledFor = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
       updateParams.timezone = 'Europe/Paris'
+      // Détacher du queue : un post encore lié à une queue (queueId + queuedFromProfile)
+      // ne peut pas être déplacé vers un créneau déjà occupé par un autre post de la même
+      // queue → Zernio retourne "Internal server error". En passant ces champs à null,
+      // on sort explicitement le post de la queue avant de lui assigner une heure précise.
+      updateParams.queueId = null
+      updateParams.queuedFromProfile = null
     } else if (data.newStatus === 'DRAFT') {
       updateParams.scheduledFor = null
     }
