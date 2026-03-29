@@ -80,10 +80,20 @@ export async function updatePost(
 
   if (data.scheduledFor !== undefined) {
     if (data.scheduledFor) {
-      // Format ISO sans Z pour Zernio
-      const d = data.scheduledFor
-      const pad = (n: number): string => String(n).padStart(2, '0')
-      params.scheduledFor = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+      // Utiliser Intl.DateTimeFormat pour obtenir l'heure locale Paris à partir de la Date UTC.
+      // getHours() retourne l'heure UTC sur un serveur Node.js tournant en UTC, ce qui provoquerait
+      // un décalage de 2h en été (CEST = UTC+2). sv-SE produit "YYYY-MM-DD HH:mm:ss" en heure Paris.
+      const formatter = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      params.scheduledFor = formatter.format(data.scheduledFor).replace(' ', 'T')
       params.timezone = 'Europe/Paris'
     } else {
       // Supprimer la date de planification (repasser en draft)

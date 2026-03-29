@@ -237,9 +237,20 @@ export async function bulkUpdatePosts(
     const updateParams: Record<string, unknown> = {}
 
     if (data.scheduledFor) {
-      const d = data.scheduledFor
-      const pad = (n: number): string => String(n).padStart(2, '0')
-      updateParams.scheduledFor = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+      // Utiliser Intl.DateTimeFormat pour obtenir l'heure locale Paris à partir de la Date UTC.
+      // getHours() retourne l'heure UTC sur un serveur Node.js tournant en UTC, ce qui provoquerait
+      // un décalage de 2h en été (CEST = UTC+2). sv-SE produit "YYYY-MM-DD HH:mm:ss" en heure Paris.
+      const formatter = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      updateParams.scheduledFor = formatter.format(data.scheduledFor).replace(' ', 'T')
       updateParams.timezone = 'Europe/Paris'
       // Détacher du queue : un post encore lié à une queue (queueId + queuedFromProfile)
       // ne peut pas être déplacé vers un créneau déjà occupé par un autre post de la même
