@@ -34,11 +34,7 @@ import React, { useEffect } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-/** Nom du BroadcastChannel partagé entre la popup et la fenêtre parente. */
-export const OAUTH_BROADCAST_CHANNEL = 'ogolong-oauth-callback'
-
-/** Nom donné à la popup lors de window.open() — utilisé pour détecter le contexte popup. */
-export const OAUTH_POPUP_NAME = 'google-oauth'
+import { OAUTH_BROADCAST_CHANNEL, OAUTH_POPUP_NAME } from '@/modules/auth/constants'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
