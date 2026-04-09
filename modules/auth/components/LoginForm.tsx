@@ -4,8 +4,8 @@
  * @description Formulaire de connexion email/password + bouton Google OAuth.
  *   - Validation côté client avec Zod via react-hook-form
  *   - Appelle better-auth signIn.email() et signIn.social()
- *   - Google OAuth ouvre une popup (500×600px) : la fenêtre principale reste visible
- *     avec un bouton "Annuler" qui ferme la popup et remet le formulaire à l'état initial
+ *   - Google OAuth ouvre une popup (500×600px) ; après auth, /auth/popup-callback
+ *     envoie un postMessage pour fermer la popup et déclencher la navigation parente
  *   - Fallback redirection pleine page si la popup est bloquée par le navigateur
  *   - Gère les états de chargement et d'erreur via useAuthStore
  *   - Redirige vers /dashboard après connexion réussie (ou callbackUrl si présent)
@@ -20,7 +20,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 
@@ -63,6 +63,13 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
   // Référence à la popup OAuth pour la fermer depuis "Annuler"
   const popupRef = useRef<Window | null>(null)
 
+  // Ferme la popup si le composant se démonte pendant le flux OAuth (navigation SPA, etc.)
+  useEffect(() => {
+    return () => {
+      popupRef.current?.close()
+    }
+  }, [])
+
   // Formulaire react-hook-form avec résolution Zod
   const form = useForm<LoginFormData>({
     resolver: zodResolver(LoginSchema),
@@ -98,12 +105,11 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
    * Connexion via Google OAuth dans une popup 500×600px.
    *
    * Flux :
-   *  1. better-auth retourne l'URL Google sans rediriger (redirect: false)
+   *  1. better-auth retourne l'URL Google sans rediriger (disableRedirect: true)
    *  2. On ouvre cette URL dans une popup centrée
-   *  3. On poll popup.closed toutes les 500ms
-   *  4. À la fermeture, on vérifie la session :
-   *     - session présente → redirection de l'app parente vers callbackUrl
-   *     - session absente  → l'utilisateur a annulé, on remet le formulaire à l'état initial
+   *  3. La popup atterrit sur /auth/popup-callback après le callback Google
+   *  4. /auth/popup-callback envoie un postMessage({ type: 'oauth-success' }) à cette fenêtre
+   *  5. On écoute ce message, on vérifie la session, on redirige vers callbackUrl
    *
    * Fallback : si la popup est bloquée (bloqueur de pub, etc.), on redirige en pleine page.
    */
@@ -111,10 +117,11 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
     reset()
     setGoogleLoading(true)
 
-    // Demande l'URL OAuth à better-auth sans déclencher de redirection
+    // Demande l'URL OAuth à better-auth sans déclencher de redirection.
+    // callbackURL pointe vers la page relais qui fermera la popup via postMessage.
     const result = await signIn.social({
       provider: 'google',
-      callbackURL: callbackUrl,
+      callbackURL: '/auth/popup-callback',
       disableRedirect: true,
     })
 
@@ -144,22 +151,32 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
 
     popupRef.current = popup
 
-    // Poll toutes les 500ms pour détecter la fermeture de la popup
-    const interval = setInterval(async () => {
-      if (!popup.closed) return
-      clearInterval(interval)
+    /**
+     * Écoute le postMessage envoyé par /auth/popup-callback.
+     * Sécurité : on vérifie l'origine pour éviter les attaques XSS cross-origin.
+     */
+    const handleMessage = async (event: MessageEvent): Promise<void> => {
+      // Ignorer les messages provenant d'une autre origine
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== 'oauth-success') return
+
+      // Nettoyer le listener et refermer la popup (au cas où elle ne s'est pas auto-fermée)
+      window.removeEventListener('message', handleMessage)
+      popup.close()
       popupRef.current = null
 
-      // Vérifier si better-auth a créé une session dans la popup
+      // Vérifier que better-auth a bien créé une session
       const session = await authClient.getSession()
       if (session.data?.session) {
         router.push(callbackUrl)
         router.refresh()
       } else {
-        // Popup fermée sans auth → annulation ou erreur côté Google
+        // Message reçu mais session absente (cas rare)
         setGoogleLoading(false)
       }
-    }, 500)
+    }
+
+    window.addEventListener('message', handleMessage)
   }
 
   /**
