@@ -18,7 +18,8 @@
  *
  * @example
  *   // Déclenchement depuis LoginForm.tsx
- *   signIn.social({ provider: 'google', callbackURL: '/auth/popup-callback' })
+ *   // Note : le groupe (auth) ne préfixe pas l'URL → l'URL réelle est /popup-callback
+ *   signIn.social({ provider: 'google', callbackURL: '/popup-callback' })
  */
 
 'use client'

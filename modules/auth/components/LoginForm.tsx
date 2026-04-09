@@ -121,7 +121,7 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
     // callbackURL pointe vers la page relais qui fermera la popup via postMessage.
     const result = await signIn.social({
       provider: 'google',
-      callbackURL: '/auth/popup-callback',
+      callbackURL: '/popup-callback',
       disableRedirect: true,
     })
 
