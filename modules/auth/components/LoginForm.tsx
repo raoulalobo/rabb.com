@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
+import { OAUTH_BROADCAST_CHANNEL, OAUTH_POPUP_NAME } from '@/app/(auth)/popup-callback/page'
 import { authClient, signIn } from '@/lib/auth-client'
 import { LoginSchema } from '@/modules/auth/schemas/auth.schema'
 import type { LoginFormData } from '@/modules/auth/schemas/auth.schema'
@@ -106,10 +107,14 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
    *
    * Flux :
    *  1. better-auth retourne l'URL Google sans rediriger (disableRedirect: true)
-   *  2. On ouvre cette URL dans une popup centrée
-   *  3. La popup atterrit sur /auth/popup-callback après le callback Google
-   *  4. /auth/popup-callback envoie un postMessage({ type: 'oauth-success' }) à cette fenêtre
-   *  5. On écoute ce message, on vérifie la session, on redirige vers callbackUrl
+   *  2. On ouvre cette URL dans une popup nommée OAUTH_POPUP_NAME
+   *  3. La popup atterrit sur /popup-callback après le callback Google
+   *  4. /popup-callback détecte window.name et envoie { type: 'oauth-success' } sur BroadcastChannel
+   *  5. On écoute ce canal, on vérifie la session, on redirige vers callbackUrl
+   *
+   * POURQUOI BroadcastChannel ?
+   * Google envoie COOP: same-origin → window.opener est détruit définitivement dans la popup.
+   * BroadcastChannel fonctionne entre tous les contextes du même origin sans dépendre de opener.
    *
    * Fallback : si la popup est bloquée (bloqueur de pub, etc.), on redirige en pleine page.
    */
@@ -118,7 +123,7 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
     setGoogleLoading(true)
 
     // Demande l'URL OAuth à better-auth sans déclencher de redirection.
-    // callbackURL pointe vers la page relais qui fermera la popup via postMessage.
+    // callbackURL pointe vers la page relais qui fermera la popup via BroadcastChannel.
     const result = await signIn.social({
       provider: 'google',
       callbackURL: '/popup-callback',
@@ -137,9 +142,11 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
     const left = Math.round(window.innerWidth / 2 - w / 2)
     const top = Math.round(window.innerHeight / 2 - h / 2)
 
+    // Le nom OAUTH_POPUP_NAME est utilisé par /popup-callback pour détecter le contexte popup
+    // (window.opener est null à cause de COOP Google, on ne peut pas l'utiliser)
     const popup = window.open(
       result.data.url,
-      'google-oauth',
+      OAUTH_POPUP_NAME,
       `width=${w},height=${h},left=${left},top=${top},resizable=yes`,
     )
 
@@ -152,17 +159,16 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
     popupRef.current = popup
 
     /**
-     * Écoute le postMessage envoyé par /auth/popup-callback.
-     * Sécurité : on vérifie l'origine pour éviter les attaques XSS cross-origin.
+     * Écoute le BroadcastChannel émis par /popup-callback.
+     * BroadcastChannel est immunisé contre COOP : il fonctionne entre contextes same-origin
+     * sans dépendre de window.opener.
      */
-    const handleMessage = async (event: MessageEvent): Promise<void> => {
-      // Ignorer les messages provenant d'une autre origine
-      if (event.origin !== window.location.origin) return
+    const channel = new BroadcastChannel(OAUTH_BROADCAST_CHANNEL)
+    channel.onmessage = async (event: MessageEvent): Promise<void> => {
       if (event.data?.type !== 'oauth-success') return
 
-      // Nettoyer le listener et refermer la popup (au cas où elle ne s'est pas auto-fermée)
-      window.removeEventListener('message', handleMessage)
-      popup.close()
+      // Nettoyer le canal et la référence popup
+      channel.close()
       popupRef.current = null
 
       // Vérifier que better-auth a bien créé une session
@@ -171,12 +177,10 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
         router.push(callbackUrl)
         router.refresh()
       } else {
-        // Message reçu mais session absente (cas rare)
+        // Signal reçu mais session absente (cas rare)
         setGoogleLoading(false)
       }
     }
-
-    window.addEventListener('message', handleMessage)
   }
 
   /**

@@ -4,22 +4,28 @@
  * @description Page relais pour le flux OAuth Google en mode popup.
  *
  *   Après que better-auth a traité le callback Google, il redirige vers cette page
- *   (qui est passée comme `callbackURL` dans signIn.social()). Cette page :
+ *   (passée comme `callbackURL` dans signIn.social()). Cette page :
  *
- *   1. Détecte qu'elle s'exécute dans une popup (window.opener !== null)
- *   2. Envoie un postMessage({ type: 'oauth-success' }) à la fenêtre parente
+ *   1. Détecte qu'elle s'exécute dans une popup via window.name === 'google-oauth'
+ *   2. Envoie { type: 'oauth-success' } sur un BroadcastChannel partagé avec le parent
  *   3. Se ferme elle-même (window.close())
  *
- *   La fenêtre parente (LoginForm ou RegisterForm) écoute ce message et déclenche
- *   la redirection finale vers /dashboard.
+ *   POURQUOI BroadcastChannel ET PAS postMessage ?
+ *   Google envoie l'en-tête `Cross-Origin-Opener-Policy: same-origin` sur ses pages
+ *   d'authentification. Quand la popup passe par les serveurs Google, le navigateur
+ *   effectue un Browsing Context Group (BCG) switch qui détruit DÉFINITIVEMENT
+ *   window.opener — même après que la popup revient sur notre domaine.
+ *   BroadcastChannel n'est pas affecté par ce switch : il fonctionne entre tous les
+ *   contextes de navigation du même origin (support universel depuis 2022).
  *
- *   Fallback : si la popup est désactivée et que l'utilisateur arrive ici en pleine
- *   page (window.opener === null), on redirige directement vers /dashboard.
+ *   Fallback : si window.name n'indique pas une popup (ex : ouverture directe de
+ *   l'URL), on redirige vers /dashboard en pleine page.
  *
  * @example
- *   // Déclenchement depuis LoginForm.tsx
+ *   // Déclenchement depuis LoginForm.tsx / RegisterForm.tsx
  *   // Note : le groupe (auth) ne préfixe pas l'URL → l'URL réelle est /popup-callback
- *   signIn.social({ provider: 'google', callbackURL: '/popup-callback' })
+ *   signIn.social({ provider: 'google', callbackURL: '/popup-callback', disableRedirect: true })
+ *   window.open(url, 'google-oauth', '...')
  */
 
 'use client'
@@ -28,25 +34,35 @@ import React, { useEffect } from 'react'
 
 import { useRouter } from 'next/navigation'
 
+/** Nom du BroadcastChannel partagé entre la popup et la fenêtre parente. */
+export const OAUTH_BROADCAST_CHANNEL = 'ogolong-oauth-callback'
+
+/** Nom donné à la popup lors de window.open() — utilisé pour détecter le contexte popup. */
+export const OAUTH_POPUP_NAME = 'google-oauth'
+
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
- * Page relais OAuth — s'exécute dans la popup Google après authentification.
- * Notifie la fenêtre parente via postMessage puis se ferme.
+ * Page relais OAuth — s'exécute dans la popup après authentification Google.
+ * Notifie la fenêtre parente via BroadcastChannel puis se ferme.
  */
 export default function PopupCallbackPage(): React.JSX.Element {
   const router = useRouter()
 
   useEffect(() => {
-    if (window.opener) {
-      // Cas nominal : on est dans une popup
-      // Envoyer le signal de succès à la fenêtre parente (même origine uniquement)
-      window.opener.postMessage({ type: 'oauth-success' }, window.location.origin)
+    // Détecter le contexte popup via le nom de fenêtre défini lors de window.open().
+    // On ne peut PAS utiliser window.opener car Google (COOP: same-origin) le détruit.
+    const isPopup = window.name === OAUTH_POPUP_NAME
+
+    if (isPopup) {
+      // Envoyer le signal de succès via BroadcastChannel (même origin, pas d'opener requis)
+      const channel = new BroadcastChannel(OAUTH_BROADCAST_CHANNEL)
+      channel.postMessage({ type: 'oauth-success' })
+      channel.close()
       // Fermer la popup — la fenêtre parente prend le relais
       window.close()
     } else {
-      // Fallback : pas de popup (popup bloquée → fallback pleine page déjà géré
-      // dans les formulaires, mais au cas où on arrive ici sans opener)
+      // Fallback : URL ouverte directement en pleine page (pas de popup)
       router.replace('/dashboard')
     }
   }, [router])
