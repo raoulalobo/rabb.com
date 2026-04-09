@@ -77,28 +77,20 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
    * Inscription / connexion via Google OAuth dans une popup 500×600px.
    * better-auth crée le compte automatiquement si l'email Google n'existe pas encore.
    *
-   * Flux :
-   *  1. better-auth retourne l'URL Google sans rediriger (disableRedirect: true)
-   *  2. On ouvre cette URL dans une popup nommée OAUTH_POPUP_NAME
-   *  3. La popup atterrit sur /popup-callback après le callback Google
-   *  4. /popup-callback détecte window.name et envoie { type: 'oauth-success' } sur BroadcastChannel
-   *  5. On écoute ce canal, on vérifie la session, on redirige vers /dashboard
+   * Mécanismes de détection (3 en parallèle pour robustesse maximale) :
+   *  A. BroadcastChannel — rapide, fonctionne si /popup-callback est atteint
+   *  B. Polling session (1s) — fallback si better-auth ignore callbackURL (issue #6582)
+   *  C. Détection popup.closed — fallback si l'utilisateur ferme manuellement
    *
-   * POURQUOI BroadcastChannel ?
-   * Google envoie COOP: same-origin → window.opener est détruit définitivement dans la popup.
-   * BroadcastChannel fonctionne entre tous les contextes du même origin sans dépendre de opener.
-   *
-   * Fallback : si la popup est bloquée (bloqueur de pub, etc.), on redirige en pleine page.
+   * Fallback : si la popup est bloquée par le navigateur, on redirige en pleine page.
    */
   const handleGoogleSignIn = async (): Promise<void> => {
     reset()
     setGoogleLoading(true)
 
-    // Demande l'URL OAuth à better-auth sans déclencher de redirection.
-    // callbackURL pointe vers la page relais qui fermera la popup via BroadcastChannel.
     const result = await signIn.social({
       provider: 'google',
-      callbackURL: '/popup-callback?mode=popup',
+      callbackURL: '/popup-callback',
       disableRedirect: true,
     })
 
@@ -108,21 +100,17 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
       return
     }
 
-    // Dimensions et position centrées pour la popup
     const w = 500
     const h = 600
     const left = Math.round(window.innerWidth / 2 - w / 2)
     const top = Math.round(window.innerHeight / 2 - h / 2)
 
-    // Nom de la fenêtre popup (informatif — la détection du contexte popup se fait
-    // via le paramètre ?mode=popup dans callbackURL, pas via window.name)
     const popup = window.open(
       result.data.url,
       OAUTH_POPUP_NAME,
       `width=${w},height=${h},left=${left},top=${top},resizable=yes`,
     )
 
-    // Fallback si la popup est bloquée par le navigateur
     if (!popup) {
       window.location.href = result.data.url
       return
@@ -130,28 +118,55 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
 
     popupRef.current = popup
 
-    /**
-     * Écoute le BroadcastChannel émis par /popup-callback.
-     * BroadcastChannel est immunisé contre COOP : il fonctionne entre contextes same-origin
-     * sans dépendre de window.opener.
-     */
-    const channel = new BroadcastChannel(OAUTH_BROADCAST_CHANNEL)
-    channel.onmessage = async (event: MessageEvent): Promise<void> => {
-      if (event.data?.type !== 'oauth-success') return
-
-      // Nettoyer le canal et la référence popup
+    let completed = false
+    const cleanup = (channel: BroadcastChannel, interval: ReturnType<typeof setInterval>): void => {
+      if (completed) return
+      completed = true
       channel.close()
+      clearInterval(interval)
       popupRef.current = null
+    }
 
-      // Vérifier que better-auth a bien créé une session
+    const onAuthComplete = async (
+      channel: BroadcastChannel,
+      interval: ReturnType<typeof setInterval>,
+    ): Promise<void> => {
+      cleanup(channel, interval)
       const session = await authClient.getSession()
       if (session.data?.session) {
         router.push('/dashboard')
         router.refresh()
       } else {
-        // Signal reçu mais session absente (cas rare)
         setGoogleLoading(false)
       }
+    }
+
+    // ── A. BroadcastChannel ───────────────────────────────────────────────────────
+    const channel = new BroadcastChannel(OAUTH_BROADCAST_CHANNEL)
+
+    // ── B. Polling session (1s) + C. Détection popup.closed ─────────────────────
+    const pollInterval = setInterval(async () => {
+      if (popup.closed) {
+        cleanup(channel, pollInterval)
+        const session = await authClient.getSession()
+        if (session.data?.session) {
+          router.push('/dashboard')
+          router.refresh()
+        } else {
+          setGoogleLoading(false)
+        }
+        return
+      }
+      const session = await authClient.getSession()
+      if (session.data?.session) {
+        popup.close()
+        await onAuthComplete(channel, pollInterval)
+      }
+    }, 1000)
+
+    channel.onmessage = async (event: MessageEvent): Promise<void> => {
+      if (event.data?.type !== 'oauth-success') return
+      await onAuthComplete(channel, pollInterval)
     }
   }
 

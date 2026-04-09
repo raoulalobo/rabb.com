@@ -33,7 +33,7 @@
 
 import React, { useEffect } from 'react'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 import { OAUTH_BROADCAST_CHANNEL } from '@/modules/auth/constants'
 
@@ -45,27 +45,29 @@ import { OAUTH_BROADCAST_CHANNEL } from '@/modules/auth/constants'
  */
 export default function PopupCallbackPage(): React.JSX.Element {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Détecter le contexte popup via le paramètre URL ?mode=popup.
-    // window.name et window.opener sont tous les deux effacés par le navigateur
-    // lors du passage cross-origin sur les serveurs Google (COOP + sécurité navigateur).
-    // Le paramètre URL est la seule valeur qui survit à travers toutes les redirections OAuth.
-    const isPopup = searchParams.get('mode') === 'popup'
+    // Cette page est EXCLUSIVEMENT utilisée comme page relais OAuth popup.
+    // On envoie toujours le signal BroadcastChannel puis on ferme la popup.
+    // Pas de détection de contexte : window.opener ET window.name sont effacés
+    // par le navigateur lors du passage cross-origin (Google COOP + sécurité navigateur).
 
-    if (isPopup) {
-      // Envoyer le signal de succès via BroadcastChannel (même origin, pas d'opener requis)
-      const channel = new BroadcastChannel(OAUTH_BROADCAST_CHANNEL)
-      channel.postMessage({ type: 'oauth-success' })
-      channel.close()
-      // Fermer la popup — la fenêtre parente prend le relais
-      window.close()
-    } else {
-      // Fallback : URL ouverte directement en pleine page (pas de popup)
+    // Signal de succès au parent via BroadcastChannel (fonctionne sans window.opener)
+    const channel = new BroadcastChannel(OAUTH_BROADCAST_CHANNEL)
+    channel.postMessage({ type: 'oauth-success' })
+    channel.close()
+
+    // Tenter de fermer la popup (fonctionne si la fenêtre a été ouverte par script)
+    window.close()
+
+    // Fallback : si window.close() n'a pas fermé la fenêtre (ouverture directe de l'URL
+    // ou navigateur restrictif), rediriger vers /dashboard après 1 seconde
+    const fallback = setTimeout(() => {
       router.replace('/dashboard')
-    }
-  }, [router, searchParams])
+    }, 1000)
+
+    return () => clearTimeout(fallback)
+  }, [router])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
