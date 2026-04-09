@@ -6,25 +6,26 @@
  *   Après que better-auth a traité le callback Google, il redirige vers cette page
  *   (passée comme `callbackURL` dans signIn.social()). Cette page :
  *
- *   1. Détecte qu'elle s'exécute dans une popup via window.name === 'google-oauth'
+ *   1. Détecte qu'elle s'exécute dans une popup via le paramètre URL ?mode=popup
  *   2. Envoie { type: 'oauth-success' } sur un BroadcastChannel partagé avec le parent
  *   3. Se ferme elle-même (window.close())
  *
- *   POURQUOI BroadcastChannel ET PAS postMessage ?
- *   Google envoie l'en-tête `Cross-Origin-Opener-Policy: same-origin` sur ses pages
- *   d'authentification. Quand la popup passe par les serveurs Google, le navigateur
- *   effectue un Browsing Context Group (BCG) switch qui détruit DÉFINITIVEMENT
- *   window.opener — même après que la popup revient sur notre domaine.
- *   BroadcastChannel n'est pas affecté par ce switch : il fonctionne entre tous les
- *   contextes de navigation du même origin (support universel depuis 2022).
+ *   POURQUOI UN PARAMÈTRE URL ET PAS window.name / window.opener ?
+ *   Google envoie COOP: same-origin ET efface window.name lors des navigations cross-origin.
+ *   Résultat : window.opener ET window.name sont tous les deux null/"" à l'arrivée sur cette page.
+ *   Le paramètre URL (?mode=popup) est inclus dans callbackURL → better-auth le préserve
+ *   dans la redirection finale → survit à toutes les redirections OAuth.
  *
- *   Fallback : si window.name n'indique pas une popup (ex : ouverture directe de
- *   l'URL), on redirige vers /dashboard en pleine page.
+ *   POURQUOI BroadcastChannel ET PAS postMessage ?
+ *   window.opener est null (COOP Google) → impossible d'utiliser postMessage vers le parent.
+ *   BroadcastChannel fonctionne entre tous les contextes du même origin sans opener.
+ *
+ *   Fallback : si ?mode=popup est absent (URL ouverte directement), on redirige vers /dashboard.
  *
  * @example
  *   // Déclenchement depuis LoginForm.tsx / RegisterForm.tsx
  *   // Note : le groupe (auth) ne préfixe pas l'URL → l'URL réelle est /popup-callback
- *   signIn.social({ provider: 'google', callbackURL: '/popup-callback', disableRedirect: true })
+ *   signIn.social({ provider: 'google', callbackURL: '/popup-callback?mode=popup', disableRedirect: true })
  *   window.open(url, 'google-oauth', '...')
  */
 
@@ -32,9 +33,9 @@
 
 import React, { useEffect } from 'react'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
-import { OAUTH_BROADCAST_CHANNEL, OAUTH_POPUP_NAME } from '@/modules/auth/constants'
+import { OAUTH_BROADCAST_CHANNEL } from '@/modules/auth/constants'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
@@ -44,11 +45,14 @@ import { OAUTH_BROADCAST_CHANNEL, OAUTH_POPUP_NAME } from '@/modules/auth/consta
  */
 export default function PopupCallbackPage(): React.JSX.Element {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Détecter le contexte popup via le nom de fenêtre défini lors de window.open().
-    // On ne peut PAS utiliser window.opener car Google (COOP: same-origin) le détruit.
-    const isPopup = window.name === OAUTH_POPUP_NAME
+    // Détecter le contexte popup via le paramètre URL ?mode=popup.
+    // window.name et window.opener sont tous les deux effacés par le navigateur
+    // lors du passage cross-origin sur les serveurs Google (COOP + sécurité navigateur).
+    // Le paramètre URL est la seule valeur qui survit à travers toutes les redirections OAuth.
+    const isPopup = searchParams.get('mode') === 'popup'
 
     if (isPopup) {
       // Envoyer le signal de succès via BroadcastChannel (même origin, pas d'opener requis)
@@ -61,7 +65,7 @@ export default function PopupCallbackPage(): React.JSX.Element {
       // Fallback : URL ouverte directement en pleine page (pas de popup)
       router.replace('/dashboard')
     }
-  }, [router])
+  }, [router, searchParams])
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">

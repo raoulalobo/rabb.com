@@ -98,7 +98,7 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
     // callbackURL pointe vers la page relais qui fermera la popup via BroadcastChannel.
     const result = await signIn.social({
       provider: 'google',
-      callbackURL: '/popup-callback',
+      callbackURL: '/popup-callback?mode=popup',
       disableRedirect: true,
     })
 
@@ -114,8 +114,8 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
     const left = Math.round(window.innerWidth / 2 - w / 2)
     const top = Math.round(window.innerHeight / 2 - h / 2)
 
-    // Le nom OAUTH_POPUP_NAME est utilisé par /popup-callback pour détecter le contexte popup
-    // (window.opener est null à cause de COOP Google, on ne peut pas l'utiliser)
+    // Nom de la fenêtre popup (informatif — la détection du contexte popup se fait
+    // via le paramètre ?mode=popup dans callbackURL, pas via window.name)
     const popup = window.open(
       result.data.url,
       OAUTH_POPUP_NAME,
