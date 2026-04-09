@@ -19,7 +19,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle2, Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
@@ -53,8 +53,6 @@ interface RegisterFormProps {
  * @returns Formulaire d'inscription ou message de succès post-inscription
  */
 export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): React.JSX.Element {
-  const router = useRouter()
-
   // Affiche le message de succès post-inscription (flux email uniquement)
   const [isSuccess, setIsSuccess] = useState(false)
   // Email soumis (pour l'afficher dans le message de succès)
@@ -134,8 +132,9 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
       cleanup(channel, interval)
       const session = await authClient.getSession()
       if (session.data?.session) {
-        router.push('/dashboard')
-        router.refresh()
+        // Rechargement complet : force better-auth à ré-initialiser son cache client
+        // depuis le cookie de session → useSession() retourne l'utilisateur correctement.
+        window.location.href = '/dashboard'
       } else {
         setGoogleLoading(false)
       }
@@ -150,8 +149,7 @@ export function RegisterForm({ showGoogleOAuth = false }: RegisterFormProps): Re
         cleanup(channel, pollInterval)
         const session = await authClient.getSession()
         if (session.data?.session) {
-          router.push('/dashboard')
-          router.refresh()
+          window.location.href = '/dashboard'
         } else {
           setGoogleLoading(false)
         }

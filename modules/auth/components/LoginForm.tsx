@@ -177,8 +177,11 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
       cleanup(channel, interval)
       const session = await authClient.getSession()
       if (session.data?.session) {
-        router.push(callbackUrl)
-        router.refresh()
+        // Rechargement complet : force better-auth à ré-initialiser son cache client
+        // depuis le cookie de session → useSession() retourne l'utilisateur correctement.
+        // router.push() + router.refresh() ne suffisent pas à invalider le cache mémoire
+        // de better-auth après un flux OAuth popup.
+        window.location.href = callbackUrl
       } else {
         setGoogleLoading(false)
       }
@@ -197,8 +200,7 @@ export function LoginForm({ showGoogleOAuth = false }: LoginFormProps): React.JS
         cleanup(channel, pollInterval)
         const session = await authClient.getSession()
         if (session.data?.session) {
-          router.push(callbackUrl)
-          router.refresh()
+          window.location.href = callbackUrl
         } else {
           // Popup fermée sans session → annulation utilisateur
           setGoogleLoading(false)
