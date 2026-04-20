@@ -16,6 +16,7 @@ import { headers } from 'next/headers'
 
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { BioLinkHomeCard } from '@/modules/biolink/components/BioLinkHomeCard'
 import { ConnectedPlatformsBanner } from '@/modules/dashboard/components/ConnectedPlatformsBanner'
 import { DashboardStats } from '@/modules/dashboard/components/DashboardStats'
 import { FailedPostsAlert } from '@/modules/dashboard/components/FailedPostsAlert'
@@ -53,6 +54,21 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
     return <OnboardingBanner step={onboardingStep} firstName={firstName} />
   }
 
+  // ── BioPage éventuelle pour le widget "Ma Link-in-Bio" ─────────────────
+  // On n'affiche le widget que si l'user a déjà une BioPage (créée via /biolink).
+  // Select minimal pour éviter de transporter des champs inutiles côté serveur.
+  const bioPage = session?.user?.id
+    ? await prisma.bioPage.findUnique({
+        where: { userId: session.user.id },
+        select: {
+          slug: true,
+          isPublished: true,
+          title: true,
+          avatarUrl: true,
+        },
+      })
+    : null
+
   // ── Dashboard normal (onboarding terminé) ──────────────────────────────
   return (
     <div className="space-y-6">
@@ -74,6 +90,11 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
       {/* ── 4. Réseaux connectés ──────────────────────────────────────────── */}
       <ConnectedPlatformsBanner />
+
+      {/* ── 5. Widget "Ma Link-in-Bio" (si BioPage existante) ─────────────── */}
+      {/* N'apparaît que si l'utilisateur a déjà créé sa BioPage via /biolink —
+          sinon on ne pollue pas le dashboard avec un CTA supplémentaire. */}
+      {bioPage && <BioLinkHomeCard page={bioPage} />}
     </div>
   )
 }
