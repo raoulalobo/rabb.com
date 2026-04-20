@@ -37,17 +37,23 @@ export const MIMI_SARA_MOCK: BioPageData = {
   slug: 'mimisara',
   name: 'Mimi Sara',
   nameSplit: ['Mimi', 'Sara'],
-  handle: '@mimisara',
+  // Handle aligné sur les comptes IG/TikTok de la cliente pour cohérence.
+  // Le slug URL reste 'mimisara' (plus lisible/SEO) — ils peuvent différer.
+  handle: '@mimimaze',
   bio: 'Auteure · Entrepreneure · Camerounaise',
   tagline:
     'Retrouvez ici mes projets, mon livre et ma boutique — un seul endroit, toujours à jour.',
   avatarUrl: '/brand/biolink-demo-avatar.jpg',
   status: 'En ligne',
+  // Réseaux sociaux réels fournis par la cliente (2026-04-20) :
+  // - Instagram  : @mimimaze
+  // - TikTok     : @mimimaze
+  // - Facebook   : La boutique d'Osy (page — pas de compte perso)
+  // YouTube et email non disponibles → non affichés.
   socials: [
-    { kind: 'ig', href: 'https://instagram.com/mimisara', label: 'Instagram' },
-    { kind: 'tt', href: 'https://tiktok.com/@mimisara', label: 'TikTok' },
-    { kind: 'yt', href: 'https://youtube.com/@mimisara', label: 'YouTube' },
-    { kind: 'mail', href: 'mailto:contact@mimisara.com', label: 'Email' },
+    { kind: 'ig', href: 'https://instagram.com/mimimaze', label: 'Instagram' },
+    { kind: 'tt', href: 'https://tiktok.com/@mimimaze', label: 'TikTok' },
+    { kind: 'fb', href: 'https://facebook.com/laboutiquedosy', label: "La boutique d'Osy — Facebook" },
   ],
   links: [
     {
