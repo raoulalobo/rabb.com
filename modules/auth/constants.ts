@@ -14,7 +14,7 @@
  * BroadcastChannel contourne COOP (Cross-Origin-Opener-Policy: same-origin de Google)
  * qui détruit window.opener lors du passage par les serveurs Google.
  */
-export const OAUTH_BROADCAST_CHANNEL = 'ogolong-oauth-callback'
+export const OAUTH_BROADCAST_CHANNEL = 'SocialTDL-oauth-callback'
 
 /**
  * Nom donné à la popup lors de window.open().

@@ -21,7 +21,7 @@ import type { Metadata } from 'next'
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'Feedback — ogolong',
+  title: 'Feedback — SocialTDL',
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ export default async function FeedbackPage(): Promise<React.JSX.Element> {
         <h1 className="text-2xl font-bold tracking-tight">Feedback</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Partagez vos remarques, signalez un bug ou suggérez une amélioration.
-          Chaque retour nous aide à améliorer ogolong.
+          Chaque retour nous aide à améliorer SocialTDL.
         </p>
       </div>
 

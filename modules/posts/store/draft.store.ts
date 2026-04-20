@@ -236,7 +236,7 @@ const initialState = {
 /**
  * Store Zustand du brouillon de post.
  * Utilise Immer pour des mutations directes lisibles (pas de spread nécessaire).
- * Persiste dans sessionStorage sous la clé 'ogolong-draft'.
+ * Persiste dans sessionStorage sous la clé 'SocialTDL-draft'.
  *
  * @example
  *   // Dans PostComposer.Editor
@@ -438,7 +438,7 @@ export const useDraftStore = create<DraftStore>()(
         }),
     })),
     {
-      name: 'ogolong-draft',
+      name: 'SocialTDL-draft',
       // sessionStorage : le brouillon est perdu à la fermeture du navigateur
       // (intentionnel — évite des brouillons "fantômes" entre sessions)
       //

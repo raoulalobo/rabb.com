@@ -2,7 +2,7 @@
  * @file Sidebar.tsx
  * @module layout
  * @description Barre de navigation latérale du dashboard.
- *   - Affiche le logo ogolong et les liens de navigation principaux
+ *   - Affiche le logo SocialTDL et les liens de navigation principaux
  *   - Responsive : visible en desktop (md+), cachée sur mobile
  *   - Sur mobile, la navigation est assurée par MobileSidebar (Sheet)
  *
@@ -94,7 +94,7 @@ export function Sidebar(): React.JSX.Element {
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
             o
           </div>
-          <span className="font-semibold text-sidebar-foreground">ogolong</span>
+          <span className="font-semibold text-sidebar-foreground">SocialTDL</span>
         </Link>
       </div>
 

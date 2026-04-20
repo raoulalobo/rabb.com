@@ -36,7 +36,7 @@ export default function LegalLayout({ children }: LegalLayoutProps): React.JSX.E
             href="/"
             className="text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity"
           >
-            ogolong
+            SocialTDL
           </Link>
         </div>
       </header>

@@ -1,6 +1,6 @@
 /**
  * @file app/layout.tsx
- * @description Layout racine de l'application ogolong.com.
+ * @description Layout racine de l'application socialtdl.net.
  *   - Fournit les fonts Geist (sans + mono) via le package npm 'geist' (local, sans réseau)
  *   - Configure les métadonnées globales (SEO)
  *   - Monte les providers globaux : TanStack Query + Sonner (notifications toast)
@@ -30,9 +30,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: {
     // Titre par défaut (pages sans titre propre)
-    default: 'ogolong — Planification de contenu',
-    // Modèle pour les pages internes : "Compose · ogolong"
-    template: '%s · ogolong',
+    default: 'SocialTDL — Planification de contenu multiplateforme',
+    // Modèle pour les pages internes : "Compose · SocialTDL"
+    template: '%s · SocialTDL',
   },
   description:
     'Planifiez et publiez votre contenu sur Instagram, TikTok, YouTube et Facebook depuis un seul outil.',

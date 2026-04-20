@@ -5,7 +5,7 @@
  *   Expose deux actions RGPD critiques pour l'utilisateur :
  *
  *   1. **Export des données** (droit à la portabilité — art. 20 RGPD)
- *      Déclenche le téléchargement de ogolong-data-YYYY-MM-DD.json via /api/user/export.
+ *      Déclenche le téléchargement de SocialTDL-data-YYYY-MM-DD.json via /api/user/export.
  *
  *   2. **Suppression du compte** (droit à l'effacement — art. 17 RGPD)
  *      Ouvre un Dialog de confirmation. L'utilisateur doit taper "supprimer" pour activer

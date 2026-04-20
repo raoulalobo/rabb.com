@@ -1,7 +1,7 @@
 /**
  * @file app/(legal)/privacy/page.tsx
  * @module legal
- * @description Page de politique de confidentialité RGPD — ogolong.com.
+ * @description Page de politique de confidentialité RGPD — socialtdl.net.
  *   Accessible sans connexion à /privacy.
  *
  *   Contenu :
@@ -11,7 +11,7 @@
  *   - Hébergement et transferts de données
  *   - Durée de conservation
  *   - Droits des utilisateurs (accès, rectification, effacement, portabilité, opposition)
- *   - Contact RGPD : privacy@ogolong.com
+ *   - Contact RGPD : privacy@socialtdl.net
  */
 
 import type { Metadata } from 'next'
@@ -22,7 +22,7 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Politique de confidentialité',
   description:
-    'Découvrez comment ogolong.com collecte, utilise et protège vos données personnelles conformément au RGPD.',
+    'Découvrez comment socialtdl.net collecte, utilise et protège vos données personnelles conformément au RGPD.',
 }
 
 // ─── Composants de mise en page du contenu légal ──────────────────────────────
@@ -85,7 +85,7 @@ export default function PrivacyPage(): React.JSX.Element {
 
       {/* ── Introduction ── */}
       <P>
-        ogolong.com (&ldquo;nous&rdquo;, &ldquo;notre service&rdquo;) s&rsquo;engage à protéger la vie
+        socialtdl.net (&ldquo;nous&rdquo;, &ldquo;notre service&rdquo;) s&rsquo;engage à protéger la vie
         privée de ses utilisateurs. Cette politique explique quelles données personnelles nous
         collectons, pourquoi nous les collectons et comment nous les utilisons, conformément au
         Règlement Général sur la Protection des Données (RGPD — Règlement UE 2016/679).
@@ -94,16 +94,16 @@ export default function PrivacyPage(): React.JSX.Element {
       {/* ── 1. Responsable du traitement ── */}
       <SectionTitle>1. Responsable du traitement</SectionTitle>
       <P>
-        Le responsable du traitement des données personnelles collectées via ogolong.com est :{' '}
-        <strong>ogolong.com</strong>.
+        Le responsable du traitement des données personnelles collectées via socialtdl.net est :{' '}
+        <strong>socialtdl.net</strong>.
       </P>
       <P>
         Contact RGPD :{' '}
         <a
-          href="mailto:privacy@ogolong.com"
+          href="mailto:privacy@socialtdl.net"
           className="text-foreground underline hover:no-underline"
         >
-          privacy@ogolong.com
+          privacy@socialtdl.net
         </a>
       </P>
 
@@ -195,7 +195,7 @@ export default function PrivacyPage(): React.JSX.Element {
       {/* ── 6. Cookies ── */}
       <SectionTitle>6. Cookies et traceurs</SectionTitle>
       <P>
-        ogolong.com utilise uniquement des cookies <strong>strictement nécessaires</strong> au
+        socialtdl.net utilise uniquement des cookies <strong>strictement nécessaires</strong> au
         fonctionnement du service. Il n&rsquo;existe pas de cookie publicitaire, analytique tiers,
         ou de tracking sur notre service.
       </P>
@@ -225,10 +225,10 @@ export default function PrivacyPage(): React.JSX.Element {
         Pour exercer ces droits ou pour toute question relative à vos données, contactez notre
         délégué à la protection des données :{' '}
         <a
-          href="mailto:privacy@ogolong.com"
+          href="mailto:privacy@socialtdl.net"
           className="text-foreground underline hover:no-underline"
         >
-          privacy@ogolong.com
+          privacy@socialtdl.net
         </a>
         . Nous nous engageons à répondre dans un délai d&rsquo;un mois.
       </P>

@@ -63,22 +63,22 @@ const FEATURE_CONFIG: Record<
 > = {
   compose: {
     path: '/screenshots/compose.png',
-    url: 'ogolong.com/compose',
+    url: 'socialtdl.net/compose',
     icon: PenLine,
   },
   analytics: {
     path: '/screenshots/analytics.png',
-    url: 'ogolong.com/analytics',
+    url: 'socialtdl.net/analytics',
     icon: BarChart2,
   },
   gallery: {
     path: '/screenshots/gallery.png',
-    url: 'ogolong.com/gallery',
+    url: 'socialtdl.net/gallery',
     icon: Images,
   },
   settings: {
     path: '/screenshots/settings.png',
-    url: 'ogolong.com/settings',
+    url: 'socialtdl.net/settings',
     icon: Settings2,
   },
 }
@@ -178,7 +178,7 @@ export function FeatureMockup({ featureId, title }: FeatureMockupProps): React.J
          */}
         <Image
           src={config.path}
-          alt={`Capture d'écran de la page ${title} du dashboard ogolong`}
+          alt={`Capture d'écran de la page ${title} du dashboard SocialTDL`}
           fill
           className="z-10 object-cover object-top"
           sizes="(max-width: 768px) 100vw, 50vw"

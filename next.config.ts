@@ -1,6 +1,6 @@
 /**
  * @file next.config.ts
- * @description Configuration Next.js pour ogolong.com.
+ * @description Configuration Next.js pour socialtdl.net.
  *
  *   Stratégie bundler :
  *   - `next dev`   → Turbopack (par défaut Next.js 16). `turbopack.root` fixe la racine

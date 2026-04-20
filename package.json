@@ -1,5 +1,5 @@
 {
-  "name": "ogolong",
+  "name": "socialtdl",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -42,6 +42,7 @@
     "next-themes": "^0.4.6",
     "openai": "^6.22.0",
     "pg": "^8.18.0",
+    "pptxgenjs": "^4.0.1",
     "prisma": "^7.4.1",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",

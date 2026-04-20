@@ -1,7 +1,7 @@
 /**
  * @file components/landing/FeaturesSection.tsx
  * @module landing
- * @description Section "Fonctionnalités" de la landing page d'ogolong.
+ * @description Section "Fonctionnalités" de la landing page d'SocialTDL.
  *
  *   Présente les 4 rubriques principales du dashboard (Compose, Analytics,
  *   Galerie, Paramètres) via des tabs interactifs animés avec

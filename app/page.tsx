@@ -1,7 +1,7 @@
 /**
  * @file app/page.tsx
  * @module app
- * @description Page d'accueil publique (landing page) de ogolong.com.
+ * @description Page d'accueil publique (landing page) de socialtdl.net.
  *
  *   Architecture : 4 sections sans duplication de features.
  *   - Navbar fixe (adapte CTA selon session)
@@ -32,11 +32,11 @@ import type { Metadata } from 'next'
 // ─── Métadonnées SEO ─────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
+  title: 'SocialTDL — Planifiez votre contenu sur tous vos réseaux',
   description:
     'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 6 autres réseaux en quelques secondes.',
   openGraph: {
-    title: 'ogolong — Planifiez votre contenu sur tous vos réseaux',
+    title: 'SocialTDL — Planifiez votre contenu sur tous vos réseaux',
     description:
       'Créez, planifiez et publiez votre contenu sur Instagram, TikTok, YouTube, Facebook et 6 autres réseaux en quelques secondes.',
     type: 'website',
@@ -57,7 +57,7 @@ const HERO_PLATFORMS = [
 // ─── Composant ────────────────────────────────────────────────────────────────
 
 /**
- * Page d'accueil publique de ogolong.com.
+ * Page d'accueil publique de socialtdl.net.
  * Server Component — les sections interactives sont isolées en Client Components.
  */
 export default async function HomePage(): Promise<React.JSX.Element> {
@@ -75,9 +75,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
           <Link
             href="/"
             className="text-xl font-semibold tracking-tight text-gray-900 transition-opacity hover:opacity-80"
-            aria-label="ogolong — retour à l'accueil"
+            aria-label="SocialTDL — retour à l'accueil"
           >
-            ogolong
+            SocialTDL
           </Link>
 
           <div className="flex items-center gap-3">

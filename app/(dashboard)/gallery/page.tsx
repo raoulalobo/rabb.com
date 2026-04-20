@@ -18,7 +18,7 @@ import { MediaLibraryContent } from '@/modules/media/components/MediaLibraryCont
 // ─── Métadonnées ───────────────────────────────────────────────────────────────
 
 export const metadata = {
-  title: 'Media Library — ogolong',
+  title: 'Media Library — SocialTDL',
   description: 'Organisez vos images et vidéos dans des dossiers et taguez-les pour les retrouver facilement.',
 }
 

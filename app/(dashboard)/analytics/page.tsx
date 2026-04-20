@@ -33,7 +33,7 @@ import type { Metadata } from 'next'
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'Analytics — ogolong',
+  title: 'Analytics — SocialTDL',
   description: 'Analysez les performances de vos publications sur tous vos réseaux sociaux.',
 }
 

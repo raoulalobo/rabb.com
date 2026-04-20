@@ -137,7 +137,7 @@ export function FeatureHighlights(): React.JSX.Element {
                   <div className="size-2.5 rounded-full bg-red-400" />
                   <div className="size-2.5 rounded-full bg-amber-400" />
                   <div className="size-2.5 rounded-full bg-green-400" />
-                  <span className="ml-3 text-[10px] text-gray-400">ogolong.com</span>
+                  <span className="ml-3 text-[10px] text-gray-400">socialtdl.net</span>
                 </div>
                 {/* Image */}
                 <div className="relative aspect-[16/10]">

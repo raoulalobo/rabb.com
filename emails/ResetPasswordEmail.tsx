@@ -7,7 +7,7 @@
  * @example
  *   import { ResetPasswordEmail } from '@/emails/ResetPasswordEmail'
  *   const html = await render(ResetPasswordEmail({
- *     url: 'https://ogolong.com/reset-password?token=xyz789',
+ *     url: 'https://socialtdl.net/reset-password?token=xyz789',
  *     name: 'Marie',
  *   }))
  */
@@ -38,7 +38,7 @@ interface ResetPasswordEmailProps {
 
 /**
  * Template email de réinitialisation de mot de passe.
- * Design cohérent avec VerificationEmail (même charte ogolong).
+ * Design cohérent avec VerificationEmail (même charte SocialTDL).
  *
  * @param url  - Lien de reset à insérer dans le bouton CTA
  * @param name - Prénom affiché dans le corps du message (optionnel)
@@ -49,14 +49,14 @@ export function ResetPasswordEmail({ url, name }: ResetPasswordEmailProps): Reac
   return (
     <Html lang="fr">
       <Head />
-      <Preview>Réinitialise ton mot de passe ogolong</Preview>
+      <Preview>Réinitialise ton mot de passe SocialTDL</Preview>
 
       <Body style={styles.body}>
         <Container style={styles.container}>
 
           {/* ── En-tête logo ───────────────────────────────────────────── */}
           <Section style={styles.header}>
-            <Text style={styles.logo}>ogolong</Text>
+            <Text style={styles.logo}>SocialTDL</Text>
           </Section>
 
           {/* ── Corps ─────────────────────────────────────────────────── */}
@@ -65,7 +65,7 @@ export function ResetPasswordEmail({ url, name }: ResetPasswordEmailProps): Reac
 
             <Text style={styles.text}>{greeting}</Text>
             <Text style={styles.text}>
-              Tu as demandé à réinitialiser le mot de passe de ton compte ogolong.
+              Tu as demandé à réinitialiser le mot de passe de ton compte SocialTDL.
               Clique sur le bouton ci-dessous pour choisir un nouveau mot de passe.
             </Text>
 
@@ -85,7 +85,7 @@ export function ResetPasswordEmail({ url, name }: ResetPasswordEmailProps): Reac
           {/* ── Pied de page ───────────────────────────────────────────── */}
           <Section style={styles.footer}>
             <Text style={styles.footerText}>
-              ogolong · Planification de contenu multiplateforme
+              SocialTDL · Planification de contenu multiplateforme
             </Text>
             <Text style={styles.footerText}>
               Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :

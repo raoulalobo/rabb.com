@@ -10,7 +10,7 @@
  * @example
  *   import { late } from '@/lib/late'
  *   // Initier la connexion OAuth
- *   const { authUrl } = await late.connect.getUrl('instagram', 'prof_abc', 'https://ogolong.com/api/platforms/callback')
+ *   const { authUrl } = await late.connect.getUrl('instagram', 'prof_abc', 'https://socialtdl.net/api/platforms/callback')
  *   const post = await late.posts.create({ content: '...', platforms: [{ platform: 'instagram', accountId: '...' }] })
  */
 
@@ -604,7 +604,7 @@ class LateClient {
      * @example
      *   const { authUrl } = await late.connect.getUrl(
      *     'instagram',
-     *     'https://ogolong.com/api/platforms/callback',
+     *     'https://socialtdl.net/api/platforms/callback',
      *   )
      *   window.location.href = authUrl
      */
@@ -633,7 +633,7 @@ class LateClient {
   /**
    * Ressource "profiles" : gestion des workspaces Late.
    * Un workspace est un conteneur qui regroupe plusieurs comptes sociaux connectés.
-   * Chaque utilisateur ogolong a UN workspace Late, créé automatiquement au premier connect.
+   * Chaque utilisateur SocialTDL a UN workspace Late, créé automatiquement au premier connect.
    */
   readonly profiles = {
     /**

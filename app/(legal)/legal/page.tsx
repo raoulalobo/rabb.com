@@ -1,7 +1,7 @@
 /**
  * @file app/(legal)/legal/page.tsx
  * @module legal
- * @description Mentions légales obligatoires — ogolong.com.
+ * @description Mentions légales obligatoires — socialtdl.net.
  *   Accessible sans connexion à /legal.
  *
  *   Contenu obligatoire (Loi pour la Confiance dans l'Économie Numérique — LCEN) :
@@ -20,7 +20,7 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Mentions légales',
   description:
-    'Mentions légales obligatoires du site ogolong.com, conformément à la loi LCEN.',
+    'Mentions légales obligatoires du site socialtdl.net, conformément à la loi LCEN.',
 }
 
 // ─── Composants de mise en page du contenu légal ──────────────────────────────
@@ -96,10 +96,10 @@ export default function LegalPage(): React.JSX.Element {
           label="Contact"
           value={
             <a
-              href="mailto:privacy@ogolong.com"
+              href="mailto:privacy@socialtdl.net"
               className="text-foreground underline hover:no-underline"
             >
-              privacy@ogolong.com
+              privacy@socialtdl.net
             </a>
           }
         />
@@ -142,7 +142,7 @@ export default function LegalPage(): React.JSX.Element {
       {/* ── 4. Propriété intellectuelle ── */}
       <SectionTitle>4. Propriété intellectuelle</SectionTitle>
       <P>
-        L&rsquo;ensemble du contenu du site ogolong.com (textes, graphismes, logo, icônes,
+        L&rsquo;ensemble du contenu du site socialtdl.net (textes, graphismes, logo, icônes,
         images, code source) est protégé par le droit d&rsquo;auteur et constitue une œuvre
         intellectuelle dont l&rsquo;éditeur est titulaire des droits. Toute reproduction,
         représentation, modification, publication, transmission ou dénaturation, totale ou
@@ -160,10 +160,10 @@ export default function LegalPage(): React.JSX.Element {
       {/* ── 5. Liens hypertextes ── */}
       <SectionTitle>5. Liens hypertextes</SectionTitle>
       <P>
-        Le site ogolong.com peut contenir des liens vers des sites tiers. Ces liens sont fournis
+        Le site socialtdl.net peut contenir des liens vers des sites tiers. Ces liens sont fournis
         à titre informatif uniquement. L&rsquo;éditeur n&rsquo;exerce aucun contrôle sur le
         contenu de ces sites et décline toute responsabilité quant à leur contenu ou leur
-        disponibilité. L&rsquo;établissement d&rsquo;un lien vers ogolong.com est soumis à
+        disponibilité. L&rsquo;établissement d&rsquo;un lien vers socialtdl.net est soumis à
         accord préalable de l&rsquo;éditeur.
       </P>
 
@@ -174,10 +174,10 @@ export default function LegalPage(): React.JSX.Element {
       </P>
       <P>
         <a
-          href="mailto:privacy@ogolong.com"
+          href="mailto:privacy@socialtdl.net"
           className="text-foreground underline hover:no-underline"
         >
-          privacy@ogolong.com
+          privacy@socialtdl.net
         </a>
       </P>
 

@@ -109,7 +109,7 @@ export async function deleteAccount(): Promise<DeleteAccountResult> {
     console.error('[deleteAccount] Erreur lors de la suppression du compte :', error)
     return {
       success: false,
-      error: 'Une erreur est survenue lors de la suppression. Contactez privacy@ogolong.com.',
+      error: 'Une erreur est survenue lors de la suppression. Contactez privacy@socialtdl.net.',
     }
   }
 }

@@ -18,7 +18,7 @@ import { CalendarClock, Clock, Layers, X, Zap } from 'lucide-react'
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 /** Clé localStorage pour persister la fermeture */
-const STORAGE_KEY = 'ogolong_queue_guide_dismissed'
+const STORAGE_KEY = 'socialtdl_queue_guide_dismissed'
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 

@@ -3,12 +3,12 @@
  * @module shared
  * @description Bannière de consentement aux cookies — conformité RGPD minimale.
  *
- *   ogolong.com n'utilise que des cookies de session essentiels (aucun cookie
+ *   socialtdl.net n'utilise que des cookies de session essentiels (aucun cookie
  *   publicitaire ni analytique tiers). Cette bannière informe l'utilisateur et
  *   enregistre son consentement dans localStorage pour ne plus s'afficher.
  *
  *   Comportement :
- *   - Absent si `localStorage.ogolong_cookie_consent` est défini
+ *   - Absent si `localStorage.socialtdl_cookie_consent` est défini
  *   - Présent en bas d'écran au premier chargement (navigation privée = toujours présent)
  *   - Clic "J'ai compris" → stocke le consentement + disparaît immédiatement
  *   - Lien "En savoir plus" → /privacy
@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button'
 
 // Clé localStorage pour persister le consentement cookies de l'utilisateur.
 // Valeur stockée : "true" (chaîne) — présence suffit à indiquer le consentement.
-const CONSENT_KEY = 'ogolong_cookie_consent'
+const CONSENT_KEY = 'socialtdl_cookie_consent'
 
 /**
  * Bannière RGPD de consentement aux cookies.

@@ -1,4 +1,4 @@
-# CLAUDE.md — ogolong.com
+# CLAUDE.md — SocialTDL
 
 > Guide de référence pour l'IA et les développeurs.
 > Toujours lire ce fichier avant de modifier du code.
@@ -7,7 +7,7 @@
 
 ## 1. Présentation du projet
 
-**ogolong.com** est un SaaS de planification de contenu sur les réseaux sociaux,
+**SocialTDL** (socialtdl.net) est un SaaS de planification de contenu multiplateforme sur les réseaux sociaux,
 ciblant les créateurs de contenu francophones solo.
 Il s'appuie sur l'API **Zernio** (ex getlate.dev) pour la publication multi-plateformes.
 
@@ -32,7 +32,7 @@ Français uniquement (MVP). i18n (next-intl) ajouté ultérieurement.
 | State management | Zustand + Immer | État global client |
 | Validation | Zod | Schémas de données (server + client) |
 | Data fetching | TanStack Query | Cache, synchronisation serveur |
-| Emails | Resend + React Email | Notifications transactionnelles |
+| Emails | Plunk + React Email | Notifications transactionnelles |
 | Déploiement | Vercel | Hosting + Edge Functions |
 | API sociale | Zernio (zernio.com/api) | Publication, scheduling, source de vérité posts |
 
@@ -51,7 +51,7 @@ Les posts ne sont **pas** stockés en DB locale (Prisma). Zernio est la source d
 ## 3. Architecture modulaire
 
 ```
-ogolong/
+SocialTDL/
 ├── app/                        # Next.js App Router
 │   ├── (auth)/                 # Routes publiques (login, register, reset)
 │   ├── (dashboard)/            # Routes protégées (layout avec sidebar)
@@ -96,7 +96,7 @@ ogolong/
 │   ├── late.ts                 # Client Zernio (singleton) — base URL: zernio.com/api
 │   ├── prisma.ts               # Client Prisma (users, platforms, media, queue, etc.)
 │   ├── supabase/               # Clients Supabase (browser + server)
-│   ├── resend.ts               # Client Resend (singleton)
+│   ├── plunk.ts                # Client Plunk (singleton) — emails transactionnels
 │   ├── auth.ts                 # Config better-auth
 │   └── validations/            # Schémas Zod partagés
 │
@@ -264,9 +264,11 @@ BETTER_AUTH_URL=
 # Zernio (ex getlate.dev)
 LATE_API_KEY=          # Clé API Zernio (Bearer token)
 
-# Resend
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@ogolong.com
+# Plunk (emails transactionnels)
+PLUNK_SECRET_KEY=                    # Clé secrète serveur (lib/plunk.ts)
+NEXT_PUBLIC_PLUNK_PUBLIC_KEY=        # Clé publique client (tracking)
+# Adresse expéditeur : noreply@socialtdl.net — configurée dans le code
+# (lib/plunk.ts: FROM_EMAIL) ; domaine à vérifier dans le dashboard Plunk.
 ```
 
 ---

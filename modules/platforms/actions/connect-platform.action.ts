@@ -76,7 +76,7 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
       // lateWorkspaceId absent = premier connect de cet utilisateur (création lazy)
       // OU état incohérent : workspace créé chez Late lors d'une tentative précédente,
       // mais l'ID n'a jamais été persisté en DB (crash, timeout, erreur réseau).
-      const profileName = user?.name ?? session.user.email ?? 'ogolong user'
+      const profileName = user?.name ?? session.user.email ?? 'SocialTDL user'
       console.log('[connectPlatform] lateWorkspaceId absent → création workspace Late pour:', session.user.id)
 
       try {
@@ -99,7 +99,7 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
 
         console.warn('[connectPlatform] Workspace déjà existant chez Late → récupération par nom...')
 
-        // ⚠️ late.profiles.list() retourne TOUS les workspaces du compte Late de ogolong.com.
+        // ⚠️ late.profiles.list() retourne TOUS les workspaces du compte Late de socialtdl.net.
         //    On cherche uniquement le profil portant le nom de CET utilisateur.
         //    Risque marginal (post-MVP) si deux utilisateurs ont le même nom : utiliser
         //    user.id comme suffixe dans le nom du profil pour garantir l'unicité.
@@ -189,7 +189,7 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
           console.error('[connectPlatform] Workspace périmé AVEC comptes connectés — recovery impossible')
           return {
             success: false,
-            error: `Ton profil Zernio a expiré mais ${existingPlatforms} réseau${existingPlatforms > 1 ? 'x' : ''} y ${existingPlatforms > 1 ? 'sont' : 'est'} encore lié${existingPlatforms > 1 ? 's' : ''}. Contacte le support (privacy@ogolong.com) pour récupérer tes données.`,
+            error: `Ton profil Zernio a expiré mais ${existingPlatforms} réseau${existingPlatforms > 1 ? 'x' : ''} y ${existingPlatforms > 1 ? 'sont' : 'est'} encore lié${existingPlatforms > 1 ? 's' : ''}. Contacte le support (privacy@socialtdl.net) pour récupérer tes données.`,
           }
         }
 
@@ -203,7 +203,7 @@ export async function connectPlatform(platform: unknown): Promise<PlatformAction
         })
 
         // Recréer un workspace chez Zernio
-        const profileName = user?.name ?? session.user.email ?? 'ogolong user'
+        const profileName = user?.name ?? session.user.email ?? 'SocialTDL user'
         const newWorkspace = await late.profiles.create({ name: profileName })
         lateWorkspaceId = newWorkspace._id
         console.log('[connectPlatform] Nouveau workspace créé:', lateWorkspaceId)

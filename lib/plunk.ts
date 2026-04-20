@@ -30,6 +30,20 @@ import { VerificationEmail } from '@/emails/VerificationEmail'
  */
 const plunk = new Plunk(process.env.PLUNK_SECRET_KEY ?? '')
 
+// ─── Expéditeur ───────────────────────────────────────────────────────────────
+
+/**
+ * Adresse email expéditrice des emails système (auth, reset).
+ * Doit être sous un domaine vérifié dans le dashboard Plunk (DKIM + SPF).
+ *
+ * Pour un email de support commercial, surcharger `from` à l'appel :
+ *   plunk.emails.send({ ..., from: 'support@socialtdl.net', name: 'SocialTDL Support' })
+ */
+const FROM_EMAIL = 'noreply@socialtdl.net'
+
+/** Nom d'affichage de l'expéditeur (visible par le destinataire dans "De :"). */
+const FROM_NAME = 'SocialTDL'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface EmailParams {
@@ -49,13 +63,13 @@ interface EmailParams {
  * Le template React Email est rendu en HTML avant envoi via Plunk.
  *
  * @param params.email - Email du destinataire
- * @param params.url   - Lien de vérification (ex: https://ogolong.com/api/auth/verify-email?token=...)
+ * @param params.url   - Lien de vérification (ex: https://socialtdl.net/api/auth/verify-email?token=...)
  * @param params.name  - Prénom affiché dans le template (optionnel)
  *
  * @example
  *   await sendVerificationEmail({
  *     email: 'marie@exemple.fr',
- *     url: 'https://ogolong.com/api/auth/verify-email?token=abc123',
+ *     url: 'https://socialtdl.net/api/auth/verify-email?token=abc123',
  *     name: 'Marie',
  *   })
  */
@@ -65,8 +79,10 @@ export async function sendVerificationEmail({ email, url, name }: EmailParams): 
 
   const result = await plunk.emails.send({
     to: email,
-    subject: 'Confirme ton adresse email — ogolong',
+    subject: 'Confirme ton adresse email — SocialTDL',
     body: html,
+    from: FROM_EMAIL,
+    name: FROM_NAME,
   })
 
   if (!result.success) {
@@ -80,13 +96,13 @@ export async function sendVerificationEmail({ email, url, name }: EmailParams): 
  * Le token est valide 1 heure par défaut (configurable via resetPasswordTokenExpiresIn).
  *
  * @param params.email - Email du destinataire
- * @param params.url   - Lien de reset (ex: https://ogolong.com/reset-password?token=...)
+ * @param params.url   - Lien de reset (ex: https://socialtdl.net/reset-password?token=...)
  * @param params.name  - Prénom affiché dans le template (optionnel)
  *
  * @example
  *   await sendPasswordResetEmail({
  *     email: 'marie@exemple.fr',
- *     url: 'https://ogolong.com/reset-password?token=xyz789',
+ *     url: 'https://socialtdl.net/reset-password?token=xyz789',
  *     name: 'Marie',
  *   })
  */
@@ -96,8 +112,10 @@ export async function sendPasswordResetEmail({ email, url, name }: EmailParams):
 
   const result = await plunk.emails.send({
     to: email,
-    subject: 'Réinitialise ton mot de passe — ogolong',
+    subject: 'Réinitialise ton mot de passe — SocialTDL',
     body: html,
+    from: FROM_EMAIL,
+    name: FROM_NAME,
   })
 
   if (!result.success) {

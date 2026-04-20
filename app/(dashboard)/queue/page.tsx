@@ -18,7 +18,7 @@ import { QueueGuide } from '@/modules/queue/components/QueueGuide'
 // ─── Métadonnées ─────────────────────────────────────────────────────────────
 
 export const metadata = {
-  title: "File d'attente — ogolong",
+  title: "File d'attente — SocialTDL",
   description: 'Définissez vos créneaux horaires récurrents pour programmer automatiquement vos posts.',
 }
 

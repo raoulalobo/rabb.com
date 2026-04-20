@@ -7,7 +7,7 @@
  * @example
  *   import { VerificationEmail } from '@/emails/VerificationEmail'
  *   const html = await render(VerificationEmail({
- *     url: 'https://ogolong.com/api/auth/verify-email?token=abc123',
+ *     url: 'https://socialtdl.net/api/auth/verify-email?token=abc123',
  *     name: 'Marie',
  *   }))
  */
@@ -38,7 +38,7 @@ interface VerificationEmailProps {
 
 /**
  * Template email de vérification d'adresse.
- * Design minimaliste cohérent avec l'identité visuelle ogolong.
+ * Design minimaliste cohérent avec l'identité visuelle SocialTDL.
  *
  * @param url  - Lien de confirmation à insérer dans le bouton CTA
  * @param name - Prénom affiché dans le corps du message (optionnel)
@@ -49,14 +49,14 @@ export function VerificationEmail({ url, name }: VerificationEmailProps): React.
   return (
     <Html lang="fr">
       <Head />
-      <Preview>Confirme ton adresse email pour accéder à ogolong</Preview>
+      <Preview>Confirme ton adresse email pour accéder à SocialTDL</Preview>
 
       <Body style={styles.body}>
         <Container style={styles.container}>
 
           {/* ── En-tête logo ───────────────────────────────────────────── */}
           <Section style={styles.header}>
-            <Text style={styles.logo}>ogolong</Text>
+            <Text style={styles.logo}>SocialTDL</Text>
           </Section>
 
           {/* ── Corps ─────────────────────────────────────────────────── */}
@@ -65,7 +65,7 @@ export function VerificationEmail({ url, name }: VerificationEmailProps): React.
 
             <Text style={styles.text}>{greeting}</Text>
             <Text style={styles.text}>
-              Merci de t'être inscrit sur ogolong. Clique sur le bouton ci-dessous
+              Merci de t'être inscrit sur SocialTDL. Clique sur le bouton ci-dessous
               pour confirmer ton adresse email et activer ton compte.
             </Text>
 
@@ -76,7 +76,7 @@ export function VerificationEmail({ url, name }: VerificationEmailProps): React.
 
             <Text style={styles.hint}>
               Ce lien expire dans 24 heures. Si tu n'as pas créé de compte sur
-              ogolong, tu peux ignorer cet email.
+              SocialTDL, tu peux ignorer cet email.
             </Text>
           </Section>
 
@@ -85,7 +85,7 @@ export function VerificationEmail({ url, name }: VerificationEmailProps): React.
           {/* ── Pied de page ───────────────────────────────────────────── */}
           <Section style={styles.footer}>
             <Text style={styles.footerText}>
-              ogolong · Planification de contenu multiplateforme
+              SocialTDL · Planification de contenu multiplateforme
             </Text>
             <Text style={styles.footerText}>
               Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :

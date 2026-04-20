@@ -76,7 +76,7 @@ function createUpstashLimiter(
     // Sliding window : la fenêtre glisse avec le temps, pas de "burst" en début de fenêtre
     limiter: Ratelimit.slidingWindow(limit, `${window} s`),
     // Préfixe pour isoler les clés de ce projet dans le Redis Upstash
-    prefix: 'ogolong:rl',
+    prefix: 'SocialTDL:rl',
   })
 
   return {

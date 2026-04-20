@@ -1,17 +1,17 @@
 /**
  * @file app/not-found.tsx
  * @module app
- * @description Page 404 de ogolong.com.
+ * @description Page 404 de socialtdl.net.
  *
  *   Concept : "publication échouée" — la page simule visuellement une PostCard
- *   avec le statut FAILED, exactement comme dans l'UI réelle de ogolong.
+ *   avec le statut FAILED, exactement comme dans l'UI réelle de SocialTDL.
  *   C'est fun, cohérent avec le domaine, et immédiatement compréhensible
  *   pour un utilisateur qui connaît l'outil.
  *
  *   Structure :
  *   1. Grand "404" typographique en font-mono
  *   2. Fausse PostCard avec statut FAILED (badge destructive)
- *      - En-tête : logo ogolong + nom + badge "ÉCHOUÉ"
+ *      - En-tête : logo SocialTDL + nom + badge "ÉCHOUÉ"
  *      - Corps : texte barré simulant un post social qui n'a pas pu être publié
  *      - Footer : métriques à zéro + message "Publication échouée"
  *   3. Bouton de retour au dashboard
@@ -24,7 +24,7 @@
  * @example
  *   // Next.js App Router détecte automatiquement ce fichier
  *   // et l'affiche pour toute route inexistante (404)
- *   // → https://ogolong.com/une-page-qui-nexiste-pas  →  not-found.tsx
+ *   // → https://socialtdl.net/une-page-qui-nexiste-pas  →  not-found.tsx
  */
 
 import Link from 'next/link'
@@ -42,7 +42,7 @@ import type { Metadata } from 'next'
  * noindex implicite via le statut HTTP 404 que Next.js envoie automatiquement.
  */
 export const metadata: Metadata = {
-  title: 'Page introuvable — ogolong',
+  title: 'Page introuvable — SocialTDL',
   description: 'Cette page n\'existe pas. Retournez au dashboard pour gérer vos posts.',
 }
 
@@ -54,12 +54,12 @@ export const metadata: Metadata = {
  * Chaque ligne est un paragraphe distinct pour le rendu.
  */
 const FAKE_POST_LINES = [
-  '✨ Nouveau post disponible sur ogolong...',
+  '✨ Nouveau post disponible sur SocialTDL...',
   '',
   'Malheureusement, cette page n\'existe pas encore.',
   'On travaille dessus. Restez connectés !',
   '',
-  '#ogolong #bientôt #PageIntrouvable',
+  '#SocialTDL #bientôt #PageIntrouvable',
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ const FAKE_POST_LINES = [
 /**
  * Page 404 — affichée automatiquement par Next.js App Router pour toute
  * route inexistante. Simule une PostCard avec statut FAILED pour rester
- * cohérent avec l'univers visuel de ogolong.
+ * cohérent avec l'univers visuel de SocialTDL.
  *
  * @returns JSX de la page 404, centré plein écran, Server Component
  */
@@ -114,13 +114,13 @@ export default function NotFound(): React.JSX.Element {
         {/* ── En-tête de la card ─────────────────────────────────────────── */}
         {/*
          * Structure identique à une vraie PostCard :
-         * - Logo ogolong (carré arrondi bg-primary + "o" blanc)
-         * - Nom de l'app "ogolong.com"
+         * - Logo SocialTDL (carré arrondi bg-primary + "o" blanc)
+         * - Nom de l'app "socialtdl.net"
          * - Badge statut FAILED (variant destructive = rouge)
          */}
         <header className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Logo ogolong — carré arrondi bg-primary avec lettre "o" blanche */}
+            {/* Logo SocialTDL — carré arrondi bg-primary avec lettre "o" blanche */}
             {/*
              * size-8 = 32px : taille standard pour un avatar/logo dans une card.
              * rounded-lg (pas rounded-full) : forme de l'icône app, pas d'avatar.
@@ -128,14 +128,14 @@ export default function NotFound(): React.JSX.Element {
              */}
             <div
               className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
-              aria-label="Logo ogolong"
+              aria-label="Logo SocialTDL"
             >
               o
             </div>
 
             {/* Nom de l'application */}
             <div className="flex flex-col">
-              <span className="text-sm font-semibold leading-tight">ogolong.com</span>
+              <span className="text-sm font-semibold leading-tight">socialtdl.net</span>
               {/* Sous-titre discret — identique au nom de plateforme dans les vraies cards */}
               <span className="text-xs text-muted-foreground">Agent IA</span>
             </div>
@@ -144,7 +144,7 @@ export default function NotFound(): React.JSX.Element {
           {/* Badge statut "ÉCHOUÉ" — variant destructive = fond rouge */}
           {/*
            * Reproduit exactement le badge affiché sur les posts FAILED dans l'UI.
-           * uppercase + tracking-wide : convention des badges de statut dans ogolong.
+           * uppercase + tracking-wide : convention des badges de statut dans SocialTDL.
            */}
           <Badge variant="destructive" className="shrink-0 font-mono text-xs uppercase tracking-wide">
             ÉCHOUÉ

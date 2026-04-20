@@ -21,7 +21,7 @@ import { createAuthClient } from 'better-auth/react'
  * Client better-auth singleton pour le navigateur.
  *
  * baseURL strategy :
- * - En production : NEXT_PUBLIC_APP_URL (ex: https://ogolong.com)
+ * - En production : NEXT_PUBLIC_APP_URL (ex: https://socialtdl.net)
  * - En dev (navigateur) : window.location.origin → s'adapte automatiquement
  *   que l'on accède via localhost:3000 ou via l'IP LAN (10.x.x.x:3000),
  *   ce qui évite les erreurs "Failed to fetch" depuis un autre appareil.

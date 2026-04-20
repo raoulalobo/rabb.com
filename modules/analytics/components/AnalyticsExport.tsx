@@ -9,7 +9,7 @@
  *   Date, Plateforme, Texte, Likes, Commentaires, Partages, Vues,
  *   Impressions, Portée, Clics, Taux d'engagement (%)
  *
- *   Le fichier est nommé : ogolong-analytics-{date}.csv
+ *   Le fichier est nommé : SocialTDL-analytics-{date}.csv
  *
  * @example
  *   <AnalyticsExport posts={analyticsPosts?.posts} />
@@ -142,7 +142,7 @@ export function AnalyticsExport({ posts }: AnalyticsExportProps): React.JSX.Elem
 
     const csvContent = generateCsv(posts)
     const date = new Date().toISOString().slice(0, 10)
-    downloadCsv(csvContent, `ogolong-analytics-${date}.csv`)
+    downloadCsv(csvContent, `SocialTDL-analytics-${date}.csv`)
   }
 
   return (

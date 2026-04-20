@@ -1,6 +1,6 @@
 /**
  * @file lib/auth.ts
- * @description Configuration better-auth pour ogolong.com.
+ * @description Configuration better-auth pour socialtdl.net.
  *   Providers : email/password (avec vérification email) + Google OAuth.
  *   Persistance : adaptateur Prisma → Supabase PostgreSQL.
  *   Emails transactionnels : Plunk + React Email (vérification email + reset mot de passe).

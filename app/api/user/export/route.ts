@@ -20,7 +20,7 @@
  * @example
  *   // Déclenchement côté client :
  *   <a href="/api/user/export" download>Exporter mes données</a>
- *   // → Télécharge : ogolong-data-2025-03-15.json
+ *   // → Télécharge : SocialTDL-data-2025-03-15.json
  */
 
 import { headers } from 'next/headers'
@@ -113,10 +113,10 @@ export async function GET(): Promise<NextResponse> {
     const exportData = {
       // Métadonnées de l'export (traçabilité RGPD)
       _export: {
-        service: 'ogolong.com',
+        service: 'socialtdl.net',
         exportedAt: new Date().toISOString(),
         rgpdArticle: 'Art. 20 RGPD — Droit à la portabilité des données',
-        contact: 'privacy@ogolong.com',
+        contact: 'privacy@socialtdl.net',
       },
       // Données utilisateur
       profile: user,
@@ -140,7 +140,7 @@ export async function GET(): Promise<NextResponse> {
 
     // ── 4. Nom du fichier avec date du jour (YYYY-MM-DD) ──────────────────
     const date = new Date().toISOString().slice(0, 10)
-    const filename = `ogolong-data-${date}.json`
+    const filename = `SocialTDL-data-${date}.json`
 
     // ── 5. Retour JSON avec header de téléchargement ───────────────────────
     // Content-Disposition: attachment → le navigateur télécharge plutôt qu'afficher

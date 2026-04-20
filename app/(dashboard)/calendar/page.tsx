@@ -27,7 +27,7 @@ import type { PostStatus } from '@/modules/posts/types'
 // ─── Métadonnées ──────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
-  title: 'Calendrier — ogolong',
+  title: 'Calendrier — SocialTDL',
   description: 'Visualisez et planifiez vos publications sur le calendrier.',
 }
 

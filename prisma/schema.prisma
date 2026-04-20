@@ -1,8 +1,8 @@
 /**
  * @file prisma/schema.prisma
- * @description Schéma Prisma pour rabb.com.
+ * @description Schéma Prisma pour socialtdl.net.
  *   Modèles : User, Session, Account, Verification (gérés par better-auth)
- *   + ConnectedPlatform, Post, NotificationPrefs (métier rabb)
+ *   + ConnectedPlatform, Post, NotificationPrefs (métier SocialTDL)
  *
  *   Nouveau modèle simplifié (post-refonte /compose) :
  *   - Post.platform (String singulier) — 1 post = 1 plateforme
@@ -125,7 +125,7 @@ model Verification {
   @@map("verifications")
 }
 
-// ─── Modèles métier rabb ──────────────────────────────────────────────────────
+// ─── Modèles métier SocialTDL ──────────────────────────────────────────────────────
 
 /**
  * Réseau social connecté par l'utilisateur via getlate.dev.
@@ -235,7 +235,7 @@ model Media {
 
 /**
  * Page "Link in Bio" publique de l'utilisateur.
- * Accessible à l'URL : ogolong.com/u/{slug}
+ * Accessible à l'URL : socialtdl.net/u/{slug}
  * Relation 1-1 avec User (un utilisateur ne peut avoir qu'une seule BioPage).
  *
  * Personnalisation : titre, bio, avatar, thème visuel, couleur d'accent.
@@ -252,7 +252,7 @@ model BioPage {
   userId      String   @unique
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // URL publique : ogolong.com/u/{slug}
+  // URL publique : socialtdl.net/u/{slug}
   slug        String   @unique
 
   // Personnalisation du profil
@@ -289,7 +289,7 @@ model BioPage {
 
   // Branding et bannière
   bannerUrl          String?                           // URL bannière large en haut
-  hideBranding       Boolean  @default(false)          // Masquer "Créé avec ogolong"
+  hideBranding       Boolean  @default(false)          // Masquer "Créé avec SocialTDL"
   faviconUrl         String?                           // Favicon personnalisé
 
   // Formulaire de contact intégré

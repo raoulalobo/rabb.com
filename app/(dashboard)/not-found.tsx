@@ -51,7 +51,7 @@ const FAKE_POST_LINES = [
   'Cette page n\'existe pas dans le dashboard.',
   'Vérifiez l\'URL ou revenez à la liste de vos posts.',
   '',
-  '#ogolong #pageIntrouvable #404',
+  '#SocialTDL #pageIntrouvable #404',
 ] as const
 
 // ─── Composant ────────────────────────────────────────────────────────────────
@@ -103,16 +103,16 @@ export default function DashboardNotFound(): React.JSX.Element {
         {/* ── En-tête ─────────────────────────────────────────────────────── */}
         <header className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Logo ogolong — identique à la PostCard réelle */}
+            {/* Logo SocialTDL — identique à la PostCard réelle */}
             <div
               className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground"
-              aria-label="Logo ogolong"
+              aria-label="Logo SocialTDL"
             >
               o
             </div>
 
             <div className="flex flex-col">
-              <span className="text-sm font-semibold leading-tight">ogolong.com</span>
+              <span className="text-sm font-semibold leading-tight">socialtdl.net</span>
               <span className="text-xs text-muted-foreground">Agent IA</span>
             </div>
           </div>

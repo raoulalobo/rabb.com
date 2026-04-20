@@ -1,6 +1,6 @@
 /**
  * @file components/shared/SiteFooter.tsx
- * @description Footer global du site ogolong.com.
+ * @description Footer global du site socialtdl.net.
  *   Utilisé dans les layouts : auth, légal, et la landing page.
  *
  *   Structure 3 colonnes :
@@ -23,7 +23,7 @@
 import Link from 'next/link'
 
 /**
- * Footer partagé du site ogolong.com.
+ * Footer partagé du site socialtdl.net.
  * Server Component pur — pas d'état client ni d'effets.
  *
  * @returns Élément <footer> avec logo, copyright et liens légaux
@@ -48,7 +48,7 @@ export function SiteFooter(): React.JSX.Element {
          * risque de désynchronisation hydratation client/serveur.
          */}
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} ogolong.com — Tous droits réservés
+          © {new Date().getFullYear()} socialtdl.net — Tous droits réservés
         </p>
 
         {/* ── Navigation légale ───────────────────────────────────────────────

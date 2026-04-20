@@ -51,22 +51,22 @@ export function MobileSidebar(): React.JSX.Element {
        */}
       <SheetContent side="left" className="w-60 p-0 bg-sidebar">
 
-        {/* ── En-tête du Sheet — logo ogolong ──────────────────────────── */}
+        {/* ── En-tête du Sheet — logo SocialTDL ──────────────────────────── */}
         <SheetHeader className="flex h-16 flex-row items-center border-b px-4">
           {/*
            * SheetTitle : requis par Radix pour l'accessibilité (aria-labelledby).
            * Contient le logo + nom de l'app, identique à la sidebar desktop.
            */}
           <SheetTitle asChild>
-            {/* Logo ogolong — identique à Sidebar.tsx, renvoie vers la homepage */}
+            {/* Logo SocialTDL — identique à Sidebar.tsx, renvoie vers la homepage */}
             <Link href="/" className="flex items-center gap-2 font-semibold text-sidebar-foreground">
               <div
                 className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm"
-                aria-label="Logo ogolong"
+                aria-label="Logo SocialTDL"
               >
                 o
               </div>
-              ogolong
+              SocialTDL
             </Link>
           </SheetTitle>
         </SheetHeader>

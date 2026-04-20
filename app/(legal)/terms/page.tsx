@@ -1,7 +1,7 @@
 /**
  * @file app/(legal)/terms/page.tsx
  * @module legal
- * @description Conditions Générales d'Utilisation (CGU) — ogolong.com.
+ * @description Conditions Générales d'Utilisation (CGU) — socialtdl.net.
  *   Accessible sans connexion à /terms.
  *
  *   Contenu :
@@ -22,7 +22,7 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Conditions Générales d\'Utilisation',
   description:
-    'Consultez les Conditions Générales d\'Utilisation du service ogolong.com, outil de planification de contenu sur les réseaux sociaux.',
+    'Consultez les Conditions Générales d\'Utilisation du service socialtdl.net, outil de planification de contenu sur les réseaux sociaux.',
 }
 
 // ─── Composants de mise en page du contenu légal ──────────────────────────────
@@ -70,7 +70,7 @@ function BulletList({ items }: { items: string[] }): React.JSX.Element {
  * Page statique des Conditions Générales d'Utilisation.
  * Server Component pur — contenu statique, pas de fetch.
  *
- * @returns Page complète avec les CGU du service ogolong.com
+ * @returns Page complète avec les CGU du service socialtdl.net
  */
 export default function TermsPage(): React.JSX.Element {
   return (
@@ -88,7 +88,7 @@ export default function TermsPage(): React.JSX.Element {
       {/* ── Introduction ── */}
       <P>
         Les présentes Conditions Générales d&rsquo;Utilisation (CGU) régissent l&rsquo;accès et
-        l&rsquo;utilisation du service ogolong.com, plateforme de planification de contenu sur
+        l&rsquo;utilisation du service socialtdl.net, plateforme de planification de contenu sur
         les réseaux sociaux. En créant un compte, vous acceptez l&rsquo;intégralité des présentes
         CGU.
       </P>
@@ -96,7 +96,7 @@ export default function TermsPage(): React.JSX.Element {
       {/* ── 1. Objet du service ── */}
       <SectionTitle>1. Objet du service</SectionTitle>
       <P>
-        ogolong.com est un outil SaaS (Software as a Service) destiné aux créateurs de contenu
+        socialtdl.net est un outil SaaS (Software as a Service) destiné aux créateurs de contenu
         indépendants. Il permet de :
       </P>
       <BulletList
@@ -127,10 +127,10 @@ export default function TermsPage(): React.JSX.Element {
         utilisation du service depuis votre compte vous est entièrement imputable. En cas de
         compromission de votre compte, vous devez nous en informer immédiatement à{' '}
         <a
-          href="mailto:privacy@ogolong.com"
+          href="mailto:privacy@socialtdl.net"
           className="text-foreground underline hover:no-underline"
         >
-          privacy@ogolong.com
+          privacy@socialtdl.net
         </a>
         .
       </P>
@@ -138,7 +138,7 @@ export default function TermsPage(): React.JSX.Element {
       {/* ── 3. Obligations de l'utilisateur ── */}
       <SectionTitle>3. Obligations de l&rsquo;utilisateur</SectionTitle>
       <P>
-        En utilisant ogolong.com, vous vous engagez à respecter les règles suivantes. Vous vous
+        En utilisant socialtdl.net, vous vous engagez à respecter les règles suivantes. Vous vous
         interdisez notamment de :
       </P>
       <BulletList
@@ -160,13 +160,13 @@ export default function TermsPage(): React.JSX.Element {
       <SectionTitle>4. Propriété intellectuelle</SectionTitle>
       <P>
         <strong>Votre contenu vous appartient.</strong> Les textes, images, vidéos et tout autre
-        contenu que vous créez, importez ou publiez via ogolong.com restent votre propriété
+        contenu que vous créez, importez ou publiez via socialtdl.net restent votre propriété
         exclusive. Vous nous accordez uniquement une licence limitée, non exclusive et révocable
         pour traiter et transmettre votre contenu aux plateformes sociales dans le cadre du
         fonctionnement normal du service.
       </P>
       <P>
-        Le code source, le design, les marques et logos d&rsquo;ogolong.com sont la propriété
+        Le code source, le design, les marques et logos d&rsquo;socialtdl.net sont la propriété
         exclusive de leurs détenteurs respectifs et sont protégés par les lois sur la propriété
         intellectuelle. Toute reproduction, modification ou utilisation sans autorisation préalable
         est strictement interdite.
@@ -184,7 +184,7 @@ export default function TermsPage(): React.JSX.Element {
       {/* ── 6. Limitation de responsabilité ── */}
       <SectionTitle>6. Limitation de responsabilité</SectionTitle>
       <P>
-        Dans les limites autorisées par la loi applicable, ogolong.com ne saurait être tenu
+        Dans les limites autorisées par la loi applicable, socialtdl.net ne saurait être tenu
         responsable :
       </P>
       <BulletList
@@ -215,7 +215,7 @@ export default function TermsPage(): React.JSX.Element {
         .
       </P>
       <P>
-        <strong>Résiliation par ogolong.com :</strong> Nous nous réservons le droit de suspendre
+        <strong>Résiliation par socialtdl.net :</strong> Nous nous réservons le droit de suspendre
         ou de résilier votre accès en cas de violation des présentes CGU, notamment en cas
         d&rsquo;utilisation abusive, de non-paiement ou d&rsquo;activité illégale. Dans les cas
         non urgents, un préavis de 30 jours vous sera adressé par email.
@@ -237,7 +237,7 @@ export default function TermsPage(): React.JSX.Element {
         Les présentes CGU sont soumises au droit français. En cas de litige relatif à
         l&rsquo;interprétation ou l&rsquo;exécution des présentes, et à défaut de résolution
         amiable dans un délai de 30 jours, les tribunaux compétents du ressort du siège social
-        d&rsquo;ogolong.com auront compétence exclusive.
+        d&rsquo;socialtdl.net auront compétence exclusive.
       </P>
       <P>
         Conformément aux dispositions du Code de la consommation, les utilisateurs peuvent

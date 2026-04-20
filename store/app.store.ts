@@ -6,7 +6,7 @@
  *
  *   Persistance :
  *   Le middleware `persist` sauvegarde uniquement les préférences utilisateur
- *   dans localStorage (clé "ogolong-app-preferences"). L'état UI transitoire
+ *   dans localStorage (clé "SocialTDL-app-preferences"). L'état UI transitoire
  *   (isSidebarOpen) n'est PAS persisté — il se réinitialise à chaque session.
  *
  * @example
@@ -100,7 +100,7 @@ export const useAppStore = create<AppState>()(
     })),
     {
       // Clé de stockage dans localStorage
-      name: 'ogolong-app-preferences',
+      name: 'SocialTDL-app-preferences',
       storage: createJSONStorage(() => localStorage),
       /**
        * Persiste uniquement les préférences utilisateur.
