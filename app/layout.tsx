@@ -2,6 +2,7 @@
  * @file app/layout.tsx
  * @description Layout racine de l'application socialtdl.net.
  *   - Fournit les fonts Geist (sans + mono) via le package npm 'geist' (local, sans réseau)
+ *   - Charge Fraunces + Space Grotesk depuis Google Fonts (utilisées par /u/[slug])
  *   - Configure les métadonnées globales (SEO)
  *   - Monte les providers globaux : TanStack Query + Sonner (notifications toast)
  *   - Affiche la bannière de consentement cookies RGPD (CookieBanner)
@@ -55,6 +56,24 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps): React.JSX.Element {
   return (
     <html lang="fr" suppressHydrationWarning>
+      <head>
+        {/*
+         * Fraunces (serif) + Space Grotesk (sans) — utilisées par la page
+         * publique /u/[slug] (Link in Bio).
+         *
+         * Chargement via <link> plutôt que next/font/google car Next.js 16 +
+         * Turbopack a historiquement un bug d'import sur "@vercel/turbopack-
+         * next/internal/font/google/font" (cf. commentaire Geist ci-dessus).
+         *
+         * Preconnect améliore le TTFB en ouvrant la connexion TCP + TLS tôt.
+         */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Space+Grotesk:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}>
         {/* Provider TanStack Query — doit envelopper toute l'app pour le cache partagé */}
         <QueryProvider>

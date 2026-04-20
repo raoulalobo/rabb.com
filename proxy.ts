@@ -20,7 +20,8 @@ import type { Session } from '@/lib/auth'
 
 // ─── Routes publiques (pas de vérification de session) ────────────────────────
 // '/' = landing page publique (app/page.tsx) — accessible à tous
-const PUBLIC_PATHS = ['/', '/login', '/register', '/reset-password']
+// '/u/' = pages Link in Bio publiques (app/u/[slug]/) — partageable sans compte
+const PUBLIC_PATHS = ['/', '/login', '/register', '/reset-password', '/u/']
 
 /**
  * Proxy de protection des routes (Next.js 16 — remplace middleware).

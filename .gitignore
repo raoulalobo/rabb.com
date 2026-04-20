@@ -49,3 +49,8 @@ pnpm-lock.yaml
 
 # Prévisualisation d'emails rendus en HTML statique (scripts/preview-emails.mjs)
 tmp/
+
+# Design handoff bundles (lourds, non nécessaires au runtime — extractions déjà
+# intégrées dans public/brand/ et modules/biolink/)
+*.zip
+!**/node_modules/**/*.zip
