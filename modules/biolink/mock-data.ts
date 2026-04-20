@@ -35,7 +35,8 @@ import type { BioPageData } from './types'
  */
 export const MIMI_SARA_MOCK: BioPageData = {
   slug: 'mimisara',
-  name: 'Mimi Sara',
+  // "\n" déclenche l'italique ligne 2 dans le renderer (cf. splitName).
+  name: 'Mimi\nSara',
   nameSplit: ['Mimi', 'Sara'],
   // Handle aligné sur les comptes IG/TikTok de la cliente pour cohérence.
   // Le slug URL reste 'mimisara' (plus lisible/SEO) — ils peuvent différer.

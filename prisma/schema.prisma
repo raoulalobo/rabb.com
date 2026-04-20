@@ -256,9 +256,16 @@ model BioPage {
   slug        String   @unique
 
   // Personnalisation du profil
-  title       String?              // Nom affiché (défaut: user.name)
-  bio         String?              // Description courte (max 300 chars)
+  title       String?              // Nom affiché (défaut: user.name). Split sur "\n" pour ligne italique.
+  bio         String?              // Description courte (max 300 chars) — baseline uppercase mobile/desktop.
   avatarUrl   String?              // Défaut: user.avatarUrl
+
+  // Handle visible en haut à gauche ("@mimimaze") — si null, fallback sur "@{slug}"
+  handle      String?              // max 30 chars, sans le @ (ajouté au rendu)
+
+  // Phrase d'intro affichée dans le panneau frosted desktop (template Mimi Sara)
+  // max 200 chars, optionnelle — si null, le bloc est masqué sur desktop.
+  tagline     String?
 
   // Thème visuel
   theme       String   @default("default")  // "default" | "dark" | "gradient" | "minimal" | "neon"

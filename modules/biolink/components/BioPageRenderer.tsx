@@ -133,6 +133,15 @@ function SocialGlyph({
 // ─── VUE MOBILE — bottom-sheet photo-dominant ────────────────────────────────
 
 /**
+ * Défauts de couleurs pour le thème mobile (design Mimi Sara).
+ * Les BioPages dont le thème est personnalisé surchargent ces valeurs.
+ */
+const MOBILE_DEFAULTS = {
+  text: '#F6F2EC',
+  accent: '#E8B87A',
+} as const
+
+/**
  * Rendu mobile : photo en full-bleed avec scrim dégradé, nom floating en haut,
  * sheet de liens en bas (CTA amber + rows glass + socials).
  *
@@ -141,9 +150,11 @@ function SocialGlyph({
  * proportionné sur tablettes et petits mobiles.
  */
 function MobileView({ data }: BioPageRendererProps): React.JSX.Element {
-  // Couleurs du design (mobile = #F6F2EC text + #E8B87A accent)
-  const text = '#F6F2EC'
-  const accent = '#E8B87A'
+  // Thème custom ou défauts template Mimi Sara
+  const text = data.theme?.titleColor ?? MOBILE_DEFAULTS.text
+  const accent = data.theme?.accentColor ?? MOBILE_DEFAULTS.accent
+  const bioColor = data.theme?.bioColor ?? text
+  const linkColor = data.theme?.linkColor ?? text
 
   return (
     <div
@@ -202,7 +213,7 @@ function MobileView({ data }: BioPageRendererProps): React.JSX.Element {
         )}
       </div>
 
-      {/* Nom floating : Fraunces 52px, ligne 1 normal, ligne 2 italique */}
+      {/* Nom floating : Fraunces 52px, ligne 1 normal, ligne 2 italique (optionnelle) */}
       <div className="absolute left-[22px] right-[22px] top-[72px] z-[3]">
         <div
           style={{
@@ -213,55 +224,63 @@ function MobileView({ data }: BioPageRendererProps): React.JSX.Element {
           }}
         >
           {data.nameSplit[0]}
-          <br />
-          <em style={{ fontStyle: 'italic', fontWeight: 300 }}>
-            {data.nameSplit[1]}
-          </em>
+          {data.nameSplit[1] !== undefined && (
+            <>
+              <br />
+              <em style={{ fontStyle: 'italic', fontWeight: 300 }}>
+                {data.nameSplit[1]}
+              </em>
+            </>
+          )}
         </div>
-        <div
-          style={{
-            fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-            fontSize: 12,
-            letterSpacing: '2px',
-            textTransform: 'uppercase',
-            marginTop: 10,
-            opacity: 0.8,
-          }}
-        >
-          {data.bio}
-        </div>
+        {data.bio && (
+          <div
+            style={{
+              fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+              fontSize: 12,
+              letterSpacing: '2px',
+              textTransform: 'uppercase',
+              marginTop: 10,
+              opacity: 0.8,
+              color: bioColor,
+            }}
+          >
+            {data.bio}
+          </div>
+        )}
       </div>
 
-      {/* Sheet bottom : CTA amber + rows glass + socials */}
+      {/* Sheet bottom : liens (1 primary + N glass) + socials */}
       <div
         className="absolute bottom-0 left-0 right-0 z-[2]"
         style={{ padding: '20px 22px 32px' }}
       >
-        <MobileLinkRow
-          link={data.links[0]}
-          index={1}
-          accent={accent}
-          text={text}
-        />
-        {data.links.slice(1).map((l, i) => (
+        {/*
+         * Tous les liens rendus dans l'ordre — MobileLinkRow adapte son style
+         * en fonction de `link.kind` (primary = amber, glass = transparent).
+         * Si `data.links` est vide, rien ne s'affiche (aucune erreur).
+         */}
+        {data.links.map((l, i) => (
           <MobileLinkRow
             key={l.href}
             link={l}
-            index={i + 2}
+            index={i + 1}
             accent={accent}
-            text={text}
+            text={linkColor}
           />
         ))}
 
-        {/* Rangée socials (centrée, opacity 0.85) */}
-        <div
-          className="flex justify-center"
-          style={{ gap: 18, marginTop: 16, opacity: 0.85 }}
-        >
-          {data.socials.map((s) => (
-            <SocialGlyph key={s.kind} social={s} size={16} />
-          ))}
-        </div>
+        {/* Rangée socials (centrée, opacity 0.85) — masquée si pas de socials */}
+        {data.socials.length > 0 && (
+          <div
+            className="flex justify-center"
+            style={{ gap: 18, marginTop: 16, opacity: 0.85, color: text }}
+          >
+            {data.socials.map((s) => (
+              <SocialGlyph key={s.kind} social={s} size={16} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -406,9 +425,18 @@ function MobileLinkRow({
  * Le nom "Mimi / Sara" en Fraunces 96px est ancré en bas à gauche de la photo.
  * Le panneau contient : header (Liens + socials), greeting, tagline, liens, footer.
  */
+/** Défauts de couleurs pour le thème desktop (design Mimi Sara). */
+const DESKTOP_DEFAULTS = {
+  text: '#ffffff',
+  accent: '#D4A574',
+} as const
+
 function DesktopView({ data }: BioPageRendererProps): React.JSX.Element {
-  const text = '#ffffff'
-  const accent = '#D4A574'
+  // Thème custom ou défauts template Mimi Sara
+  const text = data.theme?.titleColor ?? DESKTOP_DEFAULTS.text
+  const accent = data.theme?.accentColor ?? DESKTOP_DEFAULTS.accent
+  const bioColor = data.theme?.bioColor ?? text
+  const linkColor = data.theme?.linkColor ?? text
 
   return (
     <div
@@ -471,23 +499,30 @@ function DesktopView({ data }: BioPageRendererProps): React.JSX.Element {
             }}
           >
             {data.nameSplit[0]}
-            <br />
-            <em style={{ fontStyle: 'italic', fontWeight: 300 }}>
-              {data.nameSplit[1]}
-            </em>
+            {data.nameSplit[1] !== undefined && (
+              <>
+                <br />
+                <em style={{ fontStyle: 'italic', fontWeight: 300 }}>
+                  {data.nameSplit[1]}
+                </em>
+              </>
+            )}
           </div>
-          <div
-            style={{
-              fontSize: 13,
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-              marginTop: 18,
-              opacity: 0.85,
-            }}
-          >
-            {data.bio}
-          </div>
+          {data.bio && (
+            <div
+              style={{
+                fontSize: 13,
+                letterSpacing: '2px',
+                textTransform: 'uppercase',
+                fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                marginTop: 18,
+                opacity: 0.85,
+                color: bioColor,
+              }}
+            >
+              {data.bio}
+            </div>
+          )}
         </div>
       </div>
 
@@ -545,33 +580,29 @@ function DesktopView({ data }: BioPageRendererProps): React.JSX.Element {
           Bienvenue.
         </div>
 
-        {/* Tagline intro */}
-        <div
-          style={{
-            fontSize: 14,
-            opacity: 0.65,
-            lineHeight: 1.5,
-            marginBottom: 32,
-            maxWidth: 340,
-          }}
-        >
-          {data.tagline}
-        </div>
+        {/* Tagline intro — masquée si absente en DB */}
+        {data.tagline && (
+          <div
+            style={{
+              fontSize: 14,
+              opacity: 0.65,
+              lineHeight: 1.5,
+              marginBottom: 32,
+              maxWidth: 340,
+            }}
+          >
+            {data.tagline}
+          </div>
+        )}
 
-        {/* CTA primary amber + rows glass */}
-        <DesktopLinkRow
-          link={data.links[0]}
-          index={1}
-          accent={accent}
-          text={text}
-        />
-        {data.links.slice(1).map((l, i) => (
+        {/* Liens : DesktopLinkRow adapte son style via link.kind (primary/glass) */}
+        {data.links.map((l, i) => (
           <DesktopLinkRow
             key={l.href}
             link={l}
-            index={i + 2}
+            index={i + 1}
             accent={accent}
-            text={text}
+            text={linkColor}
           />
         ))}
 

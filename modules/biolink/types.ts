@@ -65,39 +65,62 @@ export interface BioSocial {
 }
 
 /**
+ * Thème de couleurs customisées — dérivé de la DB (BioPage.accentColor, etc.).
+ * Toutes les propriétés sont optionnelles : `null`/`undefined` → fallback au défaut du template.
+ */
+export interface BioTheme {
+  /** Couleur d'accent (CTA amber) — défaut template : `#E8B87A` / `#D4A574` */
+  accentColor?: string
+  /** Couleur du titre principal — défaut : `#F6F2EC` (mobile) / `#fff` (desktop) */
+  titleColor?: string
+  /** Couleur de la bio courte — défaut : titleColor avec opacity 0.8 */
+  bioColor?: string
+  /** Couleur des liens glass — défaut : titleColor */
+  linkColor?: string
+}
+
+/**
  * Données complètes d'une BioPage, forme rendue par `<BioPageRenderer />`.
  * Objet plat, immutable, sérialisable (pas de Date ni de fonctions).
+ *
+ * Les champs optionnels (`?`) sont ceux qui peuvent être absents de la DB —
+ * le mapper gère les fallbacks raisonnables. Les champs requis doivent
+ * toujours avoir une valeur (le mapper lève notFound() sinon).
  */
 export interface BioPageData {
-  /** Slug URL — ex: "mimisara" pour /u/mimisara */
+  /** Slug URL — ex: "mimisara" pour /u/mimisara (UNIQUE en DB) */
   slug: string
-  /** Nom affiché complet (fallback accessibilité) — ex: "Mimi Sara" */
+  /**
+   * Nom affiché — forme brute avec éventuellement un `\n` pour séparer
+   * la ligne italique (typographie Fraunces).
+   * Ex: "Mimi\nSara" → rendu "Mimi" ligne 1 normal + "Sara" ligne 2 italique.
+   * Ex: "La boutique d'Osy" (sans \n) → rendu sur 1 ligne sans italique.
+   */
   name: string
   /**
-   * Nom découpé en 2 lignes pour la stylisation typographique.
-   * Ligne 1 en normal, ligne 2 en italique (Fraunces).
-   * Ex: ["Mimi", "Sara"] — rendu sur 2 lignes avec la 2ᵉ en italique.
+   * Nom découpé pour la stylisation typographique. Dérivé de `name.split('\n', 2)`.
+   * - 1 élément : affichage simple, pas d'italique
+   * - 2 éléments : ligne 1 normal, ligne 2 italique
    */
-  nameSplit: [string, string]
-  /** Handle avec @ — ex: "@mimisara" (affiché en haut) */
+  nameSplit: [string, string?]
+  /** Handle avec @ — ex: "@mimimaze". Si DB null, mapper le dérive en `@{slug}`. */
   handle: string
-  /** Baseline courte — ex: "Auteure · Entrepreneure · Camerounaise" */
-  bio: string
-  /** Phrase d'intro dans le panneau frosted desktop (1-2 phrases max) */
-  tagline: string
-  /**
-   * URL de l'image avatar (full-bleed en fond).
-   * Chemin relatif (servi par Next.js depuis /public) ou URL absolue Supabase.
-   */
+  /** Baseline courte — ex: "Auteure · Entrepreneure · Camerounaise". Optionnelle. */
+  bio?: string
+  /** Phrase d'intro du panneau frosted desktop — masquée si absente. */
+  tagline?: string
+  /** URL de l'image avatar. Si DB null, mapper utilise une image par défaut. */
   avatarUrl: string
-  /** Statut optionnel à côté du handle — ex: "En ligne" (affiché en amber) */
+  /** Statut à droite du handle — ex: "En ligne" (affiché en accentColor) */
   status?: string
-  /** Liens sociaux affichés en ligne (mobile : bas, desktop : header panneau) */
+  /** Thème de couleurs personnalisées (fallback template si absentes) */
+  theme?: BioTheme
+  /** Liens sociaux en bas de page (mobile) ou header panneau (desktop) */
   socials: BioSocial[]
-  /** Liens principaux (1 primary + N glass) */
+  /** Liens principaux (1 primary maximum + N glass) */
   links: BioLinkItem[]
-  /** Mention légale footer desktop — ex: "© 2026 Mimi Sara" */
+  /** Mention légale footer desktop — dérivé par le mapper : `© {année} {name}` */
   footerBrand?: string
-  /** Nom de domaine footer desktop — ex: "mimisara.com" */
+  /** URL footer desktop — dérivé : `customDomain` ou `socialtdl.net/u/{slug}` */
   footerWebsite?: string
 }
