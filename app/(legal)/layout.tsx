@@ -13,6 +13,7 @@
  */
 
 import Link from 'next/link'
+import { WordmarkLogo } from '@/components/brand/WordmarkLogo'
 import { SiteFooter } from '@/components/shared/SiteFooter'
 
 interface LegalLayoutProps {
@@ -34,9 +35,10 @@ export default function LegalLayout({ children }: LegalLayoutProps): React.JSX.E
         <div className="mx-auto max-w-3xl px-4 py-4">
           <Link
             href="/"
-            className="text-xl font-bold tracking-tight text-foreground hover:opacity-80 transition-opacity"
+            className="flex items-center hover:opacity-80 transition-opacity"
+            aria-label="SocialTDL — retour à l'accueil"
           >
-            SocialTDL
+            <WordmarkLogo className="h-8 w-auto" />
           </Link>
         </div>
       </header>

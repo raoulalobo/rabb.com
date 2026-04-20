@@ -42,3 +42,10 @@ next-env.d.ts
 
 # Bun lockfile — régénéré à chaque install (incompatible entre versions bun)
 bun.lock
+
+# pnpm lockfile — bun est le package manager du projet (commit dd5388f)
+# Régénéré par erreur si une commande npm/pnpm s'exécute (ex: react-email dev)
+pnpm-lock.yaml
+
+# Prévisualisation d'emails rendus en HTML statique (scripts/preview-emails.mjs)
+tmp/

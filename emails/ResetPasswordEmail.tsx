@@ -20,10 +20,18 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Preview,
   Section,
   Text,
 } from '@react-email/components'
+
+/**
+ * URL de base absolue pour les assets (les clients email refusent les URLs relatives).
+ * En prod : https://socialtdl.net. En dev : tombe sur localhost:3000 (non consultable
+ * depuis Internet, mais les emails ne sont pas envoyés en conditions réelles en dev).
+ */
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://socialtdl.net'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -55,8 +63,15 @@ export function ResetPasswordEmail({ url, name }: ResetPasswordEmailProps): Reac
         <Container style={styles.container}>
 
           {/* ── En-tête logo ───────────────────────────────────────────── */}
+          {/* Img React Email : URL absolue obligatoire (clients email refusent le relatif) */}
           <Section style={styles.header}>
-            <Text style={styles.logo}>SocialTDL</Text>
+            <Img
+              src={`${APP_URL}/brand/logo-wordmark.nav.png`}
+              alt="SocialTDL"
+              width="189"
+              height="40"
+              style={styles.logo}
+            />
           </Section>
 
           {/* ── Corps ─────────────────────────────────────────────────── */}
@@ -121,9 +136,9 @@ const styles = {
     padding: '24px 32px',
   },
   logo: {
-    color: '#ffffff',
-    fontSize: '20px',
-    fontWeight: '700',
+    display: 'block',
+    height: '32px',
+    width: 'auto',
     margin: '0',
   },
   content: {

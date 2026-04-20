@@ -34,6 +34,7 @@ import {
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { WordmarkLogo } from '@/components/brand/WordmarkLogo'
 import { cn } from '@/lib/utils'
 
 // ─── Configuration de la navigation ───────────────────────────────────────────
@@ -89,12 +90,9 @@ export function Sidebar(): React.JSX.Element {
     <aside className="hidden md:flex h-full w-60 flex-col border-r bg-sidebar">
       {/* ── Logo ─────────────────────────────────────────────────────── */}
       <div className="flex h-16 items-center border-b px-4">
-        <Link href="/" className="flex items-center gap-2">
-          {/* Placeholder logo — sera remplacé en phase 03 (branding) */}
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-            o
-          </div>
-          <span className="font-semibold text-sidebar-foreground">SocialTDL</span>
+        <Link href="/" className="flex items-center" aria-label="SocialTDL — retour à l'accueil">
+          {/* Wordmark SVG inline — pixel-perfect, ~149px de large à h-8 */}
+          <WordmarkLogo className="h-8 w-auto" />
         </Link>
       </div>
 

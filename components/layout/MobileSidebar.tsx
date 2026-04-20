@@ -20,6 +20,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { WordmarkLogo } from '@/components/brand/WordmarkLogo'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { NAV_ITEMS } from '@/components/layout/Sidebar'
@@ -59,14 +60,8 @@ export function MobileSidebar(): React.JSX.Element {
            */}
           <SheetTitle asChild>
             {/* Logo SocialTDL — identique à Sidebar.tsx, renvoie vers la homepage */}
-            <Link href="/" className="flex items-center gap-2 font-semibold text-sidebar-foreground">
-              <div
-                className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm"
-                aria-label="Logo SocialTDL"
-              >
-                o
-              </div>
-              SocialTDL
+            <Link href="/" className="flex items-center" aria-label="SocialTDL — retour à l'accueil">
+              <WordmarkLogo className="h-8 w-auto" />
             </Link>
           </SheetTitle>
         </SheetHeader>

@@ -20,6 +20,7 @@
  *   ```
  */
 
+import Image from 'next/image'
 import Link from 'next/link'
 
 /**
@@ -33,15 +34,17 @@ export function SiteFooter(): React.JSX.Element {
     <footer className="border-t">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-4 sm:flex-row">
         {/* ── Logo ────────────────────────────────────────────────────────────
-         * Cercle sombre avec initiale — remplaçable par un SVG définitif.
-         * select-none empêche la sélection accidentelle de la lettre.
+         * Logo icon (juste le robot mascotte) — carré 32px pour s'intégrer
+         * proprement dans le footer compact.
          */}
-        <div
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background text-xs font-semibold select-none"
-          aria-hidden="true"
-        >
-          N
-        </div>
+        <Image
+          src="/brand/logo-icon.png"
+          alt="SocialTDL"
+          width={32}
+          height={32}
+          className="size-8 shrink-0"
+        />
+
 
         {/* ── Copyright ───────────────────────────────────────────────────────
          * new Date().getFullYear() calculé côté serveur au rendu — pas de

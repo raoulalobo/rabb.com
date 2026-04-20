@@ -23,6 +23,7 @@ import { headers } from 'next/headers'
 
 import { Button } from '@/components/ui/button'
 import { auth } from '@/lib/auth'
+import { WordmarkLogo } from '@/components/brand/WordmarkLogo'
 import { FeatureCarousel } from '@/components/landing/FeatureCarousel'
 import { PlatformLogos } from '@/components/landing/PlatformLogos'
 import { SiteFooter } from '@/components/shared/SiteFooter'
@@ -74,10 +75,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
         >
           <Link
             href="/"
-            className="text-xl font-semibold tracking-tight text-gray-900 transition-opacity hover:opacity-80"
+            className="flex items-center transition-opacity hover:opacity-80"
             aria-label="SocialTDL — retour à l'accueil"
           >
-            SocialTDL
+            {/* Wordmark SVG inline — pixel-perfect, rendu Geist Sans bold italique */}
+            <WordmarkLogo className="h-8 w-auto" />
           </Link>
 
           <div className="flex items-center gap-3">
