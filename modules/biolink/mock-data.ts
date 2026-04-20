@@ -55,22 +55,24 @@ export const MIMI_SARA_MOCK: BioPageData = {
     { kind: 'tt', href: 'https://tiktok.com/@mimimaze', label: 'TikTok' },
     { kind: 'fb', href: 'https://facebook.com/laboutiquedosy', label: "La boutique d'Osy — Facebook" },
   ],
+  // Liens réels fournis par la cliente (2026-04-20) :
+  // - 01 Livre Amazon  : https://amzn.eu/d/0d7u1lGb
+  //   Titre "Je découvre des héros africains" repris du design handoff —
+  //   à confirmer / modifier par la cliente si besoin.
+  // - 02 Boutique      : https://www.laboutiquedosy.com
+  // SkinCare retiré (pas de ressource associée).
   links: [
     {
-      label: 'Mon livre Amazon',
-      eyebrow: 'Nouveau',
+      label: 'Je découvre des héros africains',
+      eyebrow: 'Mon livre',
       kind: 'primary',
-      href: 'https://www.amazon.fr/',
+      href: 'https://amzn.eu/d/0d7u1lGb',
     },
     {
-      label: 'Ma boutique Shopify',
+      label: "La boutique d'Osy",
+      eyebrow: 'Ma boutique',
       kind: 'glass',
-      href: 'https://mimisara.myshopify.com/',
-    },
-    {
-      label: 'Livre SkinCare',
-      kind: 'glass',
-      href: 'https://mimisara.com/skincare',
+      href: 'https://www.laboutiquedosy.com',
     },
   ],
   footerBrand: '© 2026 Mimi Sara',
