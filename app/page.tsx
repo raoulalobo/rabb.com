@@ -23,6 +23,7 @@ import { headers } from 'next/headers'
 
 import { Button } from '@/components/ui/button'
 import { auth } from '@/lib/auth'
+import { IconLogo } from '@/components/brand/IconLogo'
 import { WordmarkLogo } from '@/components/brand/WordmarkLogo'
 import { FeatureCarousel } from '@/components/landing/FeatureCarousel'
 import { PlatformLogos } from '@/components/landing/PlatformLogos'
@@ -78,8 +79,13 @@ export default async function HomePage(): Promise<React.JSX.Element> {
             className="flex items-center transition-opacity hover:opacity-80"
             aria-label="SocialTDL — retour à l'accueil"
           >
-            {/* Wordmark SVG inline — pixel-perfect, rendu Geist Sans bold italique */}
-            <WordmarkLogo className="h-8 w-auto" />
+            {/*
+             * Swap responsive logo :
+             * - Mobile (< sm) : IconLogo compact 32×32 (économise ~117px)
+             * - Tablette/desktop (sm+) : WordmarkLogo complet (~149px)
+             */}
+            <IconLogo className="h-8 w-8 sm:hidden" />
+            <WordmarkLogo className="hidden h-8 w-auto sm:block" />
           </Link>
 
           <div className="flex items-center gap-3">
@@ -92,7 +98,12 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               </Button>
             ) : (
               <>
-                <Button variant="ghost" size="sm" asChild>
+                {/*
+                 * "Se connecter" masqué sur mobile (< sm) — libère ~90px pour le logo.
+                 * La page /register contient déjà un lien "Se connecter" pour les users
+                 * qui ouvriraient "Essayer gratuitement" par erreur.
+                 */}
+                <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
                   <Link href="/login">Se connecter</Link>
                 </Button>
                 <Button size="sm" asChild>

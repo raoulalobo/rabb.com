@@ -13,6 +13,7 @@
  */
 
 import Link from 'next/link'
+import { IconLogo } from '@/components/brand/IconLogo'
 import { WordmarkLogo } from '@/components/brand/WordmarkLogo'
 import { SiteFooter } from '@/components/shared/SiteFooter'
 
@@ -38,7 +39,9 @@ export default function LegalLayout({ children }: LegalLayoutProps): React.JSX.E
             className="flex items-center hover:opacity-80 transition-opacity"
             aria-label="SocialTDL — retour à l'accueil"
           >
-            <WordmarkLogo className="h-8 w-auto" />
+            {/* Swap responsive : icon compact sur mobile, wordmark sur tablette+ */}
+            <IconLogo className="h-8 w-8 sm:hidden" />
+            <WordmarkLogo className="hidden h-8 w-auto sm:block" />
           </Link>
         </div>
       </header>
