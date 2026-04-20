@@ -82,16 +82,16 @@ export async function updateBioLink(
     }
 
     // ── Construction du payload d'update (uniquement les champs fournis) ─────
+    // `kind` et `eyebrow` sont persistés dans les colonnes dédiées du modèle BioLink
+    // (migration `20260421120000_biolink_kind_eyebrow`). Une chaîne vide pour
+    // `eyebrow` est normalisée en `null` → retire visuellement l'eyebrow.
     const updateData: Record<string, unknown> = {}
     if (parsed.data.title !== undefined) updateData.title = parsed.data.title
     if (parsed.data.url !== undefined) updateData.url = parsed.data.url
     if (parsed.data.isActive !== undefined) updateData.isActive = parsed.data.isActive
-    // `kind` est encodé dans `icon` (convention "kind:primary" / "kind:glass")
-    if (parsed.data.kind !== undefined) updateData.icon = `kind:${parsed.data.kind}`
-    // `eyebrow` est stocké dans `thumbnailUrl` (slot texte réutilisé — MVP P2)
-    // On accepte une chaîne vide en entrée → null en DB (retire l'eyebrow).
+    if (parsed.data.kind !== undefined) updateData.kind = parsed.data.kind
     if (parsed.data.eyebrow !== undefined) {
-      updateData.thumbnailUrl = parsed.data.eyebrow.length > 0 ? parsed.data.eyebrow : null
+      updateData.eyebrow = parsed.data.eyebrow.length > 0 ? parsed.data.eyebrow : null
     }
 
     const updated = await prisma.bioLink.update({

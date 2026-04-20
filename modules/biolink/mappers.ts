@@ -102,9 +102,10 @@ function parseSocialLinks(raw: unknown): BioSocial[] {
  * 3. `activeFrom <= maintenant <= activeUntil` (scheduling temporel)
  * 4. `url` non null (requis par BioLinkItem)
  *
- * Le **premier** lien actif devient automatiquement le CTA `primary` (amber CTA),
- * les suivants sont `glass`. Simplifie le modèle mental : l'user réordonne les liens,
- * le 1er est mis en avant automatiquement.
+ * Le `kind` (style visuel) et l'`eyebrow` (petit texte au-dessus du label) sont
+ * lus depuis les colonnes dédiées `bio_links.kind` et `bio_links.eyebrow`
+ * (ajoutées par la migration `20260421120000_biolink_kind_eyebrow`).
+ * L'utilisateur contrôle donc explicitement quel lien est mis en avant (`primary`).
  */
 function mapLinks(links: BioLink[]): BioLinkItem[] {
   const now = new Date()
@@ -114,13 +115,14 @@ function mapLinks(links: BioLink[]): BioLinkItem[] {
     .filter((l) => !l.activeUntil || l.activeUntil >= now)
     .sort((a, b) => a.position - b.position)
 
-  return visible.map((l, i) => {
-    const kind: BioLinkKind = i === 0 ? 'primary' : 'glass'
+  return visible.map((l) => {
+    // Safe-guard : on ne laisse passer que les deux valeurs attendues, sinon fallback 'glass'
+    // pour éviter qu'une valeur corrompue en DB (ex: ancienne migration) ne casse le rendu.
+    const kind: BioLinkKind =
+      l.kind === 'primary' || l.kind === 'glass' ? l.kind : 'glass'
     return {
       label: l.title,
-      // `icon` du schéma est utilisé comme eyebrow (petit label au-dessus du titre)
-      // Ex: "Nouveau", "Mon livre", "Ma boutique"
-      eyebrow: l.icon ?? undefined,
+      eyebrow: l.eyebrow ?? undefined,
       href: l.url as string,
       kind,
     }

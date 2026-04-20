@@ -355,6 +355,12 @@ model BioLink {
   icon         String?                // Emoji ou nom d'icône Lucide (optionnel)
   thumbnailUrl String?                // Image miniature affichée dans le bouton (optionnel)
 
+  // Style visuel de la carte — lu par modules/biolink/mappers.ts pour rendre le bouton
+  // 'primary' : carte amber CTA mise en avant ; 'glass' : row semi-transparent standard
+  kind         String   @default("glass")
+  // Petit texte au-dessus du libellé (ex: "Nouveau", "Recommandé") — optionnel
+  eyebrow      String?
+
   // Planification temporelle : le lien n'est visible que dans la fenêtre [activeFrom, activeUntil]
   activeFrom   DateTime?              // Début de visibilité (null = immédiat)
   activeUntil  DateTime?              // Fin de visibilité (null = permanent)

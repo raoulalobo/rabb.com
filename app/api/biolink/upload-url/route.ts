@@ -29,22 +29,25 @@
 
 import { headers } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { auth } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Schéma Zod du body ───────────────────────────────────────────────────────
 
 /**
- * Corps attendu du POST — validation manuelle (pas de Zod ici pour rester
- * cohérent avec `app/api/user/avatar/route.ts` dont on clone la structure).
+ * Schéma Zod validant le corps du POST.
+ * - `filename` : chaîne non vide (sert à extraire l'extension du fichier)
+ * - `contentType` : doit matcher `image/*` — on accepte un set plus large
+ *   que pour l'avatar utilisateur (webp, avif, etc. OK côté biolink).
  */
-interface BioLinkUploadRequest {
-  /** Nom original du fichier (utilisé pour extraire l'extension) */
-  filename: string
-  /** Type MIME du fichier (ex: "image/jpeg", "image/webp") */
-  contentType: string
-}
+const BodySchema = z.object({
+  filename: z.string().min(1),
+  contentType: z
+    .string()
+    .regex(/^image\//, 'Seules les images sont autorisées'),
+})
 
 interface BioLinkUploadResponse {
   /** URL signée pour l'upload PUT direct vers Supabase Storage (expire vite) */
@@ -59,12 +62,6 @@ interface BioLinkUploadResponse {
 
 /** Bucket Supabase Storage réutilisé (partagé posts/galerie/biolink) */
 const MEDIA_BUCKET = 'post-media'
-
-/**
- * Whitelist MIME : toutes les images. On accepte un set plus large que pour
- * l'avatar utilisateur pour permettre webp/avif côté biolink.
- */
-const ALLOWED_CONTENT_TYPE_REGEX = /^image\//
 
 // ─── Handler POST ─────────────────────────────────────────────────────────────
 
@@ -84,30 +81,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
-  // ── Lecture et validation du body ─────────────────────────────────────────
-  let body: BioLinkUploadRequest
+  // ── Lecture et validation du body via Zod ────────────────────────────────
+  // Parse défensif du JSON : un body malformé renvoie 400 au lieu de crasher.
+  let rawBody: unknown
   try {
-    body = (await request.json()) as BioLinkUploadRequest
+    rawBody = await request.json()
   } catch {
     return NextResponse.json({ error: 'Corps JSON invalide' }, { status: 400 })
   }
 
-  const { filename, contentType } = body
-
-  if (!filename || !contentType) {
+  const parsed = BodySchema.safeParse(rawBody)
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: 'filename et contentType sont requis' },
+      { error: parsed.error.issues[0]?.message ?? 'Invalid body' },
       { status: 400 },
     )
   }
 
-  // ── Whitelist MIME : uniquement des images ────────────────────────────────
-  if (!ALLOWED_CONTENT_TYPE_REGEX.test(contentType)) {
-    return NextResponse.json(
-      { error: 'Seules les images sont autorisées comme avatar' },
-      { status: 400 },
-    )
-  }
+  // Le `contentType` a déjà été validé côté Zod (regex `^image/`). On garde
+  // uniquement `filename` pour dériver l'extension du fichier cible.
+  const { filename } = parsed.data
 
   // ── Construction du chemin dans le bucket ─────────────────────────────────
   // Format : {userId}/biolink/{timestamp}-avatar.{ext}

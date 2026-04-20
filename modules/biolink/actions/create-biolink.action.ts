@@ -10,9 +10,9 @@
  *   4. Calcule `position = max(position) + 1` pour placer le lien en bas
  *   5. Crée la row + revalide /biolink et /u/{slug}
  *
- *   Le `kind` (primary/glass) est stocké dans le champ `icon` car le schéma
- *   Prisma actuel ne distingue pas le style visuel. Convention adoptée :
- *   `icon = "kind:primary"` ou `icon = "kind:glass"`.
+ *   `kind` et `eyebrow` sont persistés dans les colonnes dédiées du modèle
+ *   `BioLink` (migration `20260421120000_biolink_kind_eyebrow`) et lus tels quels
+ *   par `modules/biolink/mappers.ts` lors du rendu public.
  *
  * @example
  *   await createBioLink({
@@ -103,18 +103,15 @@ export async function createBioLink(
     const nextPosition = (last?.position ?? -1) + 1
 
     // ── Création du lien ─────────────────────────────────────────────────────
-    // `kind` est encodé dans le champ `icon` (convention : "kind:primary" / "kind:glass")
-    // puisque le schéma Prisma ne dispose pas d'un champ dédié au style visuel.
+    // `kind` et `eyebrow` sont persistés dans les colonnes dédiées du modèle BioLink.
+    // Une chaîne vide côté eyebrow est normalisée en `null` (retire visuellement l'eyebrow).
     const link = await prisma.bioLink.create({
       data: {
         bioPageId,
         title,
         url,
-        icon: `kind:${kind}`,
-        // `eyebrow` non présent au schéma → stocké via description future ; pour l'instant on l'ignore si vide
-        // Note : le renderer lira eyebrow depuis thumbnailUrl ou autre champ dédié dans une future migration.
-        // Pour le MVP P2, on stocke eyebrow dans le champ `thumbnailUrl` (réutilisé comme slot texte).
-        thumbnailUrl: eyebrow ?? null,
+        kind,
+        eyebrow: eyebrow && eyebrow.length > 0 ? eyebrow : null,
         position: nextPosition,
         isActive,
       },
