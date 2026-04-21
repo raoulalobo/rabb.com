@@ -251,18 +251,13 @@ export function InfosSection({
         {/* ── Avatar ─────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-4">
           {avatarUrl ? (
-            // `next/image` avec `unoptimized` : bypasse l'optimiseur Next
-            // (dépend de `images.remotePatterns` dans next.config.ts pour les
-            // domaines Supabase). Pour un avatar 64px, le gain d'optimisation
-            // serait négligeable ; on privilégie ici la simplicité de config.
-            // Si la conf `next.config.ts` est étendue plus tard pour autoriser
-            // `*.supabase.co`, on pourra retirer `unoptimized`.
+            // `next/image` optimise automatiquement via `images.remotePatterns`
+            // dans next.config.ts (domaine Supabase Storage autorisé).
             <Image
               src={avatarUrl}
               alt="Avatar"
               width={64}
               height={64}
-              unoptimized
               className="size-16 rounded-full object-cover border"
             />
           ) : (

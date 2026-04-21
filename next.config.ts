@@ -37,6 +37,20 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  // Autorise `next/image` à optimiser les assets Supabase Storage (avatars,
+  // médias biolink, etc.). Hostname précis (pas de wildcard) pour éviter qu'un
+  // autre projet Supabase n'entre dans le périmètre.
+  // Bucket pattern : /storage/v1/object/public/{bucket}/{path}
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'cymguhysuoltwfnfugqi.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+    ],
+  },
+
   webpack: (config) => {
     // Fix workspace root : Webpack détecte /home/alobo/Bureau/package.json comme
     // racine et cherche les modules dans /home/alobo/Bureau/node_modules (inexistant).
