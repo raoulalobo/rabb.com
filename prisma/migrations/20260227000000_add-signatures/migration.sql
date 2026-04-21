@@ -1,0 +1,1 @@
+-- Already applied in DB, migration file was lost
