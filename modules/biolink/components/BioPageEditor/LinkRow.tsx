@@ -44,6 +44,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { deleteBioLink } from '@/modules/biolink/actions/delete-biolink.action'
 import { updateBioLink } from '@/modules/biolink/actions/update-biolink.action'
+import type { BioLinkInput } from '@/modules/biolink/schemas/biopage.schema'
 
 import type { BioLink } from '@prisma/client'
 
@@ -54,6 +55,14 @@ interface LinkRowProps {
   link: BioLink
   /** Callback post-mutation — typiquement router.refresh() */
   onMutation: () => void
+  /**
+   * Indique que ce lien vient d'être créé — déclenche un focus automatique
+   * sur l'input URL + un scrollIntoView centré au mount. Le parent
+   * (`LinksSection`) passe `true` uniquement pour le lien fraîchement
+   * créé, et reset à `false` ~500ms plus tard pour éviter un refocus
+   * lors d'un re-render ultérieur.
+   */
+  isNew?: boolean
 }
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -71,7 +80,11 @@ const AUTO_SAVE_DEBOUNCE_MS = 700
  * @param props.onMutation - Callback invoqué après chaque mutation réussie
  * @returns Row éditable positionnée par @dnd-kit/sortable
  */
-export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
+export function LinkRow({
+  link,
+  onMutation,
+  isNew = false,
+}: LinkRowProps): React.JSX.Element {
   // ── État local synchronisé avec la prop `link` ──────────────────────────
   const [title, setTitle] = useState<string>(link.title)
   const [url, setUrl] = useState<string>(link.url ?? '')
@@ -85,7 +98,27 @@ export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
   const [isDeleting, startDeleting] = useTransition()
 
   // Timeout en cours pour le debounced save — annulé à chaque nouvelle frappe
+  // ou lors d'un saveNow (toggle, select) pour éviter un double update.
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * Ref sur l'input URL — utilisée quand `isNew=true` pour focus/scroll/select-all
+   * automatiques au mount (UX : l'user tape directement l'URL après avoir cliqué
+   * sur "Ajouter un lien", sans avoir à scroller ou cliquer dans le champ).
+   */
+  const urlInputRef = useRef<HTMLInputElement | null>(null)
+
+  /**
+   * Accumulateur des champs modifiés mais pas encore persistés.
+   * Chaque `scheduleSave(patch)` fusionne dans ce ref, et le flush envoie
+   * l'ensemble en UN SEUL appel `updateBioLink`. Ça corrige le bug où taper
+   * dans `title` puis `url` écrasait le premier champ (seul le dernier patch
+   * était envoyé).
+   *
+   * Typé en `Partial<BioLinkInput>` pour matcher exactement le payload attendu
+   * par la Server Action (qui valide ensuite via BioLinkSchema.partial()).
+   */
+  const dirtyRef = useRef<Partial<BioLinkInput>>({})
 
   // Snapshot des valeurs déjà persistées — pour éviter des saves inutiles
   const persistedRef = useRef({
@@ -108,37 +141,56 @@ export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
     opacity: isDragging ? 0.5 : 1,
   }
 
-  // ── Save debounced ─────────────────────────────────────────────────────
+  // ── Save coalescé ──────────────────────────────────────────────────────
   /**
-   * Persiste un champ après debounce. Utilisé par les inputs texte.
-   * On compare avec persistedRef pour éviter de déclencher un update inutile.
+   * Flushe tous les champs accumulés dans `dirtyRef` en UN SEUL appel
+   * `updateBioLink`. Appelé soit par le timer debounce (`scheduleSave`),
+   * soit directement par `saveNow` (toggle/select).
+   *
+   * - Si le ref est vide → no-op (évite un round-trip inutile).
+   * - Reset du ref AVANT l'appel serveur pour que de nouvelles frappes
+   *   pendant la requête ne soient pas effacées par le prochain flush.
    */
-  const scheduleSave = (payload: Partial<BioLink>): void => {
+  const flush = (): void => {
+    // Toujours couper le timer en cours — flush peut être appelé hors timer.
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+    const patch = dirtyRef.current
+    // Reset : une frappe pendant le save n'est pas écrasée par le prochain flush.
+    dirtyRef.current = {}
+    if (Object.keys(patch).length === 0) return
+
+    startSaving(async () => {
+      // Payload coalescé envoyé tel quel — la Server Action valide via
+      // BioLinkSchema.partial() côté serveur (source de vérité de la forme).
+      const res = await updateBioLink(link.id, patch)
+      if (!res.success) {
+        toast.error(res.error)
+        return
+      }
+      // Met à jour le snapshot persisté pour les prochaines comparaisons
+      persistedRef.current = {
+        title: res.data.title,
+        url: res.data.url ?? '',
+        eyebrow: res.data.eyebrow ?? '',
+        kind: res.data.kind,
+        isActive: res.data.isActive,
+      }
+      onMutation()
+    })
+  }
+
+  /**
+   * Planifie un save debounced. Accumule le patch dans `dirtyRef` puis (re)arme
+   * le timer. Si l'user tape dans plusieurs champs successifs, tous les champs
+   * seront présents dans le patch final — aucun n'est écrasé.
+   */
+  const scheduleSave = (patch: Partial<BioLinkInput>): void => {
+    Object.assign(dirtyRef.current, patch)
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
-    saveTimeoutRef.current = setTimeout(() => {
-      startSaving(async () => {
-        const res = await updateBioLink(link.id, {
-          title: payload.title,
-          url: payload.url ?? undefined,
-          eyebrow: payload.eyebrow ?? undefined,
-          kind: payload.kind as 'primary' | 'glass' | undefined,
-          isActive: payload.isActive,
-        })
-        if (!res.success) {
-          toast.error(res.error)
-          return
-        }
-        // Met à jour le snapshot persisté pour les prochaines comparaisons
-        persistedRef.current = {
-          title: res.data.title,
-          url: res.data.url ?? '',
-          eyebrow: res.data.eyebrow ?? '',
-          kind: res.data.kind,
-          isActive: res.data.isActive,
-        }
-        onMutation()
-      })
-    }, AUTO_SAVE_DEBOUNCE_MS)
+    saveTimeoutRef.current = setTimeout(flush, AUTO_SAVE_DEBOUNCE_MS)
   }
 
   // Nettoyage du timeout quand la row est démontée
@@ -149,22 +201,32 @@ export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
   }, [])
 
   /**
+   * Focus + scroll + select-all sur l'input URL au mount si la row est marquée
+   * `isNew` (lien fraîchement créé via le bouton "Ajouter"). Ne s'exécute qu'une
+   * seule fois — le parent reset `isNew` à false ~500ms plus tard, mais cet
+   * effet a déjà tourné avec la valeur initiale.
+   */
+  useEffect(() => {
+    if (!isNew) return
+    const input = urlInputRef.current
+    if (!input) return
+    input.focus()
+    input.select()
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Tableau de dépendances vide volontaire : focus au mount uniquement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /**
    * Save immédiat (sans debounce) pour les toggles et selects — ces actions
    * sont intentionnelles et on veut un feedback immédiat.
+   * Fusionne le patch dans `dirtyRef` et déclenche flush — ça annule aussi
+   * le debounce d'une frappe en cours (ex: user tape dans `title` puis
+   * toggle `isActive` → on envoie un seul update avec les deux champs).
    */
-  const saveNow = async (payload: Partial<BioLink>): Promise<void> => {
-    const res = await updateBioLink(link.id, {
-      title: payload.title,
-      url: payload.url ?? undefined,
-      eyebrow: payload.eyebrow ?? undefined,
-      kind: payload.kind as 'primary' | 'glass' | undefined,
-      isActive: payload.isActive,
-    })
-    if (!res.success) {
-      toast.error(res.error)
-      return
-    }
-    onMutation()
+  const saveNow = (patch: Partial<BioLinkInput>): void => {
+    Object.assign(dirtyRef.current, patch)
+    flush()
   }
 
   /**
@@ -224,11 +286,15 @@ export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
           />
         </div>
         <Input
+          ref={urlInputRef}
           value={url}
           onChange={(e) => {
             setUrl(e.target.value)
             scheduleSave({ url: e.target.value })
           }}
+          // Sélectionne tout le texte au focus → l'user tape par-dessus la
+          // valeur par défaut (https://example.com) sans devoir effacer.
+          onFocus={(e) => e.target.select()}
           placeholder="https://..."
           type="url"
         />
@@ -242,7 +308,7 @@ export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
               onValueChange={(v) => {
                 const next = v as 'primary' | 'glass'
                 setKind(next)
-                void saveNow({ kind: next })
+                saveNow({ kind: next })
               }}
             >
               <SelectTrigger className="h-8 w-32">
@@ -262,7 +328,7 @@ export function LinkRow({ link, onMutation }: LinkRowProps): React.JSX.Element {
               checked={isActive}
               onCheckedChange={(checked) => {
                 setIsActive(checked)
-                void saveNow({ isActive: checked })
+                saveNow({ isActive: checked })
               }}
             />
           </div>

@@ -85,6 +85,14 @@ export function LinksSection({
 
   const [isAdding, startAdding] = useTransition()
 
+  /**
+   * ID du lien fraîchement créé — passé en prop `isNew` au `LinkRow` correspondant
+   * pour qu'il déclenche un focus + scroll sur son input URL au mount.
+   * Reset après un court délai pour éviter un refocus lors de re-renders ultérieurs
+   * (ex: `router.refresh()` déclenche un re-render — on ne veut pas refocus).
+   */
+  const [newLinkId, setNewLinkId] = useState<string | null>(null)
+
   // Configuration des sensors — Pointer pour souris/tactile, Keyboard pour a11y
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -148,6 +156,10 @@ export function LinksSection({
         return
       }
       toast.success('Lien ajouté')
+      // Mémorise l'ID pour déclencher le focus + scroll dans le LinkRow cible,
+      // puis reset après 500ms pour ne pas refocus lors d'un re-render ultérieur.
+      setNewLinkId(res.data.id)
+      window.setTimeout(() => setNewLinkId(null), 500)
       onMutation()
     })
   }
@@ -178,7 +190,12 @@ export function LinksSection({
             >
               <div className="space-y-2">
                 {links.map((link) => (
-                  <LinkRow key={link.id} link={link} onMutation={onMutation} />
+                  <LinkRow
+                    key={link.id}
+                    link={link}
+                    onMutation={onMutation}
+                    isNew={link.id === newLinkId}
+                  />
                 ))}
               </div>
             </SortableContext>

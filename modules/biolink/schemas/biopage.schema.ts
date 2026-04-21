@@ -72,22 +72,36 @@ export const BioPageInfosSchema = z.object({
     .min(1, 'Le titre est requis')
     .max(MAX_TITLE_LENGTH, `Le titre ne doit pas dépasser ${MAX_TITLE_LENGTH} caractères`),
 
-  /** Bio courte affichée sous le titre — optionnelle */
+  /**
+   * Bio courte affichée sous le titre — optionnelle.
+   * `nullable()` : l'utilisateur peut explicitement vider le champ (UI envoie `null`)
+   * pour effacer une valeur déjà persistée en DB.
+   * `optional()` : le champ peut être totalement absent du payload (update partiel).
+   */
   bio: z
     .string()
     .max(MAX_BIO_LENGTH, `La bio ne doit pas dépasser ${MAX_BIO_LENGTH} caractères`)
+    .nullable()
     .optional(),
 
-  /** Handle visible en haut à gauche (sans le @) — optionnel, fallback `@{slug}` */
+  /**
+   * Handle visible en haut à gauche (sans le @) — optionnel, fallback `@{slug}`.
+   * Nullable pour permettre un reset volontaire depuis l'éditeur.
+   */
   handle: z
     .string()
     .max(MAX_HANDLE_LENGTH, `Le handle ne doit pas dépasser ${MAX_HANDLE_LENGTH} caractères`)
+    .nullable()
     .optional(),
 
-  /** Phrase d'intro du panneau frosted desktop — optionnelle */
+  /**
+   * Phrase d'intro du panneau frosted desktop — optionnelle.
+   * Nullable pour permettre un reset volontaire depuis l'éditeur.
+   */
   tagline: z
     .string()
     .max(MAX_TAGLINE_LENGTH, `La tagline ne doit pas dépasser ${MAX_TAGLINE_LENGTH} caractères`)
+    .nullable()
     .optional(),
 
   /** Slug URL (ex: "mimisara" pour /u/mimisara) — unique en DB */

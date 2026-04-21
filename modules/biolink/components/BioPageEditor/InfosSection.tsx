@@ -27,6 +27,7 @@
 'use client'
 
 import { Check, Loader2, Upload, X } from 'lucide-react'
+import Image from 'next/image'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 
@@ -150,17 +151,22 @@ export function InfosSection({
   /**
    * Enregistre les champs textuels (title, bio, handle, tagline) en un seul
    * appel Server Action. Le slug et l'avatar ont leurs propres actions.
+   *
+   * Convention de reset (null vs undefined) :
+   * - `title` est NOT NULL en DB → toujours string (refus si vide côté Zod).
+   * - Les autres champs optionnels vidés en UI → envoyés en `null` pour
+   *   que Prisma écrive explicitement `NULL` dans la colonne (reset volontaire).
+   *   Sans ça (avec `undefined`), Prisma ignorerait simplement la clé et la
+   *   valeur précédente resterait en DB — l'user ne pourrait plus vider un
+   *   champ une fois rempli.
    */
   const handleSaveInfos = (): void => {
     startSavingInfos(async () => {
       const res = await updateBioPage({
         title: title.trim(),
-        // Les champs optionnels vides en UI → on envoie `undefined` pour ne
-        // pas toucher la DB (on garde la valeur actuelle). Un reset nécessite
-        // une UX dédiée qu'on n'exposera pas au MVP.
-        bio: bio.trim() === '' ? undefined : bio.trim(),
-        handle: handle.trim() === '' ? undefined : handle.trim(),
-        tagline: tagline.trim() === '' ? undefined : tagline.trim(),
+        bio: bio.trim() === '' ? null : bio.trim(),
+        handle: handle.trim() === '' ? null : handle.trim(),
+        tagline: tagline.trim() === '' ? null : tagline.trim(),
       })
       if (!res.success) {
         toast.error(res.error)
@@ -245,10 +251,18 @@ export function InfosSection({
         {/* ── Avatar ─────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-4">
           {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- image externe Supabase
-            <img
+            // `next/image` avec `unoptimized` : bypasse l'optimiseur Next
+            // (dépend de `images.remotePatterns` dans next.config.ts pour les
+            // domaines Supabase). Pour un avatar 64px, le gain d'optimisation
+            // serait négligeable ; on privilégie ici la simplicité de config.
+            // Si la conf `next.config.ts` est étendue plus tard pour autoriser
+            // `*.supabase.co`, on pourra retirer `unoptimized`.
+            <Image
               src={avatarUrl}
               alt="Avatar"
+              width={64}
+              height={64}
+              unoptimized
               className="size-16 rounded-full object-cover border"
             />
           ) : (

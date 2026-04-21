@@ -260,6 +260,13 @@ export function ShareSection({
                   key={`mobile-${iframeKey}`}
                   src={previewPath}
                   title="Aperçu mobile"
+                  // `sandbox` restreint ce que le contenu de la preview peut faire :
+                  // - allow-scripts : nécessaire pour hydrater React côté page publique
+                  // - allow-same-origin : nécessaire pour que le cookie better-auth
+                  //   soit envoyé (sinon `?preview=1` renverrait une page anonyme)
+                  // On NE met volontairement PAS allow-forms / allow-popups / allow-top-navigation
+                  // → la preview ne peut pas faire naviguer la page parente ni ouvrir des popups.
+                  sandbox="allow-scripts allow-same-origin"
                   className="rounded-xl border bg-background"
                   style={{ width: MOBILE_WIDTH_PX, height: 720 }}
                 />
@@ -272,6 +279,8 @@ export function ShareSection({
                 key={`desktop-${iframeKey}`}
                 src={previewPath}
                 title="Aperçu desktop"
+                // Même sandbox que la preview mobile — voir commentaire ci-dessus.
+                sandbox="allow-scripts allow-same-origin"
                 className="h-[720px] w-full rounded-lg border bg-background"
               />
             </TabsContent>

@@ -85,7 +85,11 @@ export async function updateBioPage(
     }
 
     // ── Mise à jour : on ne passe que les champs explicitement fournis ────────
-    // parsed.data peut contenir des clés à undefined → on les filtre.
+    // Distinction critique :
+    // - `undefined` → champ absent du payload, on ne touche pas la colonne DB
+    // - `null`      → reset volontaire, Prisma écrit `NULL` dans la colonne
+    // Cette logique permet à l'éditeur d'effacer un champ déjà rempli
+    // (ex: bio déjà saisie → textarea vidé → on veut persister l'effacement).
     const updateData: Record<string, unknown> = {}
     if (parsed.data.title !== undefined) updateData.title = parsed.data.title
     if (parsed.data.bio !== undefined) updateData.bio = parsed.data.bio
