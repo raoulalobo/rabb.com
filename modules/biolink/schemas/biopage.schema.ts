@@ -198,3 +198,69 @@ export const BioAppearanceSchema = z.object({
 
 /** Type inféré — apparence (couleurs) d'une BioPage */
 export type BioAppearance = z.infer<typeof BioAppearanceSchema>
+
+// ─── Schéma : réseaux sociaux (socialLinks JSON) ──────────────────────────────
+
+/**
+ * Plateformes sociales supportées (stockées en DB dans BioPage.socialLinks JSON).
+ * Le mapper `normalizeSocialKind` accepte aussi les alias ("instagram" → "ig"),
+ * mais depuis l'éditeur on écrit toujours la forme courte canonique.
+ */
+const SOCIAL_PLATFORMS = ['ig', 'tt', 'yt', 'fb', 'mail'] as const
+
+/** Regex email simple utilisé pour les entrées 'mail' (on préfixe `mailto:` côté action) */
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * Schéma d'UN lien social (entrée de l'array `BioPage.socialLinks`).
+ *
+ * L'URL est validée différemment selon la plateforme :
+ * - `mail` → format email (le `mailto:` est ajouté côté action avant persist)
+ * - autres → URL http/https classique
+ *
+ * @example
+ *   BioSocialItemSchema.parse({ platform: 'ig', url: 'https://instagram.com/mimimaze' })
+ *   BioSocialItemSchema.parse({ platform: 'mail', url: 'hello@mimisara.com' })
+ */
+export const BioSocialItemSchema = z
+  .object({
+    /** Plateforme canonique (ig / tt / yt / fb / mail) */
+    platform: z.enum(SOCIAL_PLATFORMS),
+    /** URL du profil ou email brut (sans `mailto:`) */
+    url: z.string().min(1, 'URL requise'),
+    /** Label d'accessibilité optionnel (fallback au nom de la plateforme si absent) */
+    label: z.string().max(40).optional(),
+  })
+  // ── Validation 1 : si plateforme = mail, l'URL doit être un email valide ──
+  .refine(
+    (data: { platform: string; url: string }) =>
+      data.platform !== 'mail' || EMAIL_REGEX.test(data.url),
+    { message: 'Email invalide (ex: hello@domaine.com)', path: ['url'] },
+  )
+  // ── Validation 2 : autres plateformes → URL http(s) parseable ─────────────
+  .refine(
+    (data: { platform: string; url: string }) => {
+      if (data.platform === 'mail') return true
+      try {
+        const parsed = new URL(data.url)
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+      } catch {
+        return false
+      }
+    },
+    { message: 'URL invalide (doit commencer par http:// ou https://)', path: ['url'] },
+  )
+
+/**
+ * Schéma de l'array complet des socialLinks — envoyé tel quel à la Server Action
+ * `updateBioPageSocials()` qui remplace intégralement `BioPage.socialLinks` en DB.
+ *
+ * L'éditeur filtre les entrées à URL vide AVANT d'envoyer, donc on ne valide que
+ * des entrées non-vides ici. Max 5 entrées (une par plateforme supportée).
+ */
+export const BioSocialsSchema = z.array(BioSocialItemSchema).max(SOCIAL_PLATFORMS.length)
+
+/** Type inféré — une entrée sociale */
+export type BioSocialItem = z.infer<typeof BioSocialItemSchema>
+/** Type inféré — liste des socials persistée */
+export type BioSocialsInput = z.infer<typeof BioSocialsSchema>

@@ -3,9 +3,10 @@
  * @module biolink/components/BioPageEditor
  * @description Composant orchestrateur de l'éditeur de BioPage (compound).
  *
- *   Agence les 4 sections en **onglets** :
+ *   Agence les 5 sections en **onglets** :
  *   - Infos      — titre, bio, handle, tagline, slug, avatar
  *   - Apparence  — couleurs accent/title/bio/link
+ *   - Réseaux    — IG / TT / YT / FB / Mail (icônes sous la bio)
  *   - Liens      — liste triable de BioLinks
  *   - Partage    — URL publique, publication, QR, preview iframe
  *
@@ -30,7 +31,9 @@ import { AppearanceSection } from './AppearanceSection'
 import { InfosSection } from './InfosSection'
 import { LinksSection } from './LinksSection'
 import { ShareSection } from './ShareSection'
+import { SocialsSection } from './SocialsSection'
 
+import type { BioSocialItem } from '@/modules/biolink/schemas/biopage.schema'
 import type { BioLink, BioPage } from '@prisma/client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -46,6 +49,44 @@ export interface BioPageEditorInitialData extends BioPage {
 interface BioPageEditorProps {
   /** Données de la BioPage + liens, telles que chargées par le Server Component parent */
   initialData: BioPageEditorInitialData
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Parse défensif du champ `BioPage.socialLinks` (JSON Prisma) en array typé
+ * `BioSocialItem[]`. Côté DB le champ est `Json @default("[]")` mais Prisma
+ * le remonte en `JsonValue` (union très large) — on filtre ici les entrées
+ * malformées pour ne passer à `SocialsSection` que ce qu'il accepte.
+ *
+ * @param raw - Valeur `socialLinks` telle que renvoyée par Prisma
+ * @returns Array filtré ne contenant que des entrées `{ platform, url, label? }` valides
+ */
+function parseInitialSocials(raw: unknown): BioSocialItem[] {
+  if (!Array.isArray(raw)) return []
+  const result: BioSocialItem[] = []
+  for (const entry of raw) {
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      typeof (entry as { platform?: unknown }).platform !== 'string' ||
+      typeof (entry as { url?: unknown }).url !== 'string'
+    ) {
+      continue
+    }
+    const platform = (entry as { platform: string }).platform
+    // Ne garder que les plateformes canoniques reconnues par l'éditeur
+    if (platform !== 'ig' && platform !== 'tt' && platform !== 'yt' && platform !== 'fb' && platform !== 'mail') {
+      continue
+    }
+    const typed = entry as { platform: typeof platform; url: string; label?: unknown }
+    result.push({
+      platform,
+      url: typed.url,
+      label: typeof typed.label === 'string' ? typed.label : undefined,
+    })
+  }
+  return result
 }
 
 // ─── Composant ───────────────────────────────────────────────────────────────
@@ -98,6 +139,7 @@ export function BioPageEditor({
         <TabsList>
           <TabsTrigger value="infos">Infos</TabsTrigger>
           <TabsTrigger value="appearance">Apparence</TabsTrigger>
+          <TabsTrigger value="socials">Réseaux</TabsTrigger>
           <TabsTrigger value="links">Liens</TabsTrigger>
           <TabsTrigger value="share">Partage</TabsTrigger>
         </TabsList>
@@ -124,6 +166,13 @@ export function BioPageEditor({
               bioColor: initialData.bioColor,
               linkColor: initialData.linkColor,
             }}
+            onMutation={handleMutation}
+          />
+        </TabsContent>
+
+        <TabsContent value="socials">
+          <SocialsSection
+            initialSocials={parseInitialSocials(initialData.socialLinks)}
             onMutation={handleMutation}
           />
         </TabsContent>
