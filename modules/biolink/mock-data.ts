@@ -61,7 +61,9 @@ export const MIMI_SARA_MOCK: BioPageData = {
   //   Titre "Je découvre des héros africains" repris du design handoff —
   //   à confirmer / modifier par la cliente si besoin.
   // - 02 Boutique      : https://www.laboutiquedosy.com
-  // SkinCare retiré (pas de ressource associée).
+  // - 03 Livre Skincare (ajouté 2026-06-26) : ASIN B0H69Z1S6T
+  //   URL nettoyée de ses paramètres de tracking → fiche produit canonique
+  //   https://www.amazon.fr/dp/B0H69Z1S6T (forme courte stable Amazon).
   links: [
     {
       label: 'Je découvre des héros africains',
@@ -74,6 +76,12 @@ export const MIMI_SARA_MOCK: BioPageData = {
       eyebrow: 'Ma boutique',
       kind: 'glass',
       href: 'https://www.laboutiquedosy.com',
+    },
+    {
+      label: 'Skincare Visage Pro — Éclatante sans maquillage',
+      eyebrow: 'Mon livre skincare',
+      kind: 'glass',
+      href: 'https://www.amazon.fr/dp/B0H69Z1S6T',
     },
   ],
   footerBrand: '© 2026 Mimi Sara',
